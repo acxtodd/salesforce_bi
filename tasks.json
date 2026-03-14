@@ -10,12 +10,12 @@
           "id": "0.1",
           "title": "Set up Turbopuffer account and API access",
           "description": "Sign up for Turbopuffer Launch plan ($64/mo). Obtain API key. Verify connectivity from local dev environment.",
-          "status": "pending",
-          "owner": "",
+          "status": "completed",
+          "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
-          "startedAt": null,
-          "completedAt": null,
+          "updatedAt": "2026-03-14T20:58:18.163127+00:00",
+          "startedAt": "2026-03-14T20:58:18.036762+00:00",
+          "completedAt": "2026-03-14T20:58:18.162925+00:00",
           "depends_on": [],
           "acceptance_criteria": [
             "Turbopuffer account created on Launch plan",
@@ -23,9 +23,24 @@
             "Can create and query a test namespace from Python"
           ],
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "dbaf349"
+          ],
           "pull_requests": [],
-          "progress_notes": []
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-14T20:58:18.036998+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-14T20:58:18.099682+00:00",
+              "note": "Turbopuffer Launch plan active. API key verified via smoke test (write, query, delete_all). Key stored in AWS Secrets Manager at salesforce-ai-search/turbopuffer-api-key and in local .env. SDK v1.17 uses Turbopuffer(region=) client, ns.write(upsert_rows=), ns.query(rank_by=). Row attributes are top-level fields (row.name, not row.attributes)."
+            },
+            {
+              "timestamp": "2026-03-14T20:58:18.163131+00:00",
+              "note": "Task completed, commit: dbaf349"
+            }
+          ]
         },
         {
           "id": "0.2",

@@ -18,6 +18,7 @@ venv/
 
 # Environment & Secrets
 .env
+.env.example
 .env.local
 .env.*.local
 salesforce/deployment-config.json

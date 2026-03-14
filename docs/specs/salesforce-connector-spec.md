@@ -953,21 +953,25 @@ Target:   CDC → Transform+Denormalize → Embed → Upsert
 
 ## 11. Permission Model
 
-### POC: Per-User OAuth (Notion's approach)
+### POC: Org-Level Connected App (No Per-User Auth)
 
-Each user authenticates to Salesforce via OAuth. Permission-sensitive queries run live SOQL as that user. Indexed search has no per-user auth filters — it returns all data in the org's namespace.
+The POC authenticates to Salesforce via an org-level Connected App (Client Credentials flow). All indexed data is visible to all users of that org. There is no per-user permission enforcement and no `live_salesforce_query` tool — the POC validates search quality and cost, not authorization.
 
 | Aspect | Behavior |
 |--------|----------|
 | Indexed search | Returns all org data regardless of user permissions |
-| Live SOQL queries | Execute as the authenticated user — full Salesforce permission enforcement |
-| Mitigation | For queries that might surface restricted records, prefer `live_salesforce_query` tool. System prompt guides this. |
+| Live SOQL queries | Not available in POC |
+| Tenant isolation | Structural — namespace-per-org, no cross-org data leakage |
 
-**Why this is acceptable for POC:** It is exactly what Notion ships for their Salesforce AI Connector at enterprise scale. It avoids the complexity of sharing bucket computation (which is incomplete and brittle in the current system anyway). It is honest about what it does and does not enforce.
+### v1: Per-User OAuth (Notion's approach)
 
-### v1: Push Permissions Into Indexed Search
+Post-POC, add per-user OAuth so each user authenticates individually to Salesforce. Permission-sensitive queries run live SOQL as that user via the `live_salesforce_query` tool. This is the pattern Notion ships for their Salesforce AI Connector at enterprise scale.
 
-Post-POC, evaluate adding attribute-based permission filtering to indexed documents:
+**Why deferred from POC:** Per-user OAuth requires Salesforce Connected App configuration, token management, and the `live_salesforce_query` tool implementation. These are independently valuable but not needed to validate the core search architecture.
+
+### v2: Push Permissions Into Indexed Search
+
+Post-v1, evaluate adding attribute-based permission filtering to indexed documents:
 
 - Store `owner_role_hierarchy` and `record_type` on documents.
 - Filter at query time by the user's role.
@@ -1286,7 +1290,7 @@ This section documents where the source PRD and PDR disagreed, and how this unif
 
 | Tension | Resolution |
 |---------|-----------|
-| **Permission emphasis** (PRD: push down; PDR: per-user OAuth) | Per-user OAuth for POC. Attribute-based filtering evaluated for v1. |
+| **Permission emphasis** (PRD: push down; PDR: per-user OAuth) | No per-user auth in POC (org-level Connected App). Per-user OAuth in v1. Attribute-based index filtering evaluated for v2. |
 | **Migration philosophy** (PRD: incremental; PDR: parallel build) | Parallel POC build. Shadow-read validation in Phase 5 before cutover. |
 | **Success metrics precision** (PRD: qualitative; PDR: quantitative) | Use PDR's quantitative targets. Tighten acceptance threshold to ≥83% (no regression). |
 | **CDC mechanism** (PRD: silent; PDR: Platform Events) | Platform Events for POC. AppFlow as fallback at scale. |
@@ -1314,7 +1318,7 @@ Decisions made in this spec. Each has an ID for cross-reference.
 | **D-04** | `SearchBackend` protocol with Turbopuffer implementation | Prevents vendor coupling (lesson learned from Bedrock KB). Thin ABC adds ~1 day of effort. | Easy — swap implementation to any vector database. |
 | **D-05** | Parallel POC build, not incremental migration | Existing orchestration is too coupled to Bedrock KB/OpenSearch to migrate incrementally. Parallel build is faster and cleaner. Shadow-reads validate in Phase 5. | Hard — switching to incremental migration would require untangling the existing system first. |
 | **D-06** | LLM tool-use as orchestration layer | Claude's tool-use accuracy is high for structured search tools. Parallel tool calls map naturally to cross-object queries. Replaces ~4 custom routing modules. | Medium — could reintroduce explicit planner if LLM tool selection proves unreliable on CRE domain. |
-| **D-07** | Per-user OAuth for permissions (POC) | Matches Notion's production pattern. Avoids sharing bucket complexity. Honest about enforcement boundaries. | Easy — add attribute-based filtering in v1 for stricter enforcement. |
+| **D-07** | No per-user auth in POC; per-user OAuth deferred to v1 | POC validates search quality and cost, not authorization. Org-level Connected App is sufficient. Per-user OAuth (Notion's pattern) and `live_salesforce_query` tool added in v1. | Easy — add per-user OAuth when auth is in scope. |
 | **D-08** | Platform Events for CDC (POC) | Simpler than AppFlow pipeline. Fewer moving parts. Sufficient for POC volume. | Easy — switch to AppFlow at scale (current system already has it). |
 | **D-09** | ≥83% acceptance test pass rate (no regression) | Current system achieves 83%. Allowing regression undermines the case for migration regardless of cost savings. | N/A — this is a success criterion, not a design decision. |
 | **D-10** | 3 objects for POC (Property, Lease, Availability) | These cover the highest-value CRE queries (space search, lease comps, availability). Minimizes denormalization work while proving the pattern. | Easy — add Sale and Deal in Phase 5. |

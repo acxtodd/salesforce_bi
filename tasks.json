@@ -114,29 +114,91 @@
         {
           "id": "0.4",
           "title": "Build bulk loader",
-          "description": "Script that reads the denorm config YAML, exports records from Salesforce via Bulk API 2.0, denormalizes per config, generates text representations, embeds via Bedrock Titan v2, and batch upserts to Turbopuffer via SearchBackend. Target objects: Property, Lease, Availability.",
+          "description": "Orchestrator task — split into subtasks 0.4.1 through 0.4.3.",
           "status": "pending",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T22:26:59.800769+00:00",
           "startedAt": null,
           "completedAt": null,
           "depends_on": [
             "0.2",
             "0.3"
           ],
-          "acceptance_criteria": [
-            "Exports Property, Lease, Availability from Salesforce sandbox via Bulk API 2.0",
-            "Denormalizes records per YAML config (parent fields inlined on children)",
-            "Generates text representation per record from embed_fields",
-            "Embeds via Bedrock Titan v2 (1024-dim)",
-            "Batch upserts to Turbopuffer namespace org_{salesforce_org_id}",
-            "Reports record counts and timing on completion"
-          ],
+          "acceptance_criteria": [],
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": []
+        },
+        {
+          "id": "0.4.1",
+          "title": "Salesforce export + denormalization",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-14T22:26:59.868795+00:00",
+          "updatedAt": "2026-03-14T22:26:59.987874+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "parent": "0.4",
+          "description": "Script that reads denorm_config.yaml, connects to Salesforce sandbox via Bulk API 2.0, exports Property/Lease/Availability records, and denormalizes (inline parent fields per config). Output: list of flat dicts ready for embedding. Reuse transform logic from lambda/transform/ and batch export patterns from salesforce/classes/AISearchBatchExport.cls.",
+          "acceptance_criteria": [
+            "Reads denorm_config.yaml to determine fields and parent relationships",
+            "Connects to Salesforce sandbox via Bulk API 2.0 (simple_salesforce)",
+            "Exports all records for Property, Lease, Availability",
+            "Denormalizes child records by querying parent fields inline",
+            "Outputs list of flat dicts with all embed_fields and metadata_fields populated"
+          ]
+        },
+        {
+          "id": "0.4.2",
+          "title": "Embedding + Turbopuffer upsert",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-14T22:27:00.062353+00:00",
+          "updatedAt": "2026-03-14T22:27:00.247708+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "parent": "0.4",
+          "description": "Takes flat dicts from 0.4.1, generates text representation from embed_fields, calls Bedrock Titan v2 for 1024-dim embeddings, and batch upserts via SearchBackend.upsert() with schema declaring text field as full_text_search:true. Must handle batching (Turbopuffer max batch size) and rate limiting (Bedrock throttling).",
+          "acceptance_criteria": [
+            "Generates text representation by concatenating embed_fields per record",
+            "Calls Bedrock Titan v2 for 1024-dim embeddings with batching",
+            "Upserts via SearchBackend.upsert() with schema={text: {type: string, full_text_search: true}}",
+            "Handles Bedrock rate limiting with backoff",
+            "Handles Turbopuffer batch size limits",
+            "Reports record counts, embedding time, and upsert time"
+          ],
+          "depends_on": [
+            "0.4.1"
+          ]
+        },
+        {
+          "id": "0.4.3",
+          "title": "Bulk loader CLI wrapper",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-14T22:27:00.323350+00:00",
+          "updatedAt": "2026-03-14T22:27:00.503380+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "parent": "0.4",
+          "description": "CLI script (scripts/bulk_load.py) that wires 0.4.1 and 0.4.2 together. Accepts --config, --objects, --namespace, --dry-run flags. Dry-run mode exports and denormalizes but skips embedding/upsert (for validation). Reports total timing and record counts.",
+          "acceptance_criteria": [
+            "CLI with --config (YAML path), --objects, --namespace (default: org_{org_id}), --dry-run",
+            "Dry-run exports and denormalizes without embedding or upserting",
+            "Full run does export → denormalize → embed → upsert end-to-end",
+            "Reports total records, total time, records/sec"
+          ],
+          "depends_on": [
+            "0.4.2"
+          ]
         },
         {
           "id": "0.5",
@@ -145,18 +207,20 @@
           "status": "pending",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T22:28:30.658107+00:00",
           "startedAt": null,
           "completedAt": null,
           "depends_on": [
             "0.4"
           ],
           "acceptance_criteria": [
+            "Create scripts/validate_data.py that runs a standard set of queries against the loaded namespace",
             "Metadata filter query returns correct results (e.g., property_type=Office AND city=Dallas)",
             "Hybrid BM25+vector query returns semantically relevant results",
             "Aggregation query (count by property_class) matches Salesforce record counts",
             "Warm query latency <50ms after initial cold query",
-            "All denormalized parent fields present on child documents"
+            "All denormalized parent fields present on child documents",
+            "This script becomes the canonical data validation entry point for 3.1"
           ],
           "files_modified": [],
           "commits": [],
@@ -174,27 +238,95 @@
         {
           "id": "1.1",
           "title": "Write query Lambda with Claude tool-use",
-          "description": "Single Lambda function: accepts user question + org context, calls Claude Sonnet 4 with tool definitions (search_records, aggregate_records), translates tool calls to SearchBackend method calls, returns tool results to Claude, streams synthesized answer via SSE. See spec §9 for tool definitions and SearchBackend mapping.",
+          "description": "Orchestrator task — split into subtasks 1.1.1 through 1.1.3.",
           "status": "pending",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T22:27:23.764637+00:00",
           "startedAt": null,
           "completedAt": null,
           "depends_on": [
             "0.5"
           ],
-          "acceptance_criteria": [
-            "Lambda accepts POST with {question, org_id, session_id}",
-            "Calls Claude Sonnet 4 via Bedrock with search_records and aggregate_records tool definitions",
-            "Translates tool calls to SearchBackend.search() and SearchBackend.aggregate()",
-            "Streams answer via SSE (Server-Sent Events)",
-            "Includes citations with record name and ID in response"
-          ],
+          "acceptance_criteria": [],
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": []
+        },
+        {
+          "id": "1.1.1",
+          "title": "Tool dispatch: translate tool calls to SearchBackend",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-14T22:27:23.839573+00:00",
+          "updatedAt": "2026-03-14T22:27:23.970995+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "parent": "1.1",
+          "description": "Module that receives Claude tool-call JSON (search_records or aggregate_records), validates field names against denorm config, translates to SearchBackend.search() or SearchBackend.aggregate() calls, and returns results as tool-response JSON. Pure function, no network — takes a SearchBackend instance as a dependency. This is the seam between Claude and Turbopuffer.",
+          "acceptance_criteria": [
+            "Accepts tool-call dict with name and parameters",
+            "Validates filter field names against a known field set (from denorm config)",
+            "Translates search_records → SearchBackend.search()",
+            "Translates aggregate_records → SearchBackend.aggregate()",
+            "Returns tool-response dict with results array",
+            "Rejects unknown tool names with clear error",
+            "Unit testable with mock SearchBackend (no network)"
+          ]
+        },
+        {
+          "id": "1.1.2",
+          "title": "Claude tool-use conversation loop",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-14T22:27:24.051384+00:00",
+          "updatedAt": "2026-03-14T22:27:24.241471+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "parent": "1.1",
+          "description": "Core query handler: takes a user question + org namespace, calls Claude Sonnet 4 via Bedrock with system prompt and tool definitions, dispatches tool calls through 1.1.1, feeds results back to Claude, and collects the final synthesis. Handles multi-turn (sequential tool calls) and parallel tool calls. Does NOT handle streaming yet — returns the complete response.",
+          "acceptance_criteria": [
+            "Calls Claude Sonnet 4 via Bedrock Converse API with tool definitions",
+            "Handles single tool call → result → synthesis",
+            "Handles parallel tool calls (multiple search_records in one turn)",
+            "Handles sequential tool calls (result of call 1 informs call 2)",
+            "Extracts citations (record name + ID) from synthesis",
+            "Returns complete response with answer text + citations array",
+            "Testable with mocked Bedrock client"
+          ],
+          "depends_on": [
+            "1.1.1"
+          ]
+        },
+        {
+          "id": "1.1.3",
+          "title": "Lambda handler with SSE streaming",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-14T22:27:24.319940+00:00",
+          "updatedAt": "2026-03-14T22:27:24.508411+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "parent": "1.1",
+          "description": "Lambda Function URL handler that accepts POST {question, org_id, session_id}, runs the conversation loop from 1.1.2, and streams the answer via Server-Sent Events. Reuse SSE patterns from lambda/answer/. Include cache-warm call on session start. Error handling for tool failures, empty results, LLM refusals.",
+          "acceptance_criteria": [
+            "Lambda Function URL accepts POST with {question, org_id, session_id}",
+            "Calls SearchBackend.warm(namespace) on first request per session",
+            "Streams answer tokens via SSE (Server-Sent Events)",
+            "Streams citation records as separate SSE event type",
+            "Handles errors gracefully (tool failure, empty results, timeout)",
+            "Deployed and callable via curl for testing"
+          ],
+          "depends_on": [
+            "1.1.2"
+          ]
         },
         {
           "id": "1.2",
@@ -203,16 +335,18 @@
           "status": "pending",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T22:28:30.418444+00:00",
           "startedAt": null,
           "completedAt": null,
-          "depends_on": [],
+          "depends_on": [
+            "0.3"
+          ],
           "acceptance_criteria": [
-            "System prompt includes CRE domain vocabulary (lease comp, NNN, Class A, etc.)",
-            "Tool descriptions include field enums from denorm config",
-            "Few-shot examples for common CRE query patterns",
+            "System prompt includes CRE domain vocabulary (lease comp, NNN, Class A, submarket, etc.)",
+            "Tool descriptions include field names from committed denorm_config.yaml",
+            "Few-shot examples for common CRE query patterns (space search, lease comp, availability, aggregation)",
             "Guidelines for when to use parallel vs. sequential tool calls",
-            "Guidelines for when to prefer live_salesforce_query (future)"
+            "Note: live_salesforce_query tool is NOT included in POC (deferred to v1 per D-07)"
           ],
           "files_modified": [],
           "commits": [],
@@ -226,7 +360,7 @@
           "status": "pending",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T22:28:30.540858+00:00",
           "startedAt": null,
           "completedAt": null,
           "depends_on": [
@@ -235,9 +369,10 @@
           ],
           "acceptance_criteria": [
             "All existing acceptance test queries executed against new endpoint",
-            "Pass rate recorded (target: ≥70% at this stage)",
+            "Pass rate recorded — interim target ≥70% (phase-level signal, not final gate)",
+            "Final gate is ≥83% at Phase 3 validation (task 3.1)",
             "Latency recorded per query (target: ≤1s p95 simple, ≤2s p95 cross-object)",
-            "Failure analysis documented for each failing query"
+            "Failure analysis documented for each failing query (informs prompt/tool tuning)"
           ],
           "files_modified": [],
           "commits": [],
@@ -279,11 +414,11 @@
         {
           "id": "2.2",
           "title": "Build CDC sync Lambda",
-          "description": "Lambda that subscribes to Salesforce CDC Platform Events for Property, Lease, Availability. On change: fetch full record, denormalize per config, embed, upsert via SearchBackend. On delete: delete from SearchBackend by ID.",
+          "description": "CDC sync Lambda that processes Salesforce Platform Event changes and keeps Turbopuffer in sync.\n\nTransport: Salesforce CDC Platform Events → CometD/Pub-Sub API → Lambda trigger (via EventBridge pipe or direct subscription).\nAuth: Org-level Connected App (same as bulk loader, Client Credentials flow).\nReplay: Use replayId to resume from last processed event on Lambda cold start. Store last replayId in DynamoDB (single row).\nBatching: Process CDC events in micro-batches (up to 10 events per invocation). Each event may contain multiple field changes.\nFailure: Failed events go to SQS DLQ. DLQ consumer retries with exponential backoff (3 attempts).\nDenormalization: On CREATE/UPDATE, fetch full record via SOQL (not just changed fields), denormalize per config, embed, upsert. On DELETE, delete by ID.\nCascade: Deferred to v1 (parent changes do not propagate to children in POC).\n\nDesign decision needed before implementation: EventBridge pipe vs. direct Pub-Sub API subscription in Lambda. EventBridge pipe is simpler (managed) but adds latency. Direct subscription gives lower latency but requires CometD client management in Lambda.",
           "status": "pending",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T22:27:43.929693+00:00",
           "startedAt": null,
           "completedAt": null,
           "depends_on": [
@@ -291,11 +426,13 @@
             "0.3"
           ],
           "acceptance_criteria": [
-            "Subscribes to CDC Platform Events for Property, Lease, Availability",
-            "On CREATE/UPDATE: fetches full record, denormalizes, embeds, upserts",
+            "Subscribes to Salesforce CDC Platform Events for Property, Lease, Availability",
+            "On CREATE/UPDATE: fetches full record via SOQL, denormalizes per config, embeds, upserts via SearchBackend",
             "On DELETE: deletes document from SearchBackend by record ID",
-            "Handles batch CDC events (multiple changes in one event)",
-            "Error handling with DLQ for failed events"
+            "Persists replayId to DynamoDB for cold-start resume",
+            "Failed events routed to SQS DLQ",
+            "Handles batch CDC events (multiple changes in one invocation)",
+            "Latency: changed record searchable within 5 minutes"
           ],
           "files_modified": [],
           "commits": [],
@@ -342,17 +479,18 @@
           "status": "pending",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T22:28:30.772738+00:00",
           "startedAt": null,
           "completedAt": null,
           "depends_on": [
             "2.3"
           ],
           "acceptance_criteria": [
-            "Every acceptance test query executed on both systems",
-            "Pass rate comparison documented",
-            "New system achieves ≥83% (no regression)",
-            "Latency comparison documented per query type"
+            "Run scripts/validate_data.py against both old and new systems",
+            "Run full acceptance test query set (from scripts/acceptance_tests/) against both systems",
+            "Pass rate comparison documented (new system target: ≥83%)",
+            "Latency comparison documented per query type (simple, cross-object, aggregation)",
+            "Results captured in results/ directory for audit"
           ],
           "files_modified": [],
           "commits": [],
@@ -366,17 +504,18 @@
           "status": "pending",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T22:28:30.888631+00:00",
           "startedAt": null,
           "completedAt": null,
           "depends_on": [
             "2.3"
           ],
           "acceptance_criteria": [
-            "Turbopuffer billing documented",
-            "AWS Lambda/Bedrock/DynamoDB billing documented",
-            "Total monthly cost ≤$200 for 1 org POC",
-            "Cost comparison table: current vs. new"
+            "Billing window: 7-day period with representative query load (at least 100 queries)",
+            "Turbopuffer billing: extract from Turbopuffer dashboard (storage + query costs)",
+            "AWS billing: extract Lambda, Bedrock (embedding + LLM), API Gateway, DynamoDB from Cost Explorer, filtered by tag",
+            "Total monthly cost projected from 7-day window (target: ≤$200/mo for 1 org)",
+            "Cost comparison table: current system vs. new system, line-item breakdown"
           ],
           "files_modified": [],
           "commits": [],
@@ -386,31 +525,101 @@
         {
           "id": "3.3",
           "title": "Analyze regressions and make go/no-go decision",
-          "description": "For each query where the new system performs worse: determine root cause, evaluate whether adding denormalized fields or tuning the system prompt fixes it. Document the go/no-go decision with rationale.",
+          "description": "Orchestrator task — split into subtasks 3.3.1 through 3.3.3.",
           "status": "pending",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T22:28:02.830123+00:00",
           "startedAt": null,
           "completedAt": null,
           "depends_on": [
             "3.1",
             "3.2"
           ],
-          "acceptance_criteria": [
-            "Each regression query analyzed with root cause",
-            "Fix attempted for each regression (denorm field addition, prompt tuning, etc.)",
-            "Go/no-go decision documented with rationale",
-            "If go: production cutover plan drafted",
-            "If no-go: specific gaps identified for next iteration"
-          ],
+          "acceptance_criteria": [],
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": []
+        },
+        {
+          "id": "3.3.1",
+          "title": "Regression root-cause analysis",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-14T22:28:02.904597+00:00",
+          "updatedAt": "2026-03-14T22:28:03.089997+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "parent": "3.3",
+          "description": "For each query where the new system scores lower than the old system (from 3.1 results): classify the failure mode (missing data, wrong filter translation, poor ranking, missing cross-object context, aggregation gap). Produce a table: query → failure mode → root cause → proposed fix.",
+          "acceptance_criteria": [
+            "Every regression query from 3.1 has a classified failure mode",
+            "Root cause identified for each (denorm gap, prompt gap, tool schema gap, Turbopuffer limitation)",
+            "Proposed fix documented for each (add field, tune prompt, add tool, defer to v1)"
+          ],
+          "depends_on": [
+            "3.1"
+          ]
+        },
+        {
+          "id": "3.3.2",
+          "title": "Apply regression fixes and re-test",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-14T22:28:03.163999+00:00",
+          "updatedAt": "2026-03-14T22:28:03.355555+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "parent": "3.3",
+          "description": "For each proposed fix from 3.3.1 that is low-effort (add denorm field, tune prompt, adjust tool schema): implement the fix, re-run the specific failing query, verify it passes. Do not fix issues that require architectural changes — document those as v1 scope.",
+          "acceptance_criteria": [
+            "Low-effort fixes applied (denorm field additions, prompt tuning, tool schema adjustments)",
+            "Each fixed query re-tested and passes",
+            "Architectural gaps documented as v1 scope with rationale"
+          ],
+          "depends_on": [
+            "3.3.1"
+          ]
+        },
+        {
+          "id": "3.3.3",
+          "title": "Go/no-go decision document",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-14T22:28:03.433180+00:00",
+          "updatedAt": "2026-03-14T22:28:03.613905+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "parent": "3.3",
+          "description": "Write the go/no-go decision document. Inputs: acceptance test results (3.1), cost comparison (3.2), regression analysis (3.3.1-2). Document: final pass rate, final cost, remaining gaps, risk assessment, recommendation (go / conditional go / no-go). If go: outline Phase 5 production cutover plan.",
+          "acceptance_criteria": [
+            "Document includes: final acceptance test pass rate (post-fixes)",
+            "Document includes: actual vs. target cost comparison",
+            "Document includes: list of unresolved regressions with severity and v1 plan",
+            "Document includes: explicit go / conditional-go / no-go recommendation with rationale",
+            "If go: Phase 5 production cutover plan outlined"
+          ],
+          "depends_on": [
+            "3.3.2",
+            "3.2"
+          ]
         }
       ]
     }
   ],
-  "backlog": []
+  "backlog": [],
+  "meta": {
+    "next_task_index": {
+      "0.4.": 4,
+      "1.1.": 4,
+      "3.3.": 4
+    }
+  }
 }

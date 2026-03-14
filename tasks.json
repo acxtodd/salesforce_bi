@@ -46,12 +46,12 @@
           "id": "0.2",
           "title": "Implement SearchBackend protocol and TurbopufferBackend",
           "description": "Write the SearchBackend ABC (search, aggregate, upsert, delete, warm) and the TurbopufferBackend implementation. See spec §9 for interface definition.",
-          "status": "pending",
-          "owner": "",
+          "status": "completed",
+          "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
-          "startedAt": null,
-          "completedAt": null,
+          "updatedAt": "2026-03-14T21:10:28.569979+00:00",
+          "startedAt": "2026-03-14T21:00:04.469049+00:00",
+          "completedAt": "2026-03-14T21:10:28.569766+00:00",
           "depends_on": [
             "0.1"
           ],
@@ -61,20 +61,31 @@
             "No direct tpuf imports outside of TurbopufferBackend"
           ],
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "pending"
+          ],
           "pull_requests": [],
-          "progress_notes": []
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-14T21:00:04.469338+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-14T21:10:28.569984+00:00",
+              "note": "Task completed, commit: pending"
+            }
+          ]
         },
         {
           "id": "0.3",
           "title": "Build denorm config generator",
           "description": "Script that connects to a Salesforce org, harvests metadata (compact layouts, search layouts, page layouts, list views, field describe), scores fields, and generates a denormalization YAML config. See spec §8.5 for signal tiers and scoring formula.",
-          "status": "pending",
-          "owner": "",
+          "status": "completed",
+          "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T00:00:00Z",
-          "startedAt": null,
-          "completedAt": null,
+          "updatedAt": "2026-03-14T21:10:28.631427+00:00",
+          "startedAt": "2026-03-14T21:00:09.492613+00:00",
+          "completedAt": "2026-03-14T21:10:28.631209+00:00",
           "depends_on": [],
           "acceptance_criteria": [
             "Connects to Salesforce sandbox via OAuth",
@@ -85,9 +96,20 @@
             "Output is human-reviewable and committable"
           ],
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "pending"
+          ],
           "pull_requests": [],
-          "progress_notes": []
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-14T21:00:09.492915+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-14T21:10:28.631432+00:00",
+              "note": "Task completed, commit: pending"
+            }
+          ]
         },
         {
           "id": "0.4",

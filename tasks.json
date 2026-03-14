@@ -1,0 +1,379 @@
+{
+  "phases": [
+    {
+      "phase": 0,
+      "name": "Foundations",
+      "description": "Turbopuffer account, SearchBackend protocol, denorm config generator, bulk loader, data validation.",
+      "status": "pending",
+      "tasks": [
+        {
+          "id": "0.1",
+          "title": "Set up Turbopuffer account and API access",
+          "description": "Sign up for Turbopuffer Launch plan ($64/mo). Obtain API key. Verify connectivity from local dev environment.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [],
+          "acceptance_criteria": [
+            "Turbopuffer account created on Launch plan",
+            "API key stored securely (not in repo)",
+            "Can create and query a test namespace from Python"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "0.2",
+          "title": "Implement SearchBackend protocol and TurbopufferBackend",
+          "description": "Write the SearchBackend ABC (search, aggregate, upsert, delete, warm) and the TurbopufferBackend implementation. See spec §9 for interface definition.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "0.1"
+          ],
+          "acceptance_criteria": [
+            "SearchBackend ABC defined with search, aggregate, upsert, delete, warm methods",
+            "TurbopufferBackend passes integration test against live namespace",
+            "No direct tpuf imports outside of TurbopufferBackend"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "0.3",
+          "title": "Build denorm config generator",
+          "description": "Script that connects to a Salesforce org, harvests metadata (compact layouts, search layouts, page layouts, list views, field describe), scores fields, and generates a denormalization YAML config. See spec §8.5 for signal tiers and scoring formula.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [],
+          "acceptance_criteria": [
+            "Connects to Salesforce sandbox via OAuth",
+            "Harvests compact layout, search layout, page layout, list view, and field describe metadata",
+            "Scores fields using the tiered formula from spec §8.5",
+            "Identifies parent denorm fields from reference fields + parent compact layouts",
+            "Generates YAML config matching the format in spec §8.5",
+            "Output is human-reviewable and committable"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "0.4",
+          "title": "Build bulk loader",
+          "description": "Script that reads the denorm config YAML, exports records from Salesforce via Bulk API 2.0, denormalizes per config, generates text representations, embeds via Bedrock Titan v2, and batch upserts to Turbopuffer via SearchBackend. Target objects: Property, Lease, Availability.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "0.2",
+            "0.3"
+          ],
+          "acceptance_criteria": [
+            "Exports Property, Lease, Availability from Salesforce sandbox via Bulk API 2.0",
+            "Denormalizes records per YAML config (parent fields inlined on children)",
+            "Generates text representation per record from embed_fields",
+            "Embeds via Bedrock Titan v2 (1024-dim)",
+            "Batch upserts to Turbopuffer namespace org_{salesforce_org_id}",
+            "Reports record counts and timing on completion"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "0.5",
+          "title": "Validate data in Turbopuffer",
+          "description": "Run direct queries against Turbopuffer to verify data integrity: metadata filter queries, hybrid BM25+vector queries, aggregation queries. Compare results against known Salesforce data.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "0.4"
+          ],
+          "acceptance_criteria": [
+            "Metadata filter query returns correct results (e.g., property_type=Office AND city=Dallas)",
+            "Hybrid BM25+vector query returns semantically relevant results",
+            "Aggregation query (count by property_class) matches Salesforce record counts",
+            "Warm query latency <50ms after initial cold query",
+            "All denormalized parent fields present on child documents"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        }
+      ]
+    },
+    {
+      "phase": 1,
+      "name": "Intelligence Layer",
+      "description": "Query Lambda with Claude tool-use, system prompt, citation extraction, streaming SSE.",
+      "status": "pending",
+      "tasks": [
+        {
+          "id": "1.1",
+          "title": "Write query Lambda with Claude tool-use",
+          "description": "Single Lambda function: accepts user question + org context, calls Claude Sonnet 4 with tool definitions (search_records, aggregate_records), translates tool calls to SearchBackend method calls, returns tool results to Claude, streams synthesized answer via SSE. See spec §9 for tool definitions and SearchBackend mapping.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "0.5"
+          ],
+          "acceptance_criteria": [
+            "Lambda accepts POST with {question, org_id, session_id}",
+            "Calls Claude Sonnet 4 via Bedrock with search_records and aggregate_records tool definitions",
+            "Translates tool calls to SearchBackend.search() and SearchBackend.aggregate()",
+            "Streams answer via SSE (Server-Sent Events)",
+            "Includes citations with record name and ID in response"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "1.2",
+          "title": "Craft system prompt with CRE domain knowledge",
+          "description": "Write the system prompt for the query Lambda. Incorporate CRE domain knowledge, temporal parsing vocabulary, entity linking vocabulary, and tool usage guidelines. Reuse content from current system's prompts and value_normalizer.py.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [],
+          "acceptance_criteria": [
+            "System prompt includes CRE domain vocabulary (lease comp, NNN, Class A, etc.)",
+            "Tool descriptions include field enums from denorm config",
+            "Few-shot examples for common CRE query patterns",
+            "Guidelines for when to use parallel vs. sequential tool calls",
+            "Guidelines for when to prefer live_salesforce_query (future)"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "1.3",
+          "title": "Test query endpoint against acceptance tests",
+          "description": "Run the existing acceptance test queries against the new /query endpoint via curl/script. Measure pass rate and latency. This is the first real quality signal.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "1.1",
+            "1.2"
+          ],
+          "acceptance_criteria": [
+            "All existing acceptance test queries executed against new endpoint",
+            "Pass rate recorded (target: ≥70% at this stage)",
+            "Latency recorded per query (target: ≤1s p95 simple, ≤2s p95 cross-object)",
+            "Failure analysis documented for each failing query"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Salesforce Integration",
+      "description": "LWC adaptation, Apex controller update, CDC sync Lambda, end-to-end testing.",
+      "status": "pending",
+      "tasks": [
+        {
+          "id": "2.1",
+          "title": "Adapt LWC and Apex controller for new API contract",
+          "description": "Update ascendixAiSearch LWC and AscendixAISearchController Apex to call the new /query endpoint. Update Named Credential with new endpoint URL. Preserve streaming display and citation rendering.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "1.1"
+          ],
+          "acceptance_criteria": [
+            "LWC submits queries to new endpoint",
+            "Streaming answer displays correctly in LWC",
+            "Citations render with record name and clickable ID",
+            "Named Credential updated with new endpoint URL"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "2.2",
+          "title": "Build CDC sync Lambda",
+          "description": "Lambda that subscribes to Salesforce CDC Platform Events for Property, Lease, Availability. On change: fetch full record, denormalize per config, embed, upsert via SearchBackend. On delete: delete from SearchBackend by ID.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "0.2",
+            "0.3"
+          ],
+          "acceptance_criteria": [
+            "Subscribes to CDC Platform Events for Property, Lease, Availability",
+            "On CREATE/UPDATE: fetches full record, denormalizes, embeds, upserts",
+            "On DELETE: deletes document from SearchBackend by record ID",
+            "Handles batch CDC events (multiple changes in one event)",
+            "Error handling with DLQ for failed events"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "2.3",
+          "title": "End-to-end integration test",
+          "description": "Verify the full loop: change a record in Salesforce → CDC fires → sync Lambda processes → record appears in search results via LWC. Also test delete propagation.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "2.1",
+            "2.2"
+          ],
+          "acceptance_criteria": [
+            "Create record in Salesforce → searchable in LWC within 5 minutes",
+            "Update record in Salesforce → updated in search results within 5 minutes",
+            "Delete record in Salesforce → removed from search results within 5 minutes",
+            "No orphaned documents after delete"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Validation Gate",
+      "description": "Full acceptance test suite, side-by-side comparison, cost measurement, go/no-go decision.",
+      "status": "pending",
+      "tasks": [
+        {
+          "id": "3.1",
+          "title": "Run full acceptance test suite side-by-side",
+          "description": "Execute all existing acceptance test queries against both the current system and the new system. Record pass/fail, latency, and answer quality for each.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "2.3"
+          ],
+          "acceptance_criteria": [
+            "Every acceptance test query executed on both systems",
+            "Pass rate comparison documented",
+            "New system achieves ≥83% (no regression)",
+            "Latency comparison documented per query type"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "3.2",
+          "title": "Measure actual cost",
+          "description": "Collect actual billing from Turbopuffer and AWS for the POC period. Compare against current system's cost baseline.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "2.3"
+          ],
+          "acceptance_criteria": [
+            "Turbopuffer billing documented",
+            "AWS Lambda/Bedrock/DynamoDB billing documented",
+            "Total monthly cost ≤$200 for 1 org POC",
+            "Cost comparison table: current vs. new"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        },
+        {
+          "id": "3.3",
+          "title": "Analyze regressions and make go/no-go decision",
+          "description": "For each query where the new system performs worse: determine root cause, evaluate whether adding denormalized fields or tuning the system prompt fixes it. Document the go/no-go decision with rationale.",
+          "status": "pending",
+          "owner": "",
+          "createdAt": "2026-03-14T00:00:00Z",
+          "updatedAt": "2026-03-14T00:00:00Z",
+          "startedAt": null,
+          "completedAt": null,
+          "depends_on": [
+            "3.1",
+            "3.2"
+          ],
+          "acceptance_criteria": [
+            "Each regression query analyzed with root cause",
+            "Fix attempted for each regression (denorm field addition, prompt tuning, etc.)",
+            "Go/no-go decision documented with rationale",
+            "If go: production cutover plan drafted",
+            "If no-go: specific gaps identified for next iteration"
+          ],
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": []
+        }
+      ]
+    }
+  ],
+  "backlog": []
+}

@@ -1,0 +1,4 @@
+# Schema Drift Checker Lambda Dependencies
+# Note: boto3 is provided by Lambda runtime, but included for local testing
+
+boto3>=1.28.0

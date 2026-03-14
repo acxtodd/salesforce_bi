@@ -1,0 +1,1 @@
+Database.executeBatch(new AISearchBatchExport('ascendix__Deal__c', 8760), 10);

@@ -1,0 +1,18 @@
+# List files to ignore in the deployment
+package.json
+package-lock.json
+node_modules
+.git
+.gitignore
+.DS_Store
+**/.DS_Store
+**/.pytest_cache
+**/__pycache__
+**/tests/
+**/test/
+**/*.test.js
+**/*.spec.js
+**/lcov-report
+**/__mocks__
+**/__tests__/**
+lwc/__tests__

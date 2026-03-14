@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>59.0</apiVersion>
+    <isExposed>true</isExposed>
+    <targets>
+        <target>lightning__AppPage</target>
+        <target>lightning__HomePage</target>
+    </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__AppPage,lightning__HomePage">
+            <property name="title" type="String" default="AI Agent Actions Admin" />
+        </targetConfig>
+    </targetConfigs>
+    <masterLabel>Action Enablement Admin</masterLabel>
+    <description>Admin UI for managing AI Agent Action enablement settings</description>
+</LightningComponentBundle>

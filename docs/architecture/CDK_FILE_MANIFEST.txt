@@ -1,0 +1,173 @@
+CDK INFRASTRUCTURE CODE ANALYSIS - FILE MANIFEST
+================================================
+
+ANALYSIS DOCUMENTS CREATED:
+==========================
+
+1. CDK_INFRASTRUCTURE_ANALYSIS.md (27 KB)
+   - Comprehensive technical analysis
+   - Detailed findings for all 7 categories requested
+   - Security assessment with critical issues
+   - Best practices recommendations
+   - Code examples for improvements
+
+2. CDK_QUICK_REFERENCE.md (8.3 KB)
+   - Visual architecture diagram
+   - Quick lookup tables
+   - Key metrics and resource counts
+   - Naming patterns cheat sheet
+   - Recommended action items with priorities
+   - Deployment commands
+
+3. CDK_FILE_MANIFEST.txt (this file)
+   - Index of all analysis documents
+   - Original CDK source file locations
+
+ORIGINAL CDK SOURCE FILES ANALYZED:
+===================================
+
+Location: /Users/toddadmin/Library/CloudStorage/OneDrive-AscendixTechnologiesInc/Salesforce BI/
+
+bin/
+  app.ts                          - CDK app entry point, stack orchestration
+
+lib/ (6 stack files)
+  network-stack.ts               - VPC, KMS, VPC Endpoints, Security Groups
+  data-stack.ts                  - S3 buckets, 9 DynamoDB tables
+  search-stack.ts                - OpenSearch Serverless, Bedrock Knowledge Base
+  ingestion-stack.ts             - Lambda ETL pipeline, Step Functions, AppFlow
+  api-stack.ts                   - API Gateway, 4 Lambda functions, VPC integration
+  monitoring-stack.ts            - CloudWatch dashboards, SNS alarms
+  cloudwatch-insights-queries.ts - Custom CloudWatch queries helper
+
+Configuration files:
+  cdk.json                       - CDK context and feature flags
+  package.json                   - Dependencies
+  tsconfig.json                  - TypeScript configuration
+
+Build outputs:
+  cdk.out/                       - Synthesized CloudFormation templates
+  dist/                          - Compiled JavaScript output
+
+Lambda code (15+ functions):
+  lambda/
+    authz/
+    retrieve/
+    answer/
+    action/
+    cdc_processor/
+    ingest/
+    validate/
+    transform/
+    chunking/
+    enrich/
+    embed/
+    sync/
+    graph_builder/
+    schema_discovery/
+    index_creator/
+
+KEY STATISTICS
+==============
+
+Stacks:              6 (Network, Data, Search, Ingestion, API, Monitoring)
+Lambda Functions:    15+ (across all stacks)
+DynamoDB Tables:     9 (Telemetry, Sessions, AuthZ Cache, Rate Limits, etc.)
+S3 Buckets:          4 (Data, Embeddings, Logs, CDC)
+VPC Endpoints:       5 (S3, DynamoDB, Bedrock, Bedrock Agent, OpenSearch)
+IAM Roles:           8+ (one per major component)
+CloudWatch Dashboards: 4
+SNS Topics:          2
+
+Lines of Code:       ~2,500 TypeScript lines (lib/ + bin/)
+CDK Version:         2.110.0
+Node Runtime:        20.x
+Python Runtime:      3.11
+
+ANALYSIS SUMMARY
+================
+
+STACK ORGANIZATION:      Well-designed layered architecture with clear dependencies
+NAMING CONVENTIONS:      Consistent hierarchical naming with global uniqueness
+CROSS-STACK REFERENCES:  Type-safe via interfaces, strong pattern
+ENVIRONMENT CONFIG:      Minimal - no dev/prod differentiation implemented
+IAM PERMISSIONS:         Mostly least-privilege, but with some overbroad wildcards
+TAGGING STRATEGY:        Basic (4 tags) - missing cost/compliance/operational tags
+CONSTRUCT PATTERNS:      Proper L2 dominance, L1 for Bedrock/OpenSearch, minimal L3
+
+SECURITY ISSUES FOUND:   4 CRITICAL, 3 HIGH, 1 MEDIUM
+RECOMMENDATIONS:         40+ specific improvements provided in analysis documents
+
+CRITICAL ISSUES TO FIX:
+======================
+
+1. Hardcoded API key in api-stack.ts line 309
+   - Should move to AWS Secrets Manager
+   
+2. API Gateway configured as REGIONAL (public) instead of PRIVATE
+   - Code comment says: "CHANGED TO REGIONAL FOR PUBLIC ACCESS WORKAROUND"
+   - Should implement proper VPC Endpoint Service
+   
+3. Bedrock knowledge-base ARN uses wildcard: knowledge-base/*
+   - Should restrict to specific knowledge base ID
+   
+4. OpenSearch collection ARN uses wildcard: collection/*
+   - Should restrict to specific collection
+
+RECOMMENDED ACTIONS (PRIORITY)
+==============================
+
+CRITICAL (Week 1):
+  1. Move hardcoded API key to Secrets Manager
+  2. Fix API Gateway to use true private endpoint
+  3. Scope Bedrock knowledge-base ARN precisely
+  4. Scope OpenSearch collection ARN precisely
+
+HIGH (Sprint 1):
+  1. Implement environment-specific configurations
+  2. Enhance tagging strategy (cost, compliance, ops)
+  3. Restrict CORS to specific domains
+  4. Create custom L3 constructs for reuse
+
+MEDIUM (Sprint 2):
+  1. Implement CDK Aspects for policies
+  2. Move configuration to cdk.json context
+  3. Add CDK assertion tests
+  4. Create CDK Pipelines for automation
+
+How to Use These Documents:
+===========================
+
+1. Start with CDK_QUICK_REFERENCE.md for overview
+   - Understand architecture and dependencies
+   - Get deployment commands
+   - See critical issues at a glance
+
+2. Read CDK_INFRASTRUCTURE_ANALYSIS.md for details
+   - Deep dive into each category
+   - See code examples for improvements
+   - Understand security implications
+
+3. Use recommendations to prioritize improvements
+   - Critical issues should be addressed immediately
+   - High priority for next sprint planning
+   - Medium/Low for backlog
+
+Next Steps:
+===========
+
+1. Review security findings with team
+2. Prioritize critical fixes in sprint planning
+3. Create tickets for each recommendation
+4. Schedule refactoring for high-priority items
+5. Plan for CDK Pipelines and testing implementation
+
+Contact:
+========
+
+For detailed analysis: See CDK_INFRASTRUCTURE_ANALYSIS.md
+For quick lookup: See CDK_QUICK_REFERENCE.md
+For file locations: This manifest file
+
+Analysis completed: 2025-11-30
+Analyst: Claude Code

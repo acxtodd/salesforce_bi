@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Create Opportunity</label>
+    <protected>false</protected>
+    <values>
+        <field>ActionName__c</field>
+        <value xsi:type="xsd:string">create_opportunity</value>
+    </values>
+    <values>
+        <field>Enabled__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>MaxPerUserPerDay__c</field>
+        <value xsi:type="xsd:double">20.0</value>
+    </values>
+    <values>
+        <field>RequiresConfirm__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>FlowName__c</field>
+        <value xsi:type="xsd:string">Create_Opportunity_Flow</value>
+    </values>
+    <values>
+        <field>InputSchemaJson__c</field>
+        <value xsi:type="xsd:string">{
+  "type": "object",
+  "required": ["Name", "AccountId", "CloseDate", "StageName"],
+  "properties": {
+    "Name": {
+      "type": "string",
+      "maxLength": 120,
+      "description": "Opportunity name"
+    },
+    "AccountId": {
+      "type": "string",
+      "pattern": "^001[a-zA-Z0-9]{15}$",
+      "description": "Account ID (18 chars)"
+    },
+    "Amount": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Opportunity amount"
+    },
+    "CloseDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Expected close date (YYYY-MM-DD)"
+    },
+    "StageName": {
+      "type": "string",
+      "enum": ["Prospecting", "Qualification", "Proposal", "Negotiation"],
+      "description": "Sales stage"
+    },
+    "Description": {
+      "type": "string",
+      "maxLength": 32000,
+      "description": "Opportunity description"
+    }
+  }
+}</value>
+    </values>
+    <values>
+        <field>OutputSchemaJson__c</field>
+        <value xsi:type="xsd:string">{
+  "type": "object",
+  "properties": {
+    "success": {"type": "boolean"},
+    "id": {"type": "string"},
+    "error": {"type": "string"}
+  }
+}</value>
+    </values>
+    <values>
+        <field>AllowedFields__c</field>
+        <value xsi:type="xsd:string">Name, AccountId, Amount, CloseDate, StageName, Description, OwnerId</value>
+    </values>
+</CustomMetadata>

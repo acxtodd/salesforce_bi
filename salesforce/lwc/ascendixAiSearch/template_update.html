@@ -1,0 +1,11 @@
+<!-- Update for ascendixAiSearch.html -->
+<!-- Replace the answer text section (around line 147-150) with this version -->
+
+                    <!-- Answer Text with clickable record names -->
+                    <template if:false={isStreaming}>
+                        <div class="answer-text" role="article" aria-label="Generated answer" onclick={handleAnswerLinkClick}>
+                            <lightning-formatted-rich-text value={formattedAnswer}></lightning-formatted-rich-text>
+                        </div>
+                    </template>
+
+<!-- Note: The only change is adding onclick={handleAnswerLinkClick} to the answer-text div -->

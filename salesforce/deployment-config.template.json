@@ -1,0 +1,69 @@
+{
+  "deployment": {
+    "environment": "sandbox",
+    "orgAlias": "my-sandbox",
+    "orgId": "",
+    "instanceUrl": "https://your-instance.salesforce.com"
+  },
+  "aws": {
+    "region": "us-east-1",
+    "apiGateway": {
+      "privateLinkEndpoint": "https://vpce-xxxxx-xxxxx.execute-api.us-east-1.vpce.amazonaws.com/prod",
+      "apiKeySecretName": "salesforce-ai-search/api-key",
+      "apiKey": "REPLACE_WITH_API_KEY"
+    },
+    "privateLink": {
+      "vpcEndpointServiceName": "com.amazonaws.vpce.us-east-1.vpce-svc-xxxxx",
+      "vpcEndpointServiceId": "vpce-svc-xxxxx"
+    }
+  },
+  "salesforce": {
+    "namedCredential": {
+      "name": "Ascendix_RAG_API",
+      "endpoint": "https://vpce-xxxxx-xxxxx.execute-api.us-east-1.vpce.amazonaws.com/prod",
+      "deployed": false,
+      "tested": false
+    },
+    "privateConnect": {
+      "endpointName": "Ascendix RAG API Private Connect",
+      "status": "pending",
+      "configured": false
+    },
+    "lwc": {
+      "componentName": "ascendixAiSearch",
+      "deployed": false,
+      "addedToAccountLayout": false,
+      "addedToHomeLayout": false
+    },
+    "permissions": {
+      "permissionSetName": "AI_Search_User",
+      "created": false,
+      "assignedUsers": []
+    }
+  },
+  "testing": {
+    "smokeTests": {
+      "namedCredentialConnectivity": false,
+      "lwcVisibleOnAccountPage": false,
+      "querySubmission": false,
+      "streamingResponse": false,
+      "citationsDisplay": false,
+      "facetFilters": false
+    },
+    "testQueries": [
+      "Show open opportunities for this account",
+      "Summarize recent cases",
+      "What are the renewal risks?"
+    ]
+  },
+  "rollback": {
+    "backupCreated": false,
+    "backupDate": "",
+    "rollbackProcedureTested": false
+  },
+  "notes": [
+    "Update this file with your actual deployment values",
+    "Keep this file secure - it contains sensitive information",
+    "Do not commit this file to version control with real values"
+  ]
+}

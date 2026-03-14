@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Default</label>
+    <protected>false</protected>
+    <values>
+        <field>API_Key__c</field>
+        <value xsi:type="xsd:string">M3L9GKMhRs2j5e9KvD3Et6upEWtHUQHy7SgrvCSQ</value>
+    </values>
+    <values>
+        <field>Batch_Size__c</field>
+        <value xsi:type="xsd:double">200.0</value>
+    </values>
+    <values>
+        <field>Enabled__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>Hours_Back__c</field>
+        <value xsi:type="xsd:double">24.0</value>
+    </values>
+    <values>
+        <field>Ingest_Endpoint__c</field>
+        <value xsi:type="xsd:string">https://s6tudheovzgiewmurm6fr5hzcu0dmbsp.lambda-url.us-west-2.on.aws</value>
+    </values>
+</CustomMetadata>

@@ -1,0 +1,320 @@
+{
+  "toolName": "create_opportunity",
+  "displayName": "Create Opportunity",
+  "description": "Creates a new Opportunity record in Salesforce with validation and sharing rule enforcement. Requires two-step confirmation before execution. Enforces CRUD permissions and field-level security.",
+  "category": "Agent Actions",
+  "endpoint": {
+    "method": "POST",
+    "path": "/action",
+    "namedCredential": "Ascendix_RAG_API"
+  },
+  "requiresConfirmation": true,
+  "inputSchema": {
+    "type": "object",
+    "required": ["actionName", "inputs", "salesforceUserId", "confirmationToken"],
+    "properties": {
+      "actionName": {
+        "type": "string",
+        "const": "create_opportunity",
+        "description": "Action name identifier. Must be 'create_opportunity'."
+      },
+      "inputs": {
+        "type": "object",
+        "description": "Opportunity field values to create",
+        "required": ["Name", "AccountId", "CloseDate", "StageName"],
+        "properties": {
+          "Name": {
+            "type": "string",
+            "description": "Opportunity name (required)",
+            "minLength": 1,
+            "maxLength": 120,
+            "examples": [
+              "ACME Renewal - Enterprise License",
+              "New Business - Q1 2026",
+              "Expansion Deal - Additional Licenses"
+            ]
+          },
+          "AccountId": {
+            "type": "string",
+            "pattern": "^001[a-zA-Z0-9]{15}$",
+            "description": "Account ID (18 characters, required). Must be a valid Account the user has access to.",
+            "examples": ["001xx000001234567"]
+          },
+          "Amount": {
+            "type": "number",
+            "description": "Opportunity amount in USD (optional)",
+            "minimum": 0,
+            "examples": [500000, 1200000, 250000]
+          },
+          "CloseDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Expected close date in YYYY-MM-DD format (required)",
+            "examples": ["2026-03-31", "2026-06-30", "2025-12-31"]
+          },
+          "StageName": {
+            "type": "string",
+            "description": "Opportunity stage (required). Must be one of the allowed stages: Prospecting, Qualification, Proposal, or Negotiation.",
+            "enum": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation"
+            ],
+            "examples": ["Prospecting", "Qualification", "Proposal", "Negotiation"]
+          },
+          "Description": {
+            "type": "string",
+            "description": "Opportunity description (optional)",
+            "maxLength": 32000,
+            "examples": [
+              "Renewal opportunity for existing enterprise customer",
+              "New business opportunity from inbound lead",
+              "Expansion opportunity for additional licenses"
+            ]
+          }
+        }
+      },
+      "salesforceUserId": {
+        "type": "string",
+        "pattern": "^005[a-zA-Z0-9]{12,15}$",
+        "description": "Salesforce User ID (15 or 18 characters) for authorization enforcement. REQUIRED for security.",
+        "examples": ["005xx000001234567"]
+      },
+      "sessionId": {
+        "type": "string",
+        "description": "Optional chat session ID for tracking multi-turn conversations",
+        "maxLength": 100,
+        "examples": ["session-2025-11-13-abc123"]
+      },
+      "confirmationToken": {
+        "type": "string",
+        "description": "Confirmation token generated during preview step. Required to prevent replay attacks.",
+        "minLength": 1,
+        "examples": ["token-abc123def456"]
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether the action executed successfully"
+      },
+      "recordIds": {
+        "type": "array",
+        "description": "Array of created Opportunity IDs",
+        "items": {
+          "type": "string",
+          "pattern": "^006[a-zA-Z0-9]{15}$",
+          "description": "Opportunity ID (18 characters)"
+        }
+      },
+      "outputValues": {
+        "type": "object",
+        "description": "Output values from the Flow execution",
+        "properties": {
+          "Success": {
+            "type": "boolean",
+            "description": "Flow execution success status"
+          },
+          "OpportunityId": {
+            "type": "string",
+            "description": "Created Opportunity ID"
+          },
+          "ErrorMessage": {
+            "type": "string",
+            "description": "Error message if Flow failed"
+          }
+        }
+      },
+      "actionName": {
+        "type": "string",
+        "description": "Name of the executed action"
+      },
+      "requestId": {
+        "type": "string",
+        "description": "Unique request ID for tracking and support"
+      },
+      "trace": {
+        "type": "object",
+        "description": "Performance timing metrics",
+        "properties": {
+          "executionMs": {
+            "type": "number",
+            "description": "Flow execution time in milliseconds"
+          },
+          "totalMs": {
+            "type": "number",
+            "description": "Total request time in milliseconds"
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "name": "Create opportunity for ACME worth $500K",
+      "input": {
+        "actionName": "create_opportunity",
+        "inputs": {
+          "Name": "ACME Renewal - Enterprise License",
+          "AccountId": "001xx000001234567",
+          "Amount": 500000,
+          "CloseDate": "2026-03-31",
+          "StageName": "Prospecting",
+          "Description": "Annual renewal for enterprise license. Customer expressed interest in expanding to additional business units."
+        },
+        "salesforceUserId": "005xx000001234567",
+        "sessionId": "session-2025-11-13-abc123",
+        "confirmationToken": "token-abc123def456"
+      },
+      "output": {
+        "success": true,
+        "recordIds": ["006xx000009876543"],
+        "outputValues": {
+          "Success": true,
+          "OpportunityId": "006xx000009876543"
+        },
+        "actionName": "create_opportunity",
+        "requestId": "req-uuid-12345",
+        "trace": {
+          "executionMs": 450,
+          "totalMs": 520
+        }
+      }
+    },
+    {
+      "name": "Create opportunity closing next quarter",
+      "input": {
+        "actionName": "create_opportunity",
+        "inputs": {
+          "Name": "New Business - Q1 2026",
+          "AccountId": "001xx000001234567",
+          "Amount": 1200000,
+          "CloseDate": "2026-03-31",
+          "StageName": "Qualification",
+          "Description": "New business opportunity from inbound marketing lead. Customer is evaluating our platform for their sales team."
+        },
+        "salesforceUserId": "005xx000001234567",
+        "sessionId": "session-2025-11-13-xyz789",
+        "confirmationToken": "token-xyz789ghi012"
+      },
+      "output": {
+        "success": true,
+        "recordIds": ["006xx000009876544"],
+        "outputValues": {
+          "Success": true,
+          "OpportunityId": "006xx000009876544"
+        },
+        "actionName": "create_opportunity",
+        "requestId": "req-uuid-67890",
+        "trace": {
+          "executionMs": 380,
+          "totalMs": 445
+        }
+      }
+    },
+    {
+      "name": "Rate limit exceeded error",
+      "input": {
+        "actionName": "create_opportunity",
+        "inputs": {
+          "Name": "Test Opportunity",
+          "AccountId": "001xx000001234567",
+          "CloseDate": "2026-12-31",
+          "StageName": "Prospecting"
+        },
+        "salesforceUserId": "005xx000001234567",
+        "confirmationToken": "token-test123"
+      },
+      "output": {
+        "error": "You've reached the daily limit of 20 for this action. Try again tomorrow."
+      },
+      "statusCode": 429
+    },
+    {
+      "name": "Validation error - missing required field",
+      "input": {
+        "actionName": "create_opportunity",
+        "inputs": {
+          "Name": "Incomplete Opportunity",
+          "AccountId": "001xx000001234567"
+        },
+        "salesforceUserId": "005xx000001234567",
+        "confirmationToken": "token-invalid"
+      },
+      "output": {
+        "error": "Required field 'CloseDate' is missing"
+      },
+      "statusCode": 400
+    }
+  ],
+  "usageGuidelines": {
+    "whenToUse": [
+      "When the user explicitly requests to create a new Opportunity",
+      "When the user provides sufficient information to populate required fields (Name, Account, CloseDate, Stage)",
+      "When the user wants to track a new sales opportunity or deal",
+      "As a follow-up action after searching for an Account"
+    ],
+    "bestPractices": [
+      "Always show a preview of the proposed Opportunity before executing",
+      "Require explicit user confirmation via the two-step confirmation flow",
+      "Validate that the AccountId exists and the user has access to it",
+      "Use reasonable defaults for optional fields (e.g., Amount, Description)",
+      "Provide clear feedback about what will be created",
+      "Include the created Opportunity ID in the success message with a deep link"
+    ],
+    "limitations": [
+      "Maximum 20 opportunities can be created per user per day (configurable via ActionEnablement metadata)",
+      "User must have Create permission on Opportunity object",
+      "User must have access to the specified Account",
+      "StageName must be a valid value from the org's Opportunity Stage picklist",
+      "Action can be disabled by administrators via ActionEnablement metadata"
+    ],
+    "confirmationFlow": [
+      "1. Agent proposes creating an Opportunity with specific field values",
+      "2. LWC displays preview modal showing all fields that will be populated",
+      "3. User reviews and clicks 'Confirm' or 'Cancel'",
+      "4. On confirm, LWC generates confirmation token and calls /action endpoint",
+      "5. Action Lambda validates token, checks rate limits, and executes Flow",
+      "6. LWC displays success message with link to created Opportunity"
+    ]
+  },
+  "securityNotes": {
+    "authorization": "This action enforces Salesforce CRUD permissions and sharing rules. Users can only create Opportunities if they have Create permission on the Opportunity object and access to the specified Account.",
+    "confirmation": "Two-step confirmation is REQUIRED. The action will fail if confirmationToken is missing or invalid.",
+    "rateLimiting": "Rate limits are enforced per user per day. Default limit is 20 creates per day, configurable via ActionEnablement metadata.",
+    "auditLogging": "All action executions are logged to AI_Action_Audit__c custom object with user ID, inputs (hashed if PII detected), success status, and timing metrics.",
+    "dataPrivacy": "All communication occurs over private networking (PrivateLink). No data traverses the public internet.",
+    "killSwitch": "Administrators can disable this action immediately by setting Enabled__c=false in ActionEnablement metadata."
+  },
+  "performanceTargets": {
+    "execution": "p95 ≤ 1.5s",
+    "rateLimitCheck": "< 20ms",
+    "auditLogging": "async, non-blocking"
+  },
+  "agentInstructions": {
+    "general": [
+      "Always show preview before executing actions",
+      "Only suggest this action when user explicitly requests to create an Opportunity",
+      "Gather all required information (Name, Account, CloseDate, Stage) before proposing the action",
+      "If user doesn't provide an Account, search for it first using retrieve_knowledge tool",
+      "Use natural language to describe what will be created in the preview"
+    ],
+    "examplePrompts": [
+      "Create an opportunity for ACME worth $500K closing next quarter",
+      "I want to create a new opportunity for the renewal",
+      "Add an opportunity to track this deal",
+      "Create a $1M opportunity for Account XYZ"
+    ],
+    "responseFormat": [
+      "When proposing the action, say: 'I can create an Opportunity with the following details: [list fields]. Would you like me to proceed?'",
+      "After successful creation, say: 'I've created the Opportunity \"[Name]\" for [Account Name]. You can view it here: [link]'",
+      "If rate limited, say: 'You've reached the daily limit for creating Opportunities. You can create more tomorrow.'",
+      "If validation fails, say: 'I need more information to create the Opportunity: [missing fields]'",
+      "NOTE: Due to confirmationToken requirement, this action currently requires the LWC component (ascendixAiSearch) to execute. Direct Agentforce invocation will fail until a wrapper is implemented."
+    ]
+  }
+}

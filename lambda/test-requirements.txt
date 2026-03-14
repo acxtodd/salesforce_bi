@@ -1,0 +1,13 @@
+# Test dependencies for Lambda functions
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+boto3==1.34.0
+moto==4.2.0
+
+# Property-based testing framework
+# Used by:
+# - Phase 3 Graph Enhancement
+# - Graph-Aware Zero-Config Retrieval (17 correctness properties per design.md)
+# Minimum 100 iterations per property test as specified in design documents
+hypothesis==6.92.1

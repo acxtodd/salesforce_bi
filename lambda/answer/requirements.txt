@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+aws-lambda-powertools
+boto3

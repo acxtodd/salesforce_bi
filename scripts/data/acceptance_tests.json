@@ -1,0 +1,787 @@
+{
+  "metadata": {
+    "version": "2.0.0",
+    "created": "2026-01-05",
+    "updated": "2026-01-05",
+    "source_requirement": "GAZC-R14 (graph-aware-zero-config-retrieval)",
+    "description": "Ground truth SOQL for 10 acceptance scenarios with pipeline diagnostics",
+    "notes": [
+      "Each scenario maps NLS query → expected SOQL → validation criteria",
+      "SOQL validated against sandbox schema per HANDOFF-2025-12-10-SCHEMA-AUDIT",
+      "Property type uses RecordType.Name (NOT ascendix__PropertyType__c)",
+      "Cross-object queries require traversal from child to parent",
+      "v2.0: Added pipeline_checkpoints for root cause diagnosis"
+    ],
+    "field_mapping_notes": {
+      "availability_size": "ascendix__AvailableArea__c (NOT ascendix__TotalSF__c)",
+      "lease_end_date": "ascendix__TermExpirationDate__c (NOT ascendix__EndDate__c)",
+      "property_total_area": "ascendix__TotalBuildingArea__c",
+      "property_available_area": "ascendix__TotalAvailableArea__c",
+      "property_address": "ascendix__Street__c (use with City/State for full address)"
+    },
+    "pipeline_diagnostics": {
+      "description": "Each test captures queryPlan from API response to diagnose failures",
+      "checkpoints": [
+        {
+          "stage": "schema_decomposition",
+          "queryPlan_key": "schemaDecomposition",
+          "validates": "NLS → structured query with target entity and filters",
+          "failure_indicates": "LLM decomposition failed or timed out to heuristic fallback"
+        },
+        {
+          "stage": "cross_object_query",
+          "queryPlan_key": "crossObjectQuery",
+          "validates": "Parent entity filtering and traversal to target",
+          "failure_indicates": "Graph nodes missing attributes or filter value mismatch"
+        },
+        {
+          "stage": "graph_filter",
+          "queryPlan_key": "graphFilterCandidates",
+          "validates": "Attribute-based filtering returned candidate IDs",
+          "failure_indicates": "Graph node attributes not indexed or value normalization issue"
+        },
+        {
+          "stage": "planner",
+          "queryPlan_key": "planner",
+          "validates": "Planner produced high-confidence structured plan",
+          "failure_indicates": "Entity linking failed or confidence below threshold"
+        },
+        {
+          "stage": "vector_search",
+          "queryPlan_key": "trace.retrieveMs",
+          "validates": "Vector search executed with correct filters",
+          "failure_indicates": "KB query failed or metadata filters not applied"
+        }
+      ],
+      "failure_modes": {
+        "wrong_city_returned": {
+          "likely_cause": "Cross-object filter returned 0 results, fell back to unfiltered vector search",
+          "check": "queryPlan.crossObjectQuery.matchingCount should be > 0",
+          "fix": "Verify graph node has correct City attribute value"
+        },
+        "wrong_record_type": {
+          "likely_cause": "RecordType filter not extracted or value mismatch",
+          "check": "queryPlan.schemaDecomposition.filters should include RecordType",
+          "fix": "Check schema_decomposer LLM prompt includes RecordType options"
+        },
+        "empty_results": {
+          "likely_cause": "Graph filter short-circuited to empty (correct behavior if no matches)",
+          "check": "queryPlan.graphFilterShortCircuit should be true",
+          "fix": "Verify test data exists with correct attribute values"
+        },
+        "fallback_to_semantic": {
+          "likely_cause": "Both cross-object and graph filter failed",
+          "check": "Look for 'falling back to pure semantic search' in logs",
+          "fix": "Data indexing gap - reindex with correct attributes"
+        }
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "GAZC-R14-AC1",
+      "requirement_ref": "14.1",
+      "name": "Available Class A office space in Plano",
+      "nls_query": "Available Class A office space in Plano",
+      "intent": {
+        "target_object": "ascendix__Availability__c",
+        "parent_object": "ascendix__Property__c",
+        "requires_traversal": true,
+        "filters": {
+          "parent": {
+            "RecordType.Name": "Office",
+            "ascendix__PropertyClass__c": "A",
+            "ascendix__City__c": "Plano"
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "First get Property IDs, then get Availabilities",
+        "step1_property_filter": "SELECT Id FROM ascendix__Property__c WHERE RecordType.Name = 'Office' AND ascendix__PropertyClass__c = 'A' AND ascendix__City__c = 'Plano'",
+        "step2_availability_query": "SELECT Id, Name, ascendix__Property__c, ascendix__AvailableArea__c, ascendix__Status__c FROM ascendix__Availability__c WHERE ascendix__Property__c IN (:propertyIds)"
+      },
+      "expected_data": {
+        "description": "From sandbox exploration: Preston Park Financial Center is Office in Plano",
+        "expected_property": "Preston Park Financial Center",
+        "expected_availabilities": ["Suite 2100 - PPFC1", "Suite 3400"],
+        "must_contain_city": "Plano",
+        "must_not_contain_city": ["Des Peres", "Miami", "Dallas"]
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "ascendix__Availability__c",
+          "expected_needs_cross_object_traversal": true,
+          "expected_traversals": [{
+            "to": "ascendix__Property__c",
+            "expected_filters": {
+              "ascendix__City__c": "Plano",
+              "ascendix__PropertyClass__c": ["A", "Class A"],
+              "RecordType": "Office"
+            }
+          }],
+          "min_confidence": 0.5,
+          "failure_action": "Check LLM decomposition prompt and heuristic fallback"
+        },
+        "cross_object_query": {
+          "expected_detected": true,
+          "expected_filter_entity": "ascendix__Property__c",
+          "expected_matching_count_gt": 0,
+          "failure_action": "Verify Property graph nodes have City=Plano attribute"
+        },
+        "graph_filter": {
+          "expected_candidates_gt": 0,
+          "expected_short_circuit": false,
+          "failure_action": "Check graph node attribute indexing for City, PropertyClass, RecordType"
+        },
+        "result_validation": {
+          "all_records_sobject": "ascendix__Availability__c",
+          "all_parent_city": "Plano",
+          "none_parent_city": ["Des Peres", "Miami", "Dallas"],
+          "failure_action": "Silent fallback to semantic search - check crossObjectQuery.matchingCount"
+        }
+      },
+      "validation": {
+        "method": "property_validation",
+        "rules": [
+          "All returned records must be Availability objects",
+          "All related Property.ascendix__City__c must equal 'Plano'",
+          "All related Property.RecordType.Name must equal 'Office'",
+          "Results must NOT include records from other cities"
+        ]
+      },
+      "status": "pending",
+      "test_results": null
+    },
+    {
+      "id": "GAZC-R14-AC2",
+      "requirement_ref": "14.2",
+      "name": "Available industrial properties in Miami FL 20k-50k sf",
+      "nls_query": "Available industrial properties in Miami, FL 20k-50k sf",
+      "intent": {
+        "target_object": "ascendix__Availability__c",
+        "parent_object": "ascendix__Property__c",
+        "requires_traversal": true,
+        "filters": {
+          "parent": {
+            "RecordType.Name": "Industrial",
+            "ascendix__City__c": "Miami",
+            "ascendix__State__c": "FL"
+          },
+          "target": {
+            "ascendix__AvailableArea__c": {
+              "gte": 20000,
+              "lte": 50000
+            }
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "Filter Property by type/location, then Availability by size",
+        "step1_property_filter": "SELECT Id FROM ascendix__Property__c WHERE RecordType.Name = 'Industrial' AND ascendix__City__c = 'Miami' AND ascendix__State__c = 'FL'",
+        "step2_availability_query": "SELECT Id, Name, ascendix__Property__c, ascendix__AvailableArea__c FROM ascendix__Availability__c WHERE ascendix__Property__c IN (:propertyIds) AND ascendix__AvailableArea__c >= 20000 AND ascendix__AvailableArea__c <= 50000"
+      },
+      "expected_data": {
+        "description": "May return empty if no matching test data",
+        "must_contain_city": "Miami",
+        "must_contain_state": "FL",
+        "must_contain_record_type": "Industrial",
+        "size_range": {"min": 20000, "max": 50000}
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "ascendix__Availability__c",
+          "expected_needs_cross_object_traversal": true,
+          "expected_numeric_filters": {
+            "ascendix__AvailableArea__c": {"gte": 20000, "lte": 50000}
+          },
+          "min_confidence": 0.5
+        },
+        "cross_object_query": {
+          "expected_detected": true,
+          "expected_filter_entity": "ascendix__Property__c",
+          "note": "May return 0 if no Industrial properties in Miami - valid empty result"
+        },
+        "result_validation": {
+          "all_records_sobject": "ascendix__Availability__c",
+          "all_parent_city": "Miami",
+          "all_parent_state": "FL",
+          "size_range_check": true
+        }
+      },
+      "validation": {
+        "method": "property_validation",
+        "rules": [
+          "All related Property.ascendix__City__c must equal 'Miami'",
+          "All related Property.ascendix__State__c must equal 'FL'",
+          "All related Property.RecordType.Name must equal 'Industrial'",
+          "All ascendix__AvailableArea__c must be between 20000 and 50000"
+        ]
+      },
+      "status": "pending",
+      "data_availability": "needs_verification"
+    },
+    {
+      "id": "GAZC-R14-AC3",
+      "requirement_ref": "14.3",
+      "name": "Class A office buildings downtown with vacancy",
+      "nls_query": "Class A office buildings downtown with vacancy >0",
+      "intent": {
+        "target_object": "ascendix__Property__c",
+        "requires_traversal": false,
+        "filters": {
+          "target": {
+            "ascendix__PropertyClass__c": "A",
+            "RecordType.Name": "Office",
+            "ascendix__SubMarket__c": {"contains": "Downtown"}
+          },
+          "aggregation": {
+            "has_availability": true
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "Properties with Class A Office, downtown submarket, and at least one availability",
+        "query": "SELECT Id, Name, ascendix__City__c, ascendix__PropertyClass__c, ascendix__SubMarket__c, (SELECT Id FROM ascendix__Availabilities__r LIMIT 1) FROM ascendix__Property__c WHERE ascendix__PropertyClass__c = 'A' AND RecordType.Name = 'Office' AND ascendix__SubMarket__c LIKE '%Downtown%'"
+      },
+      "expected_data": {
+        "description": "Properties meeting all criteria",
+        "must_contain_class": "A",
+        "must_contain_record_type": "Office",
+        "submarket_pattern": "Downtown"
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "ascendix__Property__c",
+          "expected_needs_cross_object_traversal": false,
+          "expected_filters": {
+            "ascendix__PropertyClass__c": ["A", "Class A"],
+            "RecordType": "Office"
+          },
+          "min_confidence": 0.5
+        },
+        "graph_filter": {
+          "expected_candidates_gt": 0,
+          "note": "Direct Property filter - no cross-object traversal needed"
+        },
+        "aggregation_routing": {
+          "expected_view": "vacancy_view",
+          "note": "May route to vacancy_view for vacancy >0 condition"
+        },
+        "result_validation": {
+          "all_records_sobject": "ascendix__Property__c",
+          "all_property_class": ["A", "Class A"],
+          "all_record_type": "Office"
+        }
+      },
+      "validation": {
+        "method": "property_validation",
+        "rules": [
+          "All ascendix__PropertyClass__c must equal 'A'",
+          "All RecordType.Name must equal 'Office'",
+          "All ascendix__SubMarket__c must contain 'Downtown'",
+          "Each property should have at least one availability OR vacancy > 0"
+        ]
+      },
+      "status": "pending",
+      "data_availability": "needs_verification"
+    },
+    {
+      "id": "GAZC-R14-AC4",
+      "requirement_ref": "14.4",
+      "name": "Leases expiring in next 6 months",
+      "nls_query": "Leases expiring in next 6 months",
+      "intent": {
+        "target_object": "ascendix__Lease__c",
+        "requires_traversal": false,
+        "filters": {
+          "target": {
+            "ascendix__TermExpirationDate__c": {
+              "gte": "TODAY",
+              "lte": "NEXT_6_MONTHS"
+            }
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "Leases with end date within 6 months from now",
+        "query": "SELECT Id, Name, ascendix__TermExpirationDate__c, ascendix__Property__c, ascendix__Tenant__c FROM ascendix__Lease__c WHERE ascendix__TermExpirationDate__c >= TODAY AND ascendix__TermExpirationDate__c <= NEXT_N_MONTHS:6"
+      },
+      "expected_data": {
+        "description": "Leases with end dates in the upcoming 6 month window",
+        "date_range": {
+          "start": "today",
+          "end": "+6 months"
+        }
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "ascendix__Lease__c",
+          "expected_needs_cross_object_traversal": false,
+          "expected_date_filters": {
+            "ascendix__TermExpirationDate__c": "temporal range"
+          },
+          "min_confidence": 0.5
+        },
+        "aggregation_routing": {
+          "expected_view": "leases_view",
+          "expected_date_range_parsing": true,
+          "note": "Should route to leases_view with temporal_parser date extraction"
+        },
+        "result_validation": {
+          "all_records_sobject": "ascendix__Lease__c",
+          "all_dates_in_range": true,
+          "failure_action": "Check temporal_parser.get_lease_date_range() output"
+        }
+      },
+      "validation": {
+        "method": "date_validation",
+        "rules": [
+          "All ascendix__TermExpirationDate__c must be >= today",
+          "All ascendix__TermExpirationDate__c must be <= today + 6 months",
+          "Results must be Lease objects"
+        ]
+      },
+      "status": "pending",
+      "data_availability": "temporal_test_data"
+    },
+    {
+      "id": "GAZC-R14-AC5",
+      "requirement_ref": "14.5",
+      "name": "Activities on Property 123 Main Street last 30 days",
+      "nls_query": "Activities on Property 123 Main Street last 30 days",
+      "intent": {
+        "target_object": "Task",
+        "requires_entity_resolution": true,
+        "entity_to_resolve": {
+          "object": "ascendix__Property__c",
+          "search_term": "123 Main Street",
+          "search_field": "Name"
+        },
+        "filters": {
+          "target": {
+            "WhatId": "resolved_property_id",
+            "ActivityDate": {
+              "gte": "LAST_30_DAYS"
+            }
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "First resolve property by address, then get tasks",
+        "step1_entity_resolution": "SELECT Id FROM ascendix__Property__c WHERE Name LIKE '%123 Main Street%' OR ascendix__Street__c LIKE '%123 Main Street%'",
+        "step2_activity_query": "SELECT Id, Subject, WhatId, ActivityDate FROM Task WHERE WhatId = :resolvedPropertyId AND ActivityDate >= LAST_N_DAYS:30"
+      },
+      "expected_data": {
+        "description": "Requires property '123 Main Street' to exist in sandbox",
+        "requires_test_data": true
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "Task",
+          "note": "Complex query requiring entity resolution before filtering"
+        },
+        "entity_resolution": {
+          "expected_entity_to_resolve": "ascendix__Property__c",
+          "expected_search_term": "123 Main Street",
+          "expected_resolved_id_present": true,
+          "failure_action": "Property '123 Main Street' may not exist - seed test data"
+        },
+        "planner": {
+          "expected_seed_ids_present": true,
+          "note": "Planner should resolve quoted entity to seed IDs"
+        },
+        "result_validation": {
+          "all_records_sobject": "Task",
+          "all_what_id_matches_resolved": true,
+          "all_dates_in_range": true
+        }
+      },
+      "validation": {
+        "method": "entity_resolution_validation",
+        "rules": [
+          "Entity resolution must successfully find property",
+          "All Task.WhatId must match resolved property ID",
+          "All ActivityDate must be within last 30 days"
+        ]
+      },
+      "status": "pending",
+      "data_availability": "needs_seed_data"
+    },
+    {
+      "id": "GAZC-R14-AC6",
+      "requirement_ref": "14.6",
+      "name": "Contacts with 5+ activities and Sale in Negotiation",
+      "nls_query": "Contacts with ≥5 activities last week and Sale stage=Negotiation",
+      "intent": {
+        "target_object": "Contact",
+        "requires_derived_view": "activities_agg",
+        "filters": {
+          "aggregation": {
+            "activity_count_7d": {"gte": 5}
+          },
+          "related_sale": {
+            "StageName": "Negotiation"
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "Complex query requiring activities_agg derived view",
+        "derived_view_query": "Query activities_agg for contacts with 7d_count >= 5",
+        "sale_filter": "SELECT ascendix__Contact__c FROM ascendix__Sale__c WHERE ascendix__Stage__c = 'Negotiation'",
+        "combined_logic": "Intersection of contacts with high activity AND related to Negotiation stage sales"
+      },
+      "expected_data": {
+        "description": "Contacts meeting both criteria",
+        "requires_derived_view": true,
+        "activity_threshold": 5,
+        "activity_window": "7 days"
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "Contact",
+          "note": "Complex multi-criteria query"
+        },
+        "aggregation_routing": {
+          "expected_view": "activities_agg",
+          "expected_used": true,
+          "failure_action": "Verify activities_agg view exists and is populated"
+        },
+        "result_validation": {
+          "all_records_sobject": "Contact",
+          "note": "Requires post-validation against Sale records"
+        }
+      },
+      "validation": {
+        "method": "derived_view_validation",
+        "rules": [
+          "Must use activities_agg view (not runtime aggregation)",
+          "Activity count must be >= 5 in last 7 days",
+          "Contact must be related to a Sale with Stage = 'Negotiation'"
+        ]
+      },
+      "status": "pending",
+      "data_availability": "requires_derived_view"
+    },
+    {
+      "id": "GAZC-R14-AC7",
+      "requirement_ref": "14.7",
+      "name": "Sales where Broker is Jane Doe and Stage is Due Diligence",
+      "nls_query": "Sales where Broker=Jane Doe and Stage=Due Diligence",
+      "intent": {
+        "target_object": "ascendix__Sale__c",
+        "requires_entity_resolution": true,
+        "entity_to_resolve": {
+          "object": "Contact",
+          "search_term": "Jane Doe",
+          "search_field": "Name"
+        },
+        "filters": {
+          "target": {
+            "ascendix__Broker__c": "resolved_contact_id",
+            "ascendix__Stage__c": "Due Diligence"
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "First resolve contact by name, then filter sales",
+        "step1_entity_resolution": "SELECT Id FROM Contact WHERE Name LIKE '%Jane Doe%'",
+        "step2_sale_query": "SELECT Id, Name, ascendix__Stage__c, ascendix__Broker__c FROM ascendix__Sale__c WHERE ascendix__Broker__c = :resolvedContactId AND ascendix__Stage__c = 'Due Diligence'"
+      },
+      "expected_data": {
+        "description": "Requires Contact 'Jane Doe' to exist in sandbox",
+        "requires_test_data": true,
+        "stage_value": "Due Diligence"
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "ascendix__Sale__c",
+          "expected_filters": {
+            "ascendix__Stage__c": "Due Diligence"
+          }
+        },
+        "entity_resolution": {
+          "expected_entity_to_resolve": "Contact",
+          "expected_search_term": "Jane Doe",
+          "failure_action": "Contact 'Jane Doe' may not exist - seed test data"
+        },
+        "planner": {
+          "expected_seed_ids_present": true,
+          "expected_predicates_include": "ascendix__Stage__c"
+        },
+        "result_validation": {
+          "all_records_sobject": "ascendix__Sale__c",
+          "all_stage": "Due Diligence"
+        }
+      },
+      "validation": {
+        "method": "entity_resolution_validation",
+        "rules": [
+          "Entity resolution must successfully find contact 'Jane Doe'",
+          "All Sale.ascendix__Broker__c must match resolved contact ID",
+          "All Sale.ascendix__Stage__c must equal 'Due Diligence'"
+        ]
+      },
+      "status": "pending",
+      "data_availability": "needs_seed_data"
+    },
+    {
+      "id": "GAZC-R14-AC8",
+      "requirement_ref": "14.8",
+      "name": "Companies owning 10+ retail properties in PNW",
+      "nls_query": "Companies owning ≥10 retail properties in PNW",
+      "intent": {
+        "target_object": "Account",
+        "requires_derived_view": "property_counts",
+        "requires_geographic_expansion": true,
+        "geographic_expansion": {
+          "PNW": ["Washington", "Oregon", "Idaho", "WA", "OR", "ID"]
+        },
+        "filters": {
+          "aggregation": {
+            "property_count": {"gte": 10},
+            "property_type": "Retail",
+            "property_region": "PNW"
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "Complex aggregation requiring derived property counts",
+        "property_filter": "SELECT ascendix__Owner__c, COUNT(Id) FROM ascendix__Property__c WHERE RecordType.Name = 'Retail' AND ascendix__State__c IN ('Washington', 'Oregon', 'Idaho', 'WA', 'OR', 'ID') GROUP BY ascendix__Owner__c HAVING COUNT(Id) >= 10",
+        "account_lookup": "SELECT Id, Name FROM Account WHERE Id IN (:ownerIds)"
+      },
+      "expected_data": {
+        "description": "Companies with significant retail holdings in Pacific Northwest",
+        "property_type": "Retail",
+        "states": ["WA", "OR", "ID"],
+        "min_count": 10
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "Account",
+          "note": "Complex aggregation query requiring geographic expansion"
+        },
+        "geographic_expansion": {
+          "expected_region": "PNW",
+          "expected_expanded_values": ["WA", "OR", "ID", "Washington", "Oregon", "Idaho"],
+          "failure_action": "Check if geographic aliases are configured"
+        },
+        "aggregation_routing": {
+          "note": "May require property_counts derived view or runtime aggregation"
+        },
+        "result_validation": {
+          "all_records_sobject": "Account",
+          "post_validation_required": "Verify each Account owns >= 10 Retail properties in PNW"
+        }
+      },
+      "validation": {
+        "method": "aggregation_validation",
+        "rules": [
+          "Must use derived property counts (not runtime aggregation)",
+          "All counted properties must be Retail type",
+          "All counted properties must be in WA, OR, or ID",
+          "Each returned company must own >= 10 qualifying properties"
+        ]
+      },
+      "status": "pending",
+      "data_availability": "requires_derived_view"
+    },
+    {
+      "id": "GAZC-R14-AC9",
+      "requirement_ref": "14.9",
+      "name": "Properties with vacancy rate greater than 25%",
+      "nls_query": "Properties with vacancy rate >25%",
+      "intent": {
+        "target_object": "ascendix__Property__c",
+        "requires_derived_view": "vacancy_view",
+        "filters": {
+          "aggregation": {
+            "vacancy_rate": {"gt": 0.25}
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "Uses vacancy_view derived data",
+        "derived_view_query": "Query vacancy_view for properties with vacancy_pct > 25",
+        "property_lookup": "SELECT Id, Name, ascendix__TotalBuildingArea__c, ascendix__TotalAvailableArea__c FROM ascendix__Property__c WHERE Id IN (:vacantPropertyIds)"
+      },
+      "expected_data": {
+        "description": "Properties with high vacancy",
+        "vacancy_threshold": 0.25
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "ascendix__Property__c",
+          "note": "Numeric comparison query on derived metric"
+        },
+        "aggregation_routing": {
+          "expected_view": "vacancy_view",
+          "expected_used": true,
+          "failure_action": "Verify vacancy_view exists and is populated with vacancy_pct"
+        },
+        "result_validation": {
+          "all_records_sobject": "ascendix__Property__c",
+          "all_vacancy_rate_gt": 0.25,
+          "vacancy_formula": "ascendix__TotalAvailableArea__c / ascendix__TotalBuildingArea__c"
+        }
+      },
+      "validation": {
+        "method": "derived_view_validation",
+        "rules": [
+          "Must use vacancy_view (not runtime calculation)",
+          "All returned properties must have vacancy_rate > 25%",
+          "Vacancy calculation: ascendix__TotalAvailableArea__c / ascendix__TotalBuildingArea__c"
+        ]
+      },
+      "status": "pending",
+      "data_availability": "requires_derived_view"
+    },
+    {
+      "id": "GAZC-R14-AC10",
+      "requirement_ref": "14.10",
+      "name": "Notes containing HVAC system needs replacement",
+      "nls_query": "Notes containing HVAC system needs replacement",
+      "intent": {
+        "target_object": "Note",
+        "requires_text_search": true,
+        "filters": {
+          "text_search": {
+            "field": "Body",
+            "query": "HVAC system needs replacement"
+          }
+        }
+      },
+      "ground_truth_soql": {
+        "description": "Full-text search on Note body",
+        "query": "SELECT Id, Title, Body, ParentId FROM Note WHERE Body LIKE '%HVAC%' AND Body LIKE '%replacement%'"
+      },
+      "expected_data": {
+        "description": "Notes mentioning HVAC replacement",
+        "search_terms": ["HVAC", "replacement"],
+        "return_fields": ["ParentId", "Title", "Body snippet"]
+      },
+      "pipeline_checkpoints": {
+        "capture_query_plan": true,
+        "schema_decomposition": {
+          "expected_target_entity": "Note",
+          "note": "Full-text semantic search query"
+        },
+        "intent_classification": {
+          "expected_intent": "SIMPLE_LOOKUP",
+          "note": "Text search should route to vector/semantic search"
+        },
+        "vector_search": {
+          "expected_executed": true,
+          "expected_sobject_filter": "Note",
+          "note": "Primary retrieval via semantic similarity"
+        },
+        "result_validation": {
+          "all_records_sobject": "Note",
+          "all_body_contains": ["HVAC"],
+          "failure_action": "Note records with HVAC content may not exist - seed test data"
+        }
+      },
+      "validation": {
+        "method": "text_search_validation",
+        "rules": [
+          "All returned Note.Body must contain 'HVAC'",
+          "All returned Note.Body must reference maintenance/replacement",
+          "Should return linked parent IDs for context"
+        ]
+      },
+      "status": "pending",
+      "data_availability": "needs_seed_data"
+    }
+  ],
+  "test_execution_config": {
+    "execution_method": "browser_e2e",
+    "salesforce_org": "https://ascendix-agentforce-demo--beta.sandbox.my.salesforce.com",
+    "test_user": "tterry@ascendix.com.agentforce.demo.beta",
+    "ai_search_lwc_location": "Home page or Search utility",
+    "api_endpoint": {
+      "url": "https://v2zweox56y5r6sdvlxnif3gzea0ffqow.lambda-url.us-west-2.on.aws/answer",
+      "api_key_header": "x-api-key",
+      "debug_mode": true,
+      "note": "Set debug:true in request to get full queryPlan in response"
+    },
+    "validation_approach": {
+      "for_each_test": [
+        "1. Execute NLS query via AI Search LWC (or direct API with debug:true)",
+        "2. Capture full API response including queryPlan",
+        "3. Validate pipeline checkpoints against expected values",
+        "4. If checkpoint fails, identify root cause from failure_action",
+        "5. Execute ground truth SOQL directly in Salesforce",
+        "6. Compare RAG results against SOQL results",
+        "7. Validate all returned records meet criteria",
+        "8. Record test_results with checkpoint diagnostics"
+      ],
+      "checkpoint_validation_order": [
+        "schema_decomposition - Did NLS correctly decompose to structured query?",
+        "cross_object_query - Did parent entity filtering work?",
+        "graph_filter - Did attribute filtering return candidates?",
+        "planner - Did entity linking produce predicates?",
+        "aggregation_routing - Did it route to correct derived view?",
+        "result_validation - Do returned records meet criteria?"
+      ],
+      "failure_diagnosis": {
+        "wrong_data_returned": [
+          "Check queryPlan.crossObjectQuery.matchingCount - if 0, cross-object filter failed",
+          "Check queryPlan.graphFilterCandidates - if 0, graph attributes may be missing",
+          "Look for 'falling back to pure semantic search' in queryPlan warnings"
+        ],
+        "empty_results": [
+          "Check queryPlan.graphFilterShortCircuit - if true, correct empty response",
+          "Check queryPlan.schemaDecomposition.confidence - low confidence may skip filtering",
+          "Verify test data exists with correct attribute values"
+        ],
+        "timeout_or_error": [
+          "Check queryPlan.schemaDecomposition for timeout/heuristic fallback",
+          "Check trace.decompositionMs and trace.retrieveMs for latency issues"
+        ]
+      }
+    },
+    "test_result_schema": {
+      "status": "passed|failed|error|skipped",
+      "execution_timestamp": "ISO8601",
+      "query_plan_captured": true,
+      "checkpoint_results": {
+        "schema_decomposition": "passed|failed|skipped",
+        "cross_object_query": "passed|failed|skipped|not_applicable",
+        "graph_filter": "passed|failed|skipped|not_applicable",
+        "result_validation": "passed|failed"
+      },
+      "failure_diagnosis": "Root cause if failed",
+      "raw_response": "Full API response for debugging"
+    }
+  },
+  "data_availability_summary": {
+    "verified_data": [
+      "GAZC-R14-AC1: Preston Park Financial Center (Office, Plano) with availabilities"
+    ],
+    "needs_verification": [
+      "GAZC-R14-AC2: Industrial properties in Miami",
+      "GAZC-R14-AC3: Downtown office buildings"
+    ],
+    "needs_seed_data": [
+      "GAZC-R14-AC5: Property '123 Main Street'",
+      "GAZC-R14-AC7: Contact 'Jane Doe' as broker",
+      "GAZC-R14-AC10: Notes with HVAC content"
+    ],
+    "requires_derived_views": [
+      "GAZC-R14-AC6: activities_agg view",
+      "GAZC-R14-AC8: property_counts derived data",
+      "GAZC-R14-AC9: vacancy_view"
+    ],
+    "temporal_test_data": [
+      "GAZC-R14-AC4: Leases with end dates in next 6 months"
+    ]
+  }
+}

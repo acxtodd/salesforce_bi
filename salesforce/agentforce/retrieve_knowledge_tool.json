@@ -1,0 +1,325 @@
+{
+  "toolName": "retrieve_knowledge",
+  "displayName": "Retrieve Knowledge from Salesforce Data",
+  "description": "Searches across indexed Salesforce records (Accounts, Opportunities, Cases, Notes, Properties, Leases, Contracts) using hybrid semantic and keyword search. Returns relevant chunks with metadata for grounding agent responses. Enforces Salesforce sharing rules and field-level security.",
+  "category": "Knowledge Retrieval",
+  "endpoint": {
+    "method": "POST",
+    "path": "/retrieve",
+    "namedCredential": "Ascendix_RAG_API"
+  },
+  "inputSchema": {
+    "type": "object",
+    "required": ["query", "salesforceUserId"],
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Natural language query to search for. Can be a question or keywords.",
+        "minLength": 1,
+        "maxLength": 500,
+        "examples": [
+          "Show open opportunities over $1M for ACME in EMEA",
+          "Which accounts have leases expiring next quarter?",
+          "Find cases related to HVAC issues"
+        ]
+      },
+      "filters": {
+        "type": "object",
+        "description": "Optional filters to narrow search results by object type, region, business unit, or other metadata",
+        "properties": {
+          "sobject": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["Account", "Opportunity", "Case", "Note", "Property__c", "Lease__c", "Contract__c"]
+            },
+            "description": "Filter by specific Salesforce object types"
+          },
+          "region": {
+            "type": "string",
+            "description": "Filter by geographic region (e.g., 'EMEA', 'AMER', 'APAC')"
+          },
+          "businessUnit": {
+            "type": "string",
+            "description": "Filter by business unit (e.g., 'Enterprise', 'SMB', 'Services')"
+          },
+          "quarter": {
+            "type": "string",
+            "description": "Filter by quarter (e.g., 'Q1 2026', 'Q4 2025')"
+          }
+        }
+      },
+      "recordContext": {
+        "type": "object",
+        "description": "Optional context about the current record being viewed to enhance relevance",
+        "properties": {
+          "AccountId": {
+            "type": "string",
+            "pattern": "^001[a-zA-Z0-9]{15}$",
+            "description": "Current Account ID (18 characters)"
+          },
+          "OpportunityId": {
+            "type": "string",
+            "pattern": "^006[a-zA-Z0-9]{15}$",
+            "description": "Current Opportunity ID (18 characters)"
+          },
+          "CaseId": {
+            "type": "string",
+            "pattern": "^500[a-zA-Z0-9]{15}$",
+            "description": "Current Case ID (18 characters)"
+          }
+        }
+      },
+      "salesforceUserId": {
+        "type": "string",
+        "pattern": "^005[a-zA-Z0-9]{12,15}$",
+        "description": "Salesforce User ID (15 or 18 characters) for authorization enforcement. REQUIRED for security.",
+        "examples": ["005xx000001234567"]
+      },
+      "topK": {
+        "type": "integer",
+        "description": "Number of results to return (1-20). Defaults to 8.",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 8
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "matches": {
+        "type": "array",
+        "description": "Array of relevant chunks matching the query, filtered by user permissions",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique chunk identifier in format: {sobject}/{recordId}/chunk-{index}"
+            },
+            "title": {
+              "type": "string",
+              "description": "Display title for the chunk (typically record name)"
+            },
+            "score": {
+              "type": "number",
+              "description": "Relevance score (0.0 to 1.0)"
+            },
+            "snippet": {
+              "type": "string",
+              "description": "Text excerpt from the chunk"
+            },
+            "metadata": {
+              "type": "object",
+              "description": "Metadata about the source record",
+              "properties": {
+                "sobject": {
+                  "type": "string",
+                  "description": "Salesforce object type"
+                },
+                "recordId": {
+                  "type": "string",
+                  "description": "Salesforce record ID"
+                },
+                "ownerId": {
+                  "type": "string",
+                  "description": "Record owner's User ID"
+                },
+                "territory": {
+                  "type": "string",
+                  "description": "Territory assignment"
+                },
+                "businessUnit": {
+                  "type": "string",
+                  "description": "Business unit"
+                },
+                "region": {
+                  "type": "string",
+                  "description": "Geographic region"
+                }
+              }
+            },
+            "previewUrl": {
+              "type": "string",
+              "description": "Presigned S3 URL for preview (15-minute expiration)"
+            }
+          }
+        }
+      },
+      "totalMatches": {
+        "type": "integer",
+        "description": "Total number of matches found (before topK limit)"
+      },
+      "queryPlan": {
+        "type": "object",
+        "description": "Query execution details for debugging",
+        "properties": {
+          "filters": {
+            "type": "object",
+            "description": "Applied filters"
+          },
+          "authzContext": {
+            "type": "object",
+            "description": "Authorization context used for filtering"
+          }
+        }
+      },
+      "trace": {
+        "type": "object",
+        "description": "Performance timing metrics",
+        "properties": {
+          "retrieveMs": {
+            "type": "number",
+            "description": "Retrieval time in milliseconds"
+          },
+          "authzMs": {
+            "type": "number",
+            "description": "Authorization computation time in milliseconds"
+          },
+          "totalMs": {
+            "type": "number",
+            "description": "Total request time in milliseconds"
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "name": "Search for high-value opportunities in EMEA",
+      "input": {
+        "query": "Show open opportunities over $1M for ACME in EMEA",
+        "filters": {
+          "sobject": ["Opportunity"],
+          "region": "EMEA"
+        },
+        "salesforceUserId": "005xx000001234567",
+        "topK": 5
+      },
+      "output": {
+        "matches": [
+          {
+            "id": "Opportunity/006xx1/chunk-0",
+            "title": "ACME Renewal - Enterprise License",
+            "score": 0.82,
+            "snippet": "ACME renewal valued at $1.2M closes 2026-02-10. Key blocker: budget approval pending from CFO.",
+            "metadata": {
+              "sobject": "Opportunity",
+              "recordId": "006xx1",
+              "ownerId": "005yy",
+              "territory": "EMEA",
+              "businessUnit": "Enterprise",
+              "region": "EMEA"
+            },
+            "previewUrl": "https://s3.signed-url.amazonaws.com/..."
+          }
+        ],
+        "totalMatches": 3,
+        "trace": {
+          "retrieveMs": 210,
+          "authzMs": 8,
+          "totalMs": 218
+        }
+      }
+    },
+    {
+      "name": "Find accounts with expiring leases",
+      "input": {
+        "query": "Which accounts have leases expiring next quarter?",
+        "filters": {
+          "sobject": ["Account", "Lease__c"]
+        },
+        "salesforceUserId": "005xx000001234567",
+        "topK": 8
+      },
+      "output": {
+        "matches": [
+          {
+            "id": "Lease__c/a00xx1/chunk-0",
+            "title": "Downtown Office Lease - ACME Corp",
+            "score": 0.78,
+            "snippet": "Lease expires 2026-03-31. Tenant has expressed interest in renewal but concerned about rate increase.",
+            "metadata": {
+              "sobject": "Lease__c",
+              "recordId": "a00xx1",
+              "ownerId": "005zz",
+              "territory": "AMER",
+              "businessUnit": "Commercial",
+              "region": "AMER"
+            },
+            "previewUrl": "https://s3.signed-url.amazonaws.com/..."
+          }
+        ],
+        "totalMatches": 12,
+        "trace": {
+          "retrieveMs": 195,
+          "authzMs": 6,
+          "totalMs": 201
+        }
+      }
+    },
+    {
+      "name": "Search with record context",
+      "input": {
+        "query": "Find related cases and notes",
+        "recordContext": {
+          "AccountId": "001xx000001234567"
+        },
+        "salesforceUserId": "005xx000001234567",
+        "topK": 10
+      },
+      "output": {
+        "matches": [
+          {
+            "id": "Case/500xx1/chunk-0",
+            "title": "HVAC System Malfunction",
+            "score": 0.85,
+            "snippet": "Tenant reported HVAC system not cooling properly. Maintenance scheduled for 2025-11-15.",
+            "metadata": {
+              "sobject": "Case",
+              "recordId": "500xx1",
+              "ownerId": "005aa",
+              "territory": "AMER",
+              "businessUnit": "Facilities",
+              "region": "AMER"
+            },
+            "previewUrl": "https://s3.signed-url.amazonaws.com/..."
+          }
+        ],
+        "totalMatches": 8,
+        "trace": {
+          "retrieveMs": 180,
+          "authzMs": 7,
+          "totalMs": 187
+        }
+      }
+    }
+  ],
+  "usageGuidelines": {
+    "whenToUse": [
+      "When the agent needs to find specific information across Salesforce records",
+      "When answering questions that require searching multiple object types",
+      "When the user asks for data that may be in notes, descriptions, or other text fields",
+      "As a first step before generating answers to ensure grounding in actual data"
+    ],
+    "bestPractices": [
+      "Always include the salesforceUserId to ensure proper authorization",
+      "Use filters to narrow results when the query context is known (e.g., specific object types or regions)",
+      "Include recordContext when the user is viewing a specific record to get more relevant results",
+      "Start with topK=8 for most queries; increase only if more context is needed",
+      "Prefer this tool over model knowledge for factual questions about Salesforce data"
+    ],
+    "limitations": [
+      "Only searches indexed objects: Account, Opportunity, Case, Note, Property__c, Lease__c, Contract__c",
+      "Results are filtered by user's sharing rules and field-level security",
+      "Maximum 20 results per query (topK limit)",
+      "Presigned URLs expire after 15 minutes"
+    ]
+  },
+  "securityNotes": {
+    "authorization": "This tool enforces Salesforce sharing rules and field-level security. Users will only see results they have permission to access.",
+    "dataPrivacy": "All communication occurs over private networking (PrivateLink). No data traverses the public internet.",
+    "auditLogging": "All queries are logged to DynamoDB with user ID, query text, and timing metrics for audit purposes."
+  }
+}

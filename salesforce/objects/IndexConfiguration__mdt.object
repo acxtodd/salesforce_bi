@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Index Configuration</label>
+    <pluralLabel>Index Configurations</pluralLabel>
+    <visibility>Public</visibility>
+    <description>Configuration for AI Search indexing per Salesforce object. Controls which objects are indexed, field extraction, chunking strategy, and graph database settings.</description>
+    
+    <!-- Core Indexing Fields -->
+    <fields>
+        <fullName>Object_API_Name__c</fullName>
+        <externalId>true</externalId>
+        <label>Object API Name</label>
+        <length>255</length>
+        <required>true</required>
+        <type>Text</type>
+        <unique>true</unique>
+        <description>API name of the Salesforce object (e.g., Account, ascendix__Property__c)</description>
+    </fields>
+    <fields>
+        <fullName>Enabled__c</fullName>
+        <defaultValue>true</defaultValue>
+        <externalId>false</externalId>
+        <label>Enabled</label>
+        <type>Checkbox</type>
+        <description>Whether this object is enabled for AI Search indexing</description>
+    </fields>
+    <fields>
+        <fullName>Text_Fields__c</fullName>
+        <externalId>false</externalId>
+        <label>Text Fields</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+        <description>Comma-separated list of text fields to index</description>
+    </fields>
+    <fields>
+        <fullName>Long_Text_Fields__c</fullName>
+        <externalId>false</externalId>
+        <label>Long Text Fields</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+        <description>Comma-separated list of long text area fields to index</description>
+    </fields>
+    <fields>
+        <fullName>Rich_Text_Fields__c</fullName>
+        <externalId>false</externalId>
+        <label>Rich Text Fields</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+        <description>Comma-separated list of rich text fields to index</description>
+    </fields>
+    <fields>
+        <fullName>Display_Name_Field__c</fullName>
+        <externalId>false</externalId>
+        <label>Display Name Field</label>
+        <length>255</length>
+        <required>false</required>
+        <type>Text</type>
+        <unique>false</unique>
+        <description>Field to use as display name (defaults to Name)</description>
+    </fields>
+    <fields>
+        <fullName>Preview_Fields__c</fullName>
+        <externalId>false</externalId>
+        <label>Preview Fields</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+        <description>Comma-separated list of fields to show in search result previews</description>
+    </fields>
+    
+    <!-- Chunking Configuration -->
+    <fields>
+        <fullName>Chunking_Strategy__c</fullName>
+        <externalId>false</externalId>
+        <label>Chunking Strategy</label>
+        <length>50</length>
+        <required>false</required>
+        <type>Text</type>
+        <unique>false</unique>
+        <description>Chunking strategy: semantic, fixed, or hybrid</description>
+    </fields>
+    <fields>
+        <fullName>Max_Chunk_Tokens__c</fullName>
+        <externalId>false</externalId>
+        <label>Max Chunk Tokens</label>
+        <precision>5</precision>
+        <required>false</required>
+        <scale>0</scale>
+        <type>Number</type>
+        <unique>false</unique>
+        <defaultValue>512</defaultValue>
+        <description>Maximum tokens per chunk (default 512)</description>
+    </fields>
+    
+    <!-- Graph Configuration (Phase 3) -->
+    <fields>
+        <fullName>Graph_Enabled__c</fullName>
+        <defaultValue>false</defaultValue>
+        <externalId>false</externalId>
+        <label>Graph Enabled</label>
+        <type>Checkbox</type>
+        <description>Enable graph database sync for relationship queries</description>
+    </fields>
+    <fields>
+        <fullName>Relationship_Depth__c</fullName>
+        <externalId>false</externalId>
+        <label>Relationship Depth</label>
+        <precision>1</precision>
+        <required>false</required>
+        <scale>0</scale>
+        <type>Number</type>
+        <unique>false</unique>
+        <defaultValue>2</defaultValue>
+        <description>How many levels of relationships to traverse (1-3)</description>
+    </fields>
+    <fields>
+        <fullName>Relationship_Fields__c</fullName>
+        <externalId>false</externalId>
+        <label>Relationship Fields</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+        <description>Comma-separated list of lookup/master-detail fields to traverse for graph building</description>
+    </fields>
+    <fields>
+        <fullName>Graph_Node_Attributes__c</fullName>
+        <externalId>false</externalId>
+        <label>Graph Node Attributes</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+        <description>Comma-separated list of fields to store as graph node attributes</description>
+    </fields>
+    
+    <!-- Schema Cache Override (Task 34.4) -->
+    <fields>
+        <fullName>Override_Schema_Cache__c</fullName>
+        <defaultValue>false</defaultValue>
+        <externalId>false</externalId>
+        <label>Override Schema Cache</label>
+        <type>Checkbox</type>
+        <description>When checked, use IndexConfiguration fields instead of Schema Cache. Use this when you need manual control over exported fields.</description>
+    </fields>
+    <fields>
+        <fullName>Additional_Fields__c</fullName>
+        <externalId>false</externalId>
+        <label>Additional Fields</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+        <description>Comma-separated list of additional fields to include beyond Schema Cache. Only used when Override_Schema_Cache__c is false.</description>
+    </fields>
+
+    <!-- Semantic Hints Configuration (Phase 4) -->
+    <fields>
+        <fullName>Semantic_Hints__c</fullName>
+        <externalId>false</externalId>
+        <label>Semantic Hints</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+        <description>Comma-separated keywords and aliases for entity detection (e.g., "space, vacant, suite" for Availability). Helps the AI understand user intent without code changes.</description>
+    </fields>
+    <fields>
+        <fullName>Object_Description__c</fullName>
+        <externalId>false</externalId>
+        <label>Object Description</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+        <description>Human-readable description of what this object represents. Used in LLM prompts for better query understanding.</description>
+    </fields>
+</CustomObject>

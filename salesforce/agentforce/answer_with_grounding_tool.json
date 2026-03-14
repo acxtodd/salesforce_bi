@@ -1,0 +1,342 @@
+{
+  "toolName": "answer_with_grounding",
+  "displayName": "Answer Questions with Grounded Citations",
+  "description": "Generates natural language answers to questions about Salesforce data with paragraph-level citations. Uses retrieval-augmented generation (RAG) to ground responses in actual Salesforce records. Enforces sharing rules and field-level security. Applies Bedrock Guardrails for safety.",
+  "category": "Question Answering",
+  "endpoint": {
+    "method": "POST",
+    "path": "/answer",
+    "namedCredential": "Ascendix_RAG_API",
+    "streaming": true,
+    "streamingProtocol": "Server-Sent Events (SSE)"
+  },
+  "inputSchema": {
+    "type": "object",
+    "required": ["query", "salesforceUserId"],
+    "properties": {
+      "sessionId": {
+        "type": "string",
+        "description": "Optional session ID for multi-turn conversations. If provided, maintains context across queries.",
+        "maxLength": 100,
+        "examples": ["acct-001xx-2025-11-13-session1"]
+      },
+      "query": {
+        "type": "string",
+        "description": "Natural language question to answer. Should be specific and focused.",
+        "minLength": 1,
+        "maxLength": 500,
+        "examples": [
+          "Summarize renewal risks for ACME with citations",
+          "What are the key blockers for opportunities closing this quarter?",
+          "Which properties have open maintenance cases?"
+        ]
+      },
+      "recordContext": {
+        "type": "object",
+        "description": "Optional context about the current record being viewed to enhance relevance and focus the answer",
+        "properties": {
+          "AccountId": {
+            "type": "string",
+            "pattern": "^001[a-zA-Z0-9]{15}$",
+            "description": "Current Account ID (18 characters)"
+          },
+          "OpportunityId": {
+            "type": "string",
+            "pattern": "^006[a-zA-Z0-9]{15}$",
+            "description": "Current Opportunity ID (18 characters)"
+          },
+          "CaseId": {
+            "type": "string",
+            "pattern": "^500[a-zA-Z0-9]{15}$",
+            "description": "Current Case ID (18 characters)"
+          }
+        }
+      },
+      "salesforceUserId": {
+        "type": "string",
+        "pattern": "^005[a-zA-Z0-9]{12,15}$",
+        "description": "Salesforce User ID (15 or 18 characters) for authorization enforcement. REQUIRED for security.",
+        "examples": ["005xx000001234567"]
+      },
+      "topK": {
+        "type": "integer",
+        "description": "Number of chunks to retrieve for context (1-20). Defaults to 8. Higher values provide more context but increase latency.",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 8
+      },
+      "policy": {
+        "type": "object",
+        "description": "Optional policy controls for answer generation",
+        "properties": {
+          "require_citations": {
+            "type": "boolean",
+            "description": "Whether to require citations for all factual claims. Defaults to true.",
+            "default": true
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "Maximum tokens in generated answer. Defaults to 600.",
+            "minimum": 100,
+            "maximum": 1000,
+            "default": 600
+          },
+          "temperature": {
+            "type": "number",
+            "description": "Sampling temperature (0.0-1.0). Lower values are more focused. Defaults to 0.3.",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "default": 0.3
+          }
+        }
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "description": "Streaming response using Server-Sent Events. Events include: 'token' (answer text), 'citation' (source references), 'done' (completion with trace)",
+    "properties": {
+      "answer": {
+        "type": "string",
+        "description": "Complete generated answer with inline citations in format [Source: RecordId]"
+      },
+      "citations": {
+        "type": "array",
+        "description": "Array of source records cited in the answer",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Cited record ID in format: {sobject}/{recordId}"
+            },
+            "sobject": {
+              "type": "string",
+              "description": "Salesforce object type"
+            },
+            "recordId": {
+              "type": "string",
+              "description": "Salesforce record ID"
+            },
+            "title": {
+              "type": "string",
+              "description": "Display title for the citation"
+            },
+            "snippet": {
+              "type": "string",
+              "description": "Relevant text excerpt from the source"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location pointer (e.g., 'field:Description', 'comment:2025-11-03')"
+            },
+            "previewUrl": {
+              "type": "string",
+              "description": "Presigned S3 URL for preview (15-minute expiration)"
+            }
+          }
+        }
+      },
+      "trace": {
+        "type": "object",
+        "description": "Performance timing metrics",
+        "properties": {
+          "retrieveMs": {
+            "type": "number",
+            "description": "Retrieval time in milliseconds"
+          },
+          "generateMs": {
+            "type": "number",
+            "description": "Answer generation time in milliseconds"
+          },
+          "firstTokenMs": {
+            "type": "number",
+            "description": "Time to first token in milliseconds"
+          },
+          "totalMs": {
+            "type": "number",
+            "description": "Total request time in milliseconds"
+          }
+        }
+      },
+      "reason": {
+        "type": "string",
+        "description": "Reason code if no answer provided (e.g., 'no_accessible_results', 'guardrails_violation')"
+      }
+    }
+  },
+  "streamingEvents": {
+    "token": {
+      "description": "Emitted for each token of the generated answer",
+      "format": "event: token\\ndata: {\"token\": \"text\"}\\n\\n"
+    },
+    "citation": {
+      "description": "Emitted when a citation is identified in the answer",
+      "format": "event: citation\\ndata: {\"id\": \"Opportunity/006xx1\", \"loc\": \"field:Description\", \"text\": \"excerpt\"}\\n\\n"
+    },
+    "done": {
+      "description": "Emitted when answer generation is complete",
+      "format": "event: done\\ndata: {\"trace\": {\"retrieveMs\": 210, \"generateMs\": 840, \"totalMs\": 1050}}\\n\\n"
+    },
+    "error": {
+      "description": "Emitted if an error occurs during generation",
+      "format": "event: error\\ndata: {\"error\": \"error_code\", \"message\": \"description\"}\\n\\n"
+    }
+  },
+  "examples": [
+    {
+      "name": "Summarize renewal risks with citations",
+      "input": {
+        "sessionId": "acct-001xx-session1",
+        "query": "Summarize renewal risks for ACME with citations",
+        "recordContext": {
+          "AccountId": "001xx000001234567"
+        },
+        "salesforceUserId": "005xx000001234567",
+        "topK": 6,
+        "policy": {
+          "require_citations": true,
+          "max_tokens": 600,
+          "temperature": 0.3
+        }
+      },
+      "output": {
+        "answer": "ACME's renewal faces several key risks:\n\n1. **Budget Approval Delays**: The $1.2M enterprise license renewal is pending CFO approval, which may delay the close date [Source: Opportunity/006xx1].\n\n2. **Pricing Concerns**: Customer has expressed concerns about the proposed rate increase in recent discussions [Source: Case/500xx2].\n\n3. **Competitive Pressure**: ACME is evaluating alternative vendors, as noted in the latest account review [Source: Note/002xx3].\n\n4. **Technical Issues**: Unresolved HVAC maintenance issues at their downtown property may impact overall satisfaction [Source: Case/500xx4].\n\nRecommendation: Schedule executive alignment call to address pricing concerns and expedite CFO approval.",
+        "citations": [
+          {
+            "id": "Opportunity/006xx1",
+            "sobject": "Opportunity",
+            "recordId": "006xx1",
+            "title": "ACME Renewal - Enterprise License",
+            "snippet": "Budget approval pending from CFO. Expected decision by 2025-11-20.",
+            "location": "field:Risk_Notes__c",
+            "previewUrl": "https://s3.signed-url.amazonaws.com/..."
+          },
+          {
+            "id": "Case/500xx2",
+            "sobject": "Case",
+            "recordId": "500xx2",
+            "title": "Pricing Discussion - ACME",
+            "snippet": "Customer expressed concerns about 15% rate increase. Requested competitive analysis.",
+            "location": "field:Description",
+            "previewUrl": "https://s3.signed-url.amazonaws.com/..."
+          },
+          {
+            "id": "Note/002xx3",
+            "sobject": "Note",
+            "recordId": "002xx3",
+            "title": "Account Review - Q4 2025",
+            "snippet": "ACME evaluating Competitor X and Competitor Y. Need to demonstrate ROI.",
+            "location": "field:Body",
+            "previewUrl": "https://s3.signed-url.amazonaws.com/..."
+          },
+          {
+            "id": "Case/500xx4",
+            "sobject": "Case",
+            "recordId": "500xx4",
+            "title": "HVAC System Malfunction",
+            "snippet": "Ongoing maintenance issues affecting tenant satisfaction. Resolution ETA 2025-11-25.",
+            "location": "field:Description",
+            "previewUrl": "https://s3.signed-url.amazonaws.com/..."
+          }
+        ],
+        "trace": {
+          "retrieveMs": 210,
+          "generateMs": 840,
+          "firstTokenMs": 320,
+          "totalMs": 1050
+        }
+      }
+    },
+    {
+      "name": "Answer question about opportunities",
+      "input": {
+        "query": "What are the key blockers for opportunities closing this quarter?",
+        "salesforceUserId": "005xx000001234567",
+        "topK": 8
+      },
+      "output": {
+        "answer": "Based on current opportunities, the main blockers for Q4 2025 closures are:\n\n1. **Budget Constraints**: Multiple opportunities are waiting for budget approval, particularly in the Enterprise segment [Source: Opportunity/006xx1, Opportunity/006xx5].\n\n2. **Technical Evaluation**: Several prospects are still in technical evaluation phase and need additional proof-of-concept work [Source: Opportunity/006xx7].\n\n3. **Competitive Pressure**: Price comparisons with competitors are delaying decisions in 3 major deals [Source: Opportunity/006xx2].\n\n4. **Legal Review**: Contract terms are under legal review for 2 large enterprise deals [Source: Opportunity/006xx9].",
+        "citations": [
+          {
+            "id": "Opportunity/006xx1",
+            "sobject": "Opportunity",
+            "recordId": "006xx1",
+            "title": "ACME Renewal - Enterprise License",
+            "snippet": "Budget approval pending. CFO review scheduled for 2025-11-20.",
+            "location": "field:Next_Steps__c",
+            "previewUrl": "https://s3.signed-url.amazonaws.com/..."
+          }
+        ],
+        "trace": {
+          "retrieveMs": 195,
+          "generateMs": 920,
+          "firstTokenMs": 285,
+          "totalMs": 1115
+        }
+      }
+    },
+    {
+      "name": "No accessible results",
+      "input": {
+        "query": "Show me all executive compensation details",
+        "salesforceUserId": "005xx000001234567",
+        "topK": 8
+      },
+      "output": {
+        "answer": null,
+        "citations": [],
+        "reason": "no_accessible_results",
+        "trace": {
+          "retrieveMs": 180,
+          "generateMs": 0,
+          "totalMs": 180
+        }
+      }
+    }
+  ],
+  "usageGuidelines": {
+    "whenToUse": [
+      "When the agent needs to provide a comprehensive answer to a user question",
+      "When synthesizing information from multiple Salesforce records",
+      "When the user asks for summaries, analysis, or insights",
+      "When citations and source attribution are important for trust",
+      "As a follow-up to retrieve_knowledge to generate natural language answers"
+    ],
+    "bestPractices": [
+      "Always include the salesforceUserId to ensure proper authorization",
+      "Use recordContext when answering questions about a specific record",
+      "Set require_citations=true (default) for factual questions",
+      "Use sessionId for multi-turn conversations to maintain context",
+      "Prefer this tool over generic LLM responses for Salesforce-specific questions",
+      "Configure the agent to prefer retriever grounding over model priors"
+    ],
+    "limitations": [
+      "Only answers based on indexed Salesforce data (no external knowledge)",
+      "Maximum 1000 tokens per answer (configurable via policy.max_tokens)",
+      "Streaming response requires SSE-compatible client",
+      "Results filtered by user's sharing rules and field-level security",
+      "May return no answer if no accessible results found"
+    ],
+    "groundingStrategy": [
+      "The tool ONLY uses information from retrieved Salesforce chunks",
+      "All factual claims must be supported by citations",
+      "If insufficient information is available, the tool returns 'no answer' rather than speculating",
+      "Bedrock Guardrails enforce grounding requirements and block unsupported claims",
+      "Configure Agentforce to prefer this tool's grounded responses over generic model knowledge"
+    ]
+  },
+  "securityNotes": {
+    "authorization": "This tool enforces Salesforce sharing rules and field-level security. Users will only see information from records they have permission to access.",
+    "dataPrivacy": "All communication occurs over private networking (PrivateLink). No data traverses the public internet.",
+    "guardrails": "Bedrock Guardrails are applied to detect and block: prompt injection, PII leakage, ungrounded claims, and inappropriate content.",
+    "auditLogging": "All queries and generated answers are logged to DynamoDB with user ID, query text, citations, and timing metrics for audit purposes.",
+    "sessionData": "Session data is stored in DynamoDB with 30-day TTL for multi-turn conversations."
+  },
+  "performanceTargets": {
+    "firstToken": "p95 ≤ 800ms",
+    "endToEnd": "p95 ≤ 4.0s for answers under 1000 tokens",
+    "retrieval": "p95 ≤ 400ms",
+    "streaming": "50-100 tokens per chunk for smooth rendering"
+  }
+}

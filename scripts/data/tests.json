@@ -1,0 +1,1110 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2026-01-05",
+    "description": "Salesforce AI Search - Requirements-Based Test Tracking",
+    "sources": [
+      {
+        "spec": "salesforce-ai-search-poc",
+        "date": "2024-11-26",
+        "status": "foundation"
+      },
+      {
+        "spec": "phase3-graph-enhancement",
+        "date": "2024-11-27",
+        "status": "partially_superseded"
+      },
+      {
+        "spec": "zero-config-schema-discovery",
+        "date": "2024-11-30",
+        "status": "extended"
+      },
+      {
+        "spec": "zero-config-production",
+        "date": "2024-11-30",
+        "status": "extended"
+      },
+      {
+        "spec": "graph-aware-zero-config-retrieval",
+        "date": "2024-12-14",
+        "status": "current"
+      }
+    ],
+    "test_summary": {
+      "total_requirements": 25,
+      "total_acceptance_criteria": 116,
+      "passed": 3,
+      "failed": 0,
+      "pending": 113,
+      "last_updated": "2026-01-05T13:05:00Z",
+      "superseded_requirements": 6,
+      "by_priority": {
+        "P0": 14,
+        "P1": 9,
+        "P2": 2
+      },
+      "by_layer": {
+        "foundation": 5,
+        "security": 3,
+        "graph": 1,
+        "zero_config": 9,
+        "quality": 7
+      }
+    }
+  },
+  "layers": {
+    "foundation": {
+      "description": "Core RAG system capabilities from original POC",
+      "spec_source": "salesforce-ai-search-poc"
+    },
+    "security": {
+      "description": "Authorization, FLS, sharing rules enforcement",
+      "spec_source": "multiple"
+    },
+    "graph": {
+      "description": "Graph traversal and relationship queries",
+      "spec_source": "graph-aware-zero-config-retrieval"
+    },
+    "zero_config": {
+      "description": "Dynamic schema discovery and configuration",
+      "spec_source": "graph-aware-zero-config-retrieval"
+    },
+    "agent_actions": {
+      "description": "Phase 2 agent create/update capabilities",
+      "spec_source": "salesforce-ai-search-poc"
+    },
+    "quality": {
+      "description": "Acceptance testing, metrics, observability",
+      "spec_source": "multiple"
+    }
+  },
+  "requirements": [
+    {
+      "id": "POC-R1",
+      "layer": "foundation",
+      "spec": "salesforce-ai-search-poc",
+      "title": "Natural Language Query with Citations",
+      "user_story": "As a Salesforce user, I want to ask natural language questions about my Salesforce data",
+      "acceptance_criteria": [
+        {
+          "id": "POC-R1-AC1",
+          "description": "RAG System returns streaming answer with citations when user submits query",
+          "status": true,
+          "test_command": "Browser E2E: Salesforce LWC",
+          "verified_date": "2026-01-05",
+          "verified_by": "Browser E2E - Query: 'Available office space in Des Peres' returned structured answer with citation"
+        },
+        {
+          "id": "POC-R1-AC2",
+          "description": "RAG System includes paragraph-level citations with record IDs",
+          "status": true,
+          "test_command": "Browser E2E: Salesforce LWC",
+          "verified_date": "2026-01-05",
+          "verified_by": "Browser E2E - Citations drawer showed: ascendix__Availability__c/a0Dfk000002JsPiEAK with Score: 1.00"
+        },
+        {
+          "id": "POC-R1-AC3",
+          "description": "RAG System returns no-answer message when zero citations after filtering",
+          "status": true,
+          "test_command": "Browser E2E: Salesforce LWC",
+          "verified_date": "2026-01-05",
+          "verified_by": "Browser E2E - Query: 'Available Class A office space in Plano' returned 'I don't have enough information' with explanation of what WAS found"
+        },
+        {
+          "id": "POC-R1-AC4",
+          "description": "Supports queries spanning Account, Opportunity, Case, Note, Property, Lease, Contract",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R1-AC5",
+          "description": "LWC displays streaming tokens as they arrive",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "POC-R2",
+      "layer": "security",
+      "spec": "salesforce-ai-search-poc",
+      "title": "Sharing Rules and Field-Level Security",
+      "user_story": "As a Salesforce administrator, I want the system to enforce Salesforce sharing rules and FLS",
+      "acceptance_criteria": [
+        {
+          "id": "POC-R2-AC1",
+          "description": "RAG System filters results using sharing buckets for requesting user",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R2-AC2",
+          "description": "RAG System filters results using FLS profile tags",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R2-AC3",
+          "description": "AuthZ Sidecar caches results for 24 hours per user",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R2-AC4",
+          "description": "RAG System performs post-filter validation on top-K results",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R2-AC5",
+          "description": "Uses redacted chunk variants for users without field access",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R2-AC6",
+          "description": "Zero security leaks in red-team testing",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": "ZCP-R5",
+      "priority": "P0",
+      "notes": "Extended by zero-config-production R5-R6 for dynamic AuthZ"
+    },
+    {
+      "id": "POC-R3",
+      "layer": "foundation",
+      "spec": "salesforce-ai-search-poc",
+      "title": "Cross-Entity Questions",
+      "user_story": "As a Salesforce user, I want answers to cross-entity questions",
+      "acceptance_criteria": [
+        {
+          "id": "POC-R3-AC1",
+          "description": "RAG System retrieves chunks from all referenced object types for multi-hop questions",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R3-AC2",
+          "description": "Uses hybrid search combining dense embeddings and BM25",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R3-AC3",
+          "description": "Correctly answers at least 2 multi-hop questions in acceptance testing",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R3-AC4",
+          "description": "Stores parent relationship IDs in chunk metadata",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R3-AC5",
+          "description": "Returns default of 8 top-K results per query",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": "GAZC-R4",
+      "priority": "P1",
+      "notes": "Superseded by graph-aware-zero-config-retrieval R4 for graph traversal"
+    },
+    {
+      "id": "POC-R4",
+      "layer": "security",
+      "spec": "salesforce-ai-search-poc",
+      "title": "Private Networking",
+      "user_story": "As a security officer, I want all communication to use private networking",
+      "acceptance_criteria": [
+        {
+          "id": "POC-R4-AC1",
+          "description": "Accepts requests only through Private API Gateway via PrivateLink",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R4-AC2",
+          "description": "Receives traffic through Salesforce Private Connect",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R4-AC3",
+          "description": "Encrypts data at rest using AWS KMS",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R4-AC4",
+          "description": "Stores no data in public S3 buckets",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R4-AC5",
+          "description": "Applies Bedrock Guardrails for prompt injection, PII, grounding",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "POC-R5",
+      "layer": "foundation",
+      "spec": "salesforce-ai-search-poc",
+      "title": "Data Freshness via CDC",
+      "user_story": "As a sales representative, I want search results to reflect recent changes",
+      "acceptance_criteria": [
+        {
+          "id": "POC-R5-AC1",
+          "description": "CDC Pipeline ingests change events within 5 minutes at P50",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R5-AC2",
+          "description": "Streams data from AppFlow to S3 to EventBridge to Bedrock KB",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R5-AC3",
+          "description": "Uses scheduled Apex export as fallback",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R5-AC4",
+          "description": "Exposes metrics showing lag between ingest and index",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R5-AC5",
+          "description": "Stores lastModified timestamps in chunk metadata",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": "GAZC-R10",
+      "priority": "P1",
+      "notes": "Extended by graph-aware-zero-config-retrieval R10 with p95 < 10 min SLO"
+    },
+    {
+      "id": "POC-R8",
+      "layer": "quality",
+      "spec": "salesforce-ai-search-poc",
+      "title": "Monitoring and Performance Targets",
+      "user_story": "As a system operator, I want to monitor retrieval quality, latency, and authorization denials",
+      "acceptance_criteria": [
+        {
+          "id": "POC-R8-AC1",
+          "description": "Achieves p95 first token latency of 800ms or less",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R8-AC2",
+          "description": "Achieves p95 end-to-end answer latency of 4.0s or less",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R8-AC3",
+          "description": "Achieves retrieval precision@5 of 70% or greater",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R8-AC4",
+          "description": "Exposes CloudWatch metrics for latency, precision, hit rate, auth denials",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R8-AC5",
+          "description": "Triggers alarms on backlog, 5xx rate, OpenSearch degradation",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": "GAZC-R7",
+      "priority": "P1",
+      "notes": "Extended by graph-aware-zero-config-retrieval R7 with p95 retrieval <=1.0s"
+    },
+    {
+      "id": "POC-R9",
+      "layer": "foundation",
+      "spec": "salesforce-ai-search-poc",
+      "title": "Chunk Sizing and Metadata",
+      "user_story": "As a data engineer, I want chunks properly sized and enriched",
+      "acceptance_criteria": [
+        {
+          "id": "POC-R9-AC1",
+          "description": "Creates chunks between 300-500 tokens",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R9-AC2",
+          "description": "Retains heading context in each chunk",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R9-AC3",
+          "description": "Stores required metadata: sobject, recordId, parentIds, ownerId, etc.",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R9-AC4",
+          "description": "Supports indexing up to 100,000 chunks in POC",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R9-AC5",
+          "description": "Uses Titan Text Embeddings v2 model",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P1"
+    },
+    {
+      "id": "POC-R30",
+      "layer": "quality",
+      "spec": "salesforce-ai-search-poc",
+      "title": "Automated Acceptance Testing",
+      "user_story": "As a QA engineer, I want automated acceptance tests for the curated query set",
+      "acceptance_criteria": [
+        {
+          "id": "POC-R30-AC1",
+          "description": "Provides automated test framework for 22 curated CRE test queries",
+          "status": false,
+          "test_command": "python scripts/run_acceptance_tests.py"
+        },
+        {
+          "id": "POC-R30-AC2",
+          "description": "Measures and reports precision@5 for each query category",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R30-AC3",
+          "description": "Returns exit code 0 if overall precision@5 >= 70%",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R30-AC4",
+          "description": "Reports latency metrics (avg, P95, max)",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "POC-R30-AC5",
+          "description": "Logs expected vs actual results for debugging failures",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "GAZC-R1",
+      "layer": "zero_config",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Planner Layer",
+      "user_story": "As a CRE professional, I want my natural language queries automatically translated into structured filters",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R1-AC1",
+          "description": "Planner emits structured plan with targetObject, predicates, traversalPlan, seedIds, confidence",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R1-AC2",
+          "description": "Planner completes analysis within 500ms (p95) with fallback",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R1-AC3",
+          "description": "Falls back to hybrid vector search when confidence below threshold",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R1-AC4",
+          "description": "Logs planner I/O, filters, hits/misses, latency for telemetry",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "GAZC-R2",
+      "layer": "zero_config",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Entity and Field Linking",
+      "user_story": "As a CRE professional, I want the system to understand my terminology (Class A, office, vacancy)",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R2-AC1",
+          "description": "Entity Linker builds vocabulary from SF Describe API, picklist values, RecordTypes, layouts",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R2-AC2",
+          "description": "Maps entity references (office, retail, Class A) to correct objects/fields",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R2-AC3",
+          "description": "Uses field relevance scoring for ambiguous terms",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R2-AC4",
+          "description": "Rebuilds vocabulary nightly from Describe, picklists, RecordTypes, layouts",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "GAZC-R3",
+      "layer": "zero_config",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Value Normalization",
+      "user_story": "As a CRE professional, I want to use natural language for dates and ranges",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R3-AC1",
+          "description": "Converts temporal expressions (next 6 months, last 30 days, Q3 2026) to date ranges",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R3-AC2",
+          "description": "Converts size ranges (20k-50k sf) to numeric filter predicates",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R3-AC3",
+          "description": "Converts percentage values (vacancy >25%) to numeric comparisons",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R3-AC4",
+          "description": "Maps stage/status references to valid picklist values",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R3-AC5",
+          "description": "Expands geographic references (PNW, downtown) to matching values",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P1"
+    },
+    {
+      "id": "GAZC-R4",
+      "layer": "graph",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Graph Traversal Planning",
+      "user_story": "As a CRE professional, I want to query across related objects",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R4-AC1",
+          "description": "Traversal Planner determines optimal path with depth 0-2 and node/edge caps",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R4-AC2",
+          "description": "Enforces max depth 2, max nodes 50-100, timeout limits",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R4-AC3",
+          "description": "Returns partial results and logs cap trigger when limits exceeded",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R4-AC4",
+          "description": "Completes traversal within 400ms (p95)",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "GAZC-R5",
+      "layer": "zero_config",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Derived Views and Rollups",
+      "user_story": "As a CRE professional, I want to query aggregated data without slow runtime calculations",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R5-AC1",
+          "description": "Maintains availability_view with size, status, TI hints, property link",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R5-AC2",
+          "description": "Maintains vacancy_view with vacancy % and available sqft per property",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R5-AC3",
+          "description": "Maintains leases_view with end dates, tenant info, extracted flags",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R5-AC4",
+          "description": "Maintains activities_agg with counts for 7/30/90 day windows",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R5-AC5",
+          "description": "Maintains sales_view with stage, close date, broker info",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R5-AC6",
+          "description": "Uses derived views instead of runtime aggregation",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R5-AC7",
+          "description": "Falls back to vector+filter when rollup missing, logs gap",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P1"
+    },
+    {
+      "id": "GAZC-R6",
+      "layer": "zero_config",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Entity Resolution",
+      "user_story": "As a CRE professional, I want to search by name and find exact records",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R6-AC1",
+          "description": "Entity Resolver resolves names to SF record IDs using exact/approximate matching",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R6-AC2",
+          "description": "Uses resolved IDs as seed filters to reduce text matches",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R6-AC3",
+          "description": "Returns most relevant matches based on context and recency for multiple matches",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P1"
+    },
+    {
+      "id": "GAZC-R7",
+      "layer": "quality",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Query Execution Performance",
+      "user_story": "As a CRE professional, I want my queries to execute quickly",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R7-AC1",
+          "description": "Filters KB by recordId when Planner provides seedIds",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R7-AC2",
+          "description": "Applies filters to both KB and graph when no seedIds",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R7-AC3",
+          "description": "Achieves p95 retrieval latency <=1.0s (<=1.5s with graph path)",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R7-AC4",
+          "description": "Less than 2% of results depend solely on name-text matches",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "GAZC-R8",
+      "layer": "quality",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Fallback and Reliability",
+      "user_story": "As a CRE professional, I want the system to always return results even when advanced features fail",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R8-AC1",
+          "description": "Gracefully falls back to hybrid vector search when Planner fails/times out",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R8-AC2",
+          "description": "Falls back to vector-only when graph traversal fails",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R8-AC3",
+          "description": "Maintains fallback-to-vector-only rate below 10%",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "GAZC-R9",
+      "layer": "quality",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Quality Metrics",
+      "user_story": "As a system administrator, I want to monitor search quality",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R9-AC1",
+          "description": "Achieves precision@5 >= 0.75",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R9-AC2",
+          "description": "Maintains empty-result rate below 8%",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R9-AC3",
+          "description": "Achieves binding precision >= 0.90 and recall >= 0.90 on test set",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "GAZC-R10",
+      "layer": "foundation",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Data Freshness",
+      "user_story": "As a CRE professional, I want search results to reflect recent data changes",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R10-AC1",
+          "description": "CDC pipeline propagates changes with p95 latency under 10 minutes",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R10-AC2",
+          "description": "Nightly backfill completes within 2 hours",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R10-AC3",
+          "description": "Refreshes rollups as part of CDC and backfill processes",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P1"
+    },
+    {
+      "id": "GAZC-R11",
+      "layer": "security",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Security and Access Control",
+      "user_story": "As a system administrator, I want the system to enforce proper access controls",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R11-AC1",
+          "description": "Requires API key authentication via Named Credential only",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R11-AC2",
+          "description": "AOSS encrypts data with customer-managed keys (CMK)",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R11-AC3",
+          "description": "IAM policies scoped to single collection/index with env-suffixed tables",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R11-AC4",
+          "description": "Enforces authorization at each hop during graph traversal",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "GAZC-R12",
+      "layer": "quality",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Observability and Monitoring",
+      "user_story": "As a system administrator, I want comprehensive dashboards and alerts",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R12-AC1",
+          "description": "Dashboards display planner confidence, binding precision@k, fallback rate, empty-result rate, latency",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R12-AC2",
+          "description": "Dashboards display CDC lag, rollup freshness, AOSS OCU usage, Bedrock invocations",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R12-AC3",
+          "description": "Triggers alert when CDC lag exceeds 10 minutes",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R12-AC4",
+          "description": "Triggers alert when fallback rate spikes or latency regresses",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R12-AC5",
+          "description": "Logs include planner I/O, filters, hits/misses, user corrections, rollup gaps, traversal caps",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P1"
+    },
+    {
+      "id": "GAZC-R14",
+      "layer": "quality",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Acceptance Scenarios",
+      "user_story": "As a QA engineer, I want defined acceptance scenarios to validate the system",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R14-AC1",
+          "description": "Available Class A office space in Plano - filters Property.RecordType=Office, Class=A, City=Plano",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=class_a_office_plano"
+        },
+        {
+          "id": "GAZC-R14-AC2",
+          "description": "Available industrial properties in Miami 20k-50k sf - correct filters applied",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=industrial_miami"
+        },
+        {
+          "id": "GAZC-R14-AC3",
+          "description": "Class A office buildings downtown with vacancy >0 - correct filters",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=downtown_vacancy"
+        },
+        {
+          "id": "GAZC-R14-AC4",
+          "description": "Leases expiring in next 6 months - EndDate within 6 months",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=expiring_leases"
+        },
+        {
+          "id": "GAZC-R14-AC5",
+          "description": "Activities on Property 123 Main Street last 30 days - resolves Property by address",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=property_activities"
+        },
+        {
+          "id": "GAZC-R14-AC6",
+          "description": "Contacts with >=5 activities last week and Sale stage=Negotiation",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=active_contacts"
+        },
+        {
+          "id": "GAZC-R14-AC7",
+          "description": "Sales where Broker=Jane Doe and Stage=Due Diligence",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=broker_sales"
+        },
+        {
+          "id": "GAZC-R14-AC8",
+          "description": "Companies owning >=10 retail properties in PNW",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=company_properties"
+        },
+        {
+          "id": "GAZC-R14-AC9",
+          "description": "Properties with vacancy rate >25% - uses vacancy_view",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=high_vacancy"
+        },
+        {
+          "id": "GAZC-R14-AC10",
+          "description": "Notes containing HVAC system needs replacement - text search with parent IDs",
+          "status": false,
+          "test_command": "python scripts/test_scenario.py --scenario=hvac_notes"
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0"
+    },
+    {
+      "id": "GAZC-R19",
+      "layer": "zero_config",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Schema Cache Traceability (Gap 1 Remediation)",
+      "user_story": "As a system administrator, I want every field in schema cache traceable to actual Salesforce schema",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R19-AC1",
+          "description": "Every field validated against SF Describe API when populated",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R19-AC2",
+          "description": "Source (SF Describe API response) logged when field added",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R19-AC3",
+          "description": "Manual seeding includes validation step to verify fields exist",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0",
+      "notes": "Critical gap fix - 40% of schema cache was fabricated fields"
+    },
+    {
+      "id": "GAZC-R20",
+      "layer": "zero_config",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Schema Discovery Integration (Gap 2 Remediation)",
+      "user_story": "As a system administrator, I want schema discovery to run automatically",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R20-AC1",
+          "description": "Schema Discovery Lambda runs when new SF org connected",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R20-AC2",
+          "description": "Calls SF Describe API for all configured objects",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R20-AC3",
+          "description": "Runs before query processing when cache empty or stale (>24h)",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P0",
+      "notes": "Critical gap fix - Schema Discovery Lambda was never invoked"
+    },
+    {
+      "id": "GAZC-R24",
+      "layer": "zero_config",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Signal Harvesting from Saved Searches",
+      "user_story": "As a CRE professional, I want the system to understand which fields are important based on Saved Searches",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R24-AC1",
+          "description": "Signal Harvester queries ascendix_search__Search__c for active saved searches",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R24-AC2",
+          "description": "Extracts filter fields from fieldsList[].logicalName with relevance_score >= 10",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R24-AC3",
+          "description": "Extracts result columns with relevance_score >= 5",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R24-AC4",
+          "description": "Extracts relationship paths and marks as primary graph edges",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R24-AC5",
+          "description": "Seeds Vocab Cache with saved search filter values",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R24-AC6",
+          "description": "Gracefully degrades when Ascendix Search package not installed",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P2"
+    },
+    {
+      "id": "GAZC-R27",
+      "layer": "zero_config",
+      "spec": "graph-aware-zero-config-retrieval",
+      "title": "Planner Relevance-Based Disambiguation",
+      "user_story": "As a CRE professional, I want the system to prefer commonly-used fields when my query is ambiguous",
+      "acceptance_criteria": [
+        {
+          "id": "GAZC-R27-AC1",
+          "description": "Entity Linker prefers field with highest relevance_score for multiple matches",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R27-AC2",
+          "description": "Traversal Planner prefers relationships marked as 'primary' from saved searches",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R27-AC3",
+          "description": "Boosts confidence when using high-relevance fields (score >= 8)",
+          "status": false,
+          "test_command": null
+        },
+        {
+          "id": "GAZC-R27-AC4",
+          "description": "Logs disambiguation decisions with field names and scores",
+          "status": false,
+          "test_command": null
+        }
+      ],
+      "superseded_by": null,
+      "priority": "P2"
+    }
+  ],
+  "superseded_requirements": [
+    {
+      "id": "POC-R25",
+      "original_spec": "salesforce-ai-search-poc",
+      "title": "Cross-Object Query Improvements (Phase 2.5)",
+      "superseded_by": "GAZC-R4",
+      "reason": "Graph-aware retrieval provides more comprehensive relationship traversal"
+    },
+    {
+      "id": "POC-R28",
+      "original_spec": "salesforce-ai-search-poc",
+      "title": "Custom Object Configuration (Phase 3)",
+      "superseded_by": "ZCS-R1",
+      "reason": "Zero-config schema discovery removes need for manual IndexConfiguration"
+    },
+    {
+      "id": "P3-R1",
+      "original_spec": "phase3-graph-enhancement",
+      "title": "Multi-Hop Relationship Queries",
+      "superseded_by": "GAZC-R4",
+      "reason": "Graph-aware zero-config provides unified graph traversal planning"
+    },
+    {
+      "id": "P3-R3",
+      "original_spec": "phase3-graph-enhancement",
+      "title": "Query Intent Router",
+      "superseded_by": "GAZC-R1",
+      "reason": "Planner layer provides comprehensive intent->plan translation"
+    },
+    {
+      "id": "ZCS-R1",
+      "original_spec": "zero-config-schema-discovery",
+      "title": "Auto-Discover Salesforce Object Schemas",
+      "superseded_by": "GAZC-R20",
+      "reason": "Graph-aware spec includes integrated schema discovery with gap remediation"
+    },
+    {
+      "id": "ZCP-R5",
+      "original_spec": "zero-config-production",
+      "title": "Real Salesforce Sharing Rules",
+      "superseded_by": "GAZC-R11",
+      "reason": "Graph-aware spec includes authorization with per-hop enforcement"
+    }
+  ]
+}

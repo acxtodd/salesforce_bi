@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Action Enablement</label>
+    <pluralLabel>Action Enablements</pluralLabel>
+    <visibility>Public</visibility>
+    <fields>
+        <fullName>ActionName__c</fullName>
+        <externalId>false</externalId>
+        <label>Action Name</label>
+        <length>255</length>
+        <required>true</required>
+        <type>Text</type>
+        <unique>true</unique>
+    </fields>
+    <fields>
+        <fullName>Enabled__c</fullName>
+        <defaultValue>true</defaultValue>
+        <externalId>false</externalId>
+        <label>Enabled</label>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>MaxPerUserPerDay__c</fullName>
+        <externalId>false</externalId>
+        <label>Max Per User Per Day</label>
+        <precision>18</precision>
+        <required>false</required>
+        <scale>0</scale>
+        <type>Number</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>RequiresConfirm__c</fullName>
+        <defaultValue>true</defaultValue>
+        <externalId>false</externalId>
+        <label>Requires Confirm</label>
+        <type>Checkbox</type>
+    </fields>
+    <fields>
+        <fullName>FlowName__c</fullName>
+        <externalId>false</externalId>
+        <label>Flow Name</label>
+        <length>255</length>
+        <required>false</required>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>ApexMethod__c</fullName>
+        <externalId>false</externalId>
+        <label>Apex Method</label>
+        <length>255</length>
+        <required>false</required>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>InputSchemaJson__c</fullName>
+        <externalId>false</externalId>
+        <label>Input Schema JSON</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>OutputSchemaJson__c</fullName>
+        <externalId>false</externalId>
+        <label>Output Schema JSON</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+    </fields>
+    <fields>
+        <fullName>AllowedFields__c</fullName>
+        <externalId>false</externalId>
+        <label>Allowed Fields</label>
+        <length>32768</length>
+        <type>LongTextArea</type>
+        <visibleLines>3</visibleLines>
+    </fields>
+</CustomObject>

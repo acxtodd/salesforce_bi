@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>AI Action Audit</label>
+    <pluralLabel>AI Action Audits</pluralLabel>
+    <nameField>
+        <label>Audit Number</label>
+        <type>AutoNumber</type>
+        <displayFormat>AUD-{00000000}</displayFormat>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>Private</sharingModel>
+    <enableReports>true</enableReports>
+    <enableActivities>false</enableActivities>
+    <enableHistory>false</enableHistory>
+    
+    <!-- UserId__c - Lookup to User (automatically indexed) -->
+    <fields>
+        <fullName>UserId__c</fullName>
+        <label>User</label>
+        <type>Lookup</type>
+        <referenceTo>User</referenceTo>
+        <relationshipLabel>AI Action Audits</relationshipLabel>
+        <relationshipName>AI_Action_Audits</relationshipName>
+        <required>false</required>
+        <deleteConstraint>SetNull</deleteConstraint>
+        <externalId>false</externalId>
+        <trackTrending>false</trackTrending>
+    </fields>
+    
+    <!-- ActionName__c - Text 80 (indexed for reporting) -->
+    <fields>
+        <fullName>ActionName__c</fullName>
+        <label>Action Name</label>
+        <type>Text</type>
+        <length>80</length>
+        <required>true</required>
+        <externalId>true</externalId>
+        <trackTrending>false</trackTrending>
+    </fields>
+    
+    <!-- InputsJson__c - Encrypted Text Long -->
+    <fields>
+        <fullName>InputsJson__c</fullName>
+        <label>Inputs JSON</label>
+        <type>LongTextArea</type>
+        <length>32768</length>
+        <required>false</required>
+        <externalId>false</externalId>
+        <visibleLines>3</visibleLines>
+    </fields>
+    
+    <!-- InputsHash__c - Text 64 for SHA-256 hash -->
+    <fields>
+        <fullName>InputsHash__c</fullName>
+        <label>Inputs Hash</label>
+        <type>Text</type>
+        <length>64</length>
+        <required>false</required>
+        <externalId>false</externalId>
+    </fields>
+    
+    <!-- Records__c - Text Area Long for JSON array of record IDs -->
+    <fields>
+        <fullName>Records__c</fullName>
+        <label>Records</label>
+        <type>LongTextArea</type>
+        <length>32768</length>
+        <required>false</required>
+        <externalId>false</externalId>
+        <visibleLines>3</visibleLines>
+    </fields>
+    
+    <!-- Success__c - Checkbox -->
+    <fields>
+        <fullName>Success__c</fullName>
+        <label>Success</label>
+        <type>Checkbox</type>
+        <defaultValue>false</defaultValue>
+        <required>false</required>
+        <externalId>false</externalId>
+    </fields>
+    
+    <!-- Error__c - Text Area -->
+    <fields>
+        <fullName>Error__c</fullName>
+        <label>Error</label>
+        <type>LongTextArea</type>
+        <length>32768</length>
+        <required>false</required>
+        <externalId>false</externalId>
+        <visibleLines>3</visibleLines>
+    </fields>
+    
+    <!-- ChatSessionId__c - Text 80 -->
+    <fields>
+        <fullName>ChatSessionId__c</fullName>
+        <label>Chat Session ID</label>
+        <type>Text</type>
+        <length>80</length>
+        <required>false</required>
+        <externalId>false</externalId>
+    </fields>
+    
+    <!-- LatencyMs__c - Number -->
+    <fields>
+        <fullName>LatencyMs__c</fullName>
+        <label>Latency (ms)</label>
+        <type>Number</type>
+        <precision>10</precision>
+        <scale>0</scale>
+        <required>false</required>
+        <externalId>false</externalId>
+    </fields>
+</CustomObject>

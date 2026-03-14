@@ -1,0 +1,109 @@
+/* Additional CSS for natural record name hyperlinks */
+/* Add these styles to your existing ascendixAiSearch.css file */
+
+/* Record links - matching Salesforce native link style */
+.record-link {
+    color: #0070d2 !important;  /* Salesforce standard link blue */
+    text-decoration: none !important;
+    font-weight: inherit;  /* Keep the same weight as surrounding text */
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    transition: all 0.1s ease;
+    display: inline;
+    position: relative;
+}
+
+/* Hover state */
+.record-link:hover {
+    color: #005fb2 !important;  /* Darker blue on hover */
+    text-decoration: underline !important;
+}
+
+/* Active/clicking state */
+.record-link:active {
+    color: #00396b !important;  /* Even darker when clicking */
+}
+
+/* Visited links (optional - you may want to keep them blue) */
+.record-link:visited {
+    color: #0070d2 !important;  /* Keep same blue even if visited */
+}
+
+/* Focus state for accessibility */
+.record-link:focus {
+    outline: 2px solid #1589ee;
+    outline-offset: 1px;
+    border-radius: 2px;
+    text-decoration: underline !important;
+}
+
+/* Focus visible only for keyboard navigation */
+.record-link:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.record-link:focus-visible {
+    outline: 2px solid #1589ee;
+    outline-offset: 1px;
+    border-radius: 2px;
+}
+
+/* Ensure links inside formatted rich text display correctly */
+lightning-formatted-rich-text .record-link {
+    display: inline !important;
+}
+
+/* Optional: Add a small external link icon for new tab behavior */
+.record-link[data-new-tab="true"]::after {
+    content: '\00A0\2197'; /* Space + northeast arrow */
+    font-size: 0.75em;
+    vertical-align: super;
+}
+
+/* Make sure the answer container handles clicks properly */
+.answer-text {
+    cursor: default;
+    user-select: text;  /* Allow text selection */
+}
+
+/* Ensure proper styling in different Salesforce themes */
+.slds-theme_default .record-link,
+.slds-theme_shade .record-link {
+    color: #0070d2 !important;
+}
+
+.slds-theme_inverse .record-link {
+    color: #4fc3f7 !important;  /* Lighter blue for dark themes */
+}
+
+.slds-theme_inverse .record-link:hover {
+    color: #81d4fa !important;
+}
+
+/* Mobile/touch specific styles */
+@media (pointer: coarse) {
+    .record-link {
+        /* Larger tap target for mobile */
+        padding: 2px 4px;
+        margin: -2px -4px;
+    }
+
+    .record-link:active {
+        background-color: rgba(0, 112, 210, 0.1);
+        border-radius: 4px;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .record-link {
+        text-decoration: underline !important;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .record-link {
+        transition: none;
+    }
+}

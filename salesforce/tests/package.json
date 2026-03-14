@@ -1,0 +1,23 @@
+{
+  "name": "ascendix-ai-search-e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end performance tests for Ascendix AI Search LWC",
+  "main": "e2e-performance-test.js",
+  "scripts": {
+    "test": "node e2e-performance-test.js",
+    "test:headless": "node e2e-performance-test.js --headless=true"
+  },
+  "keywords": [
+    "salesforce",
+    "lwc",
+    "e2e",
+    "performance",
+    "testing"
+  ],
+  "author": "Ascendix",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "puppeteer": "^21.5.0"
+  },
+  "devDependencies": {}
+}

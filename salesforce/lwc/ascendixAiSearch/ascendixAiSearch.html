@@ -1,0 +1,391 @@
+<template>
+    <lightning-card title="Ascendix AI Search" icon-name="standard:search">
+        <div class="slds-p-around_medium">
+            <!-- Query Input Section -->
+            <div class="slds-form-element">
+                <label class="slds-form-element__label" for="query-input">
+                    <abbr class="slds-required" title="required" aria-label="required">* </abbr>Ask a question
+                </label>
+                <div class="slds-form-element__control">
+                    <lightning-textarea id="query-input" name="query" value={queryText}
+                        placeholder="e.g., Show open opportunities over $1M for ACME in EMEA and summarize blockers"
+                        onchange={handleQueryChange} onkeydown={handleKeyDown} disabled={isStreaming} maxlength="1000"
+                        class="query-input" aria-describedby="query-help" aria-required="true"></lightning-textarea>
+                    <div id="query-help" class="slds-assistive-text">
+                        Enter your question about Salesforce data. Press Ctrl+Enter to submit.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Facet Filters -->
+            <div class="slds-m-top_medium" role="group" aria-labelledby="filters-heading">
+                <div id="filters-heading" class="slds-text-body_small slds-m-bottom_x-small">
+                    Filters (optional)
+                </div>
+                <div class="filter-chips-container">
+                    <!-- Region Filter -->
+                    <lightning-combobox name="region" data-filter-name="region" label="Region"
+                        value={selectedFilters.region} placeholder="Select Region" options={regionOptions}
+                        onchange={handleFilterChange} class="filter-combobox"
+                        aria-label="Filter by region"></lightning-combobox>
+
+                    <!-- Business Unit Filter -->
+                    <lightning-combobox name="businessUnit" data-filter-name="businessUnit" label="Business Unit"
+                        value={selectedFilters.businessUnit} placeholder="Select Business Unit"
+                        options={businessUnitOptions} onchange={handleFilterChange} class="filter-combobox"
+                        aria-label="Filter by business unit"></lightning-combobox>
+
+                    <!-- Quarter Filter -->
+                    <lightning-combobox name="quarter" data-filter-name="quarter" label="Quarter"
+                        value={selectedFilters.quarter} placeholder="Select Quarter" options={quarterOptions}
+                        onchange={handleFilterChange} class="filter-combobox"
+                        aria-label="Filter by quarter"></lightning-combobox>
+                </div>
+
+                <!-- Active Filter Chips -->
+                <template if:true={hasActiveFilters}>
+                    <div class="slds-m-top_small active-filters" role="list" aria-label="Active filters">
+                        <template if:true={selectedFilters.region}>
+                            <span class="filter-chip" role="listitem">
+                                Region: {selectedFilters.region}
+                                <button class="filter-chip-remove" onclick={handleRemoveRegion}
+                                    title="Remove region filter" aria-label="Remove region filter">×</button>
+                            </span>
+                        </template>
+                        <template if:true={selectedFilters.businessUnit}>
+                            <span class="filter-chip" role="listitem">
+                                BU: {selectedFilters.businessUnit}
+                                <button class="filter-chip-remove" onclick={handleRemoveBusinessUnit}
+                                    title="Remove business unit filter"
+                                    aria-label="Remove business unit filter">×</button>
+                            </span>
+                        </template>
+                        <template if:true={selectedFilters.quarter}>
+                            <span class="filter-chip" role="listitem">
+                                Quarter: {selectedFilters.quarter}
+                                <button class="filter-chip-remove" onclick={handleRemoveQuarter}
+                                    title="Remove quarter filter" aria-label="Remove quarter filter">×</button>
+                            </span>
+                        </template>
+                        <lightning-button variant="base" label="Clear All" title="Clear all filters"
+                            onclick={handleClearAllFilters} class="slds-m-left_small"
+                            aria-label="Clear all active filters"></lightning-button>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="slds-m-top_small">
+                <lightning-button variant="brand" label="Search" title="Submit query" onclick={handleSubmit}
+                    disabled={isSubmitDisabled} icon-name="utility:search" class="submit-button"></lightning-button>
+            </div>
+
+            <!-- Error Message Display -->
+            <template if:true={errorMessage}>
+                <div class="slds-m-top_medium">
+                    <div class="error-message">
+                        <div class="slds-grid slds-grid_align-spread">
+                            <div class="slds-col">
+                                <lightning-icon icon-name="utility:error" alternative-text="Error" size="small"
+                                    class="slds-m-right_x-small"></lightning-icon>
+                                <span>{errorMessage}</span>
+                            </div>
+                            <template if:true={showRetryButton}>
+                                <div class="slds-col slds-no-flex">
+                                    <lightning-button variant="base" label="Retry" title="Retry request"
+                                        onclick={handleRetry} icon-name="utility:refresh"></lightning-button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Action Result Display (Phase 2) -->
+            <template if:true={actionResultMessage}>
+                <div class="slds-m-top_medium">
+                    <div class="action-result-message">
+                        <lightning-icon icon-name="utility:info" alternative-text="Info" size="small"
+                            class="slds-m-right_x-small"></lightning-icon>
+                        <span>{actionResultMessage}</span>
+
+                        <!-- Display record links if available -->
+                        <template if:true={hasActionResultRecords}>
+                            <div class="slds-m-top_small">
+                                <template for:each={actionResultRecordIds} for:item="recordId">
+                                    <span key={recordId} data-recordid={recordId}>
+                                        <lightning-button variant="base" label={recordId} title="View record"
+                                            onclick={handleViewActionRecord} icon-name="utility:new_window"
+                                            class="slds-m-right_x-small action-result-record-link"></lightning-button>
+                                    </span>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Streaming Answer Display Container -->
+            <template if:true={showAnswerSection}>
+                <div class="slds-m-top_large answer-container" role="region" aria-labelledby="answer-heading"
+                    data-id="answer-display">
+                    <div id="answer-heading" class="slds-text-heading_small slds-m-bottom_small">Answer</div>
+
+                    <!-- Loading Skeleton -->
+                    <template if:true={isStreaming}>
+                        <div class="skeleton-container" role="status" aria-live="polite" aria-label="Generating answer">
+                            <lightning-spinner alternative-text="Generating answer..." size="small"
+                                class="slds-m-bottom_small"></lightning-spinner>
+                            <div class="skeleton-text" aria-hidden="true"></div>
+                            <div class="skeleton-text" aria-hidden="true"></div>
+                            <div class="skeleton-text short" aria-hidden="true"></div>
+                            <span class="slds-assistive-text">Please wait while we generate your answer</span>
+                        </div>
+                    </template>
+
+                    <!-- Answer Text -->
+                    <template if:false={isStreaming}>
+                        <div class="answer-text" role="article" aria-label="Generated answer" onclick={handleAnswerLinkClick}>
+                            <lightning-formatted-rich-text value={formattedAnswer}></lightning-formatted-rich-text>
+                        </div>
+                        
+                        <!-- Relationship Context Summary (Task 12.3) -->
+                        <template if:true={hasGraphResults}>
+                            <div class="relationship-context slds-m-top_small" role="complementary"
+                                aria-label="Relationship context">
+                                <div class="relationship-context-header">
+                                    <lightning-icon icon-name="utility:connected_apps" size="xx-small"
+                                        alternative-text="Graph" class="slds-m-right_xx-small"></lightning-icon>
+                                    Relationship Context
+                                </div>
+                                <div class="relationship-summary">
+                                    {relationshipSummary.message}
+                                </div>
+                            </div>
+                        </template>
+                    </template>
+                </div>
+            </template>
+
+            <!-- Citations Drawer Toggle -->
+            <template if:true={hasCitations}>
+                <div class="slds-m-top_medium">
+                    <lightning-button variant="neutral" label={citationsButtonLabel} title="View citations"
+                        onclick={toggleCitationsDrawer} icon-name="utility:list"></lightning-button>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+
+    <!-- Citations Drawer -->
+    <template if:true={showCitationsDrawer}>
+        <section role="dialog" tabindex="-1" aria-labelledby="citations-heading" aria-modal="true"
+            class="slds-modal slds-fade-in-open slds-modal_large">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close" onclick={toggleCitationsDrawer}>
+                        <lightning-icon icon-name="utility:close" alternative-text="close"
+                            size="small"></lightning-icon>
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                    <h2 id="citations-heading" class="slds-modal__title slds-hyphenate">
+                        Citations ({citations.length})
+                    </h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium" id="citations-content">
+                    <!-- Citations will be rendered here -->
+                    <template for:each={citations} for:item="citation">
+                        <div key={citation.id} class="citation-item slds-box slds-m-bottom_small"
+                            data-citationid={citation.id}>
+                            <div class="slds-grid slds-wrap">
+                                <div class="slds-col slds-size_1-of-1">
+                                    <div class="slds-text-heading_small slds-m-bottom_x-small">
+                                        <button type="button" class="slds-button slds-button_reset citation-link"
+                                            title={citation.title}
+                                            onclick={handleCitationClick}>{citation.title}</button>
+                                    </div>
+                                    <div class="slds-text-body_small slds-text-color_weak slds-m-bottom_x-small">
+                                        {citation.sobject} • Score: {citation.score}
+                                        <template if:true={citation.fromGraph}>
+                                            <span class="graph-indicator" title="Found via relationship traversal">
+                                                <lightning-icon icon-name="utility:connected_apps" size="xx-small"
+                                                    alternative-text="Graph result" class="slds-m-left_xx-small"></lightning-icon>
+                                            </span>
+                                        </template>
+                                    </div>
+                                    <!-- Relationship Path Display (Task 12.1) -->
+                                    <template if:true={citation.hasRelationshipPath}>
+                                        <div class="relationship-path slds-m-bottom_x-small" role="navigation"
+                                            aria-label="Relationship path">
+                                            <template for:each={citation.relationshipPathNodes} for:item="pathNode">
+                                                <span key={pathNode.key} class="path-node-wrapper">
+                                                    <template if:false={pathNode.isFirst}>
+                                                        <span class="path-arrow" aria-hidden="true">→</span>
+                                                    </template>
+                                                    <button type="button" 
+                                                        class="slds-button slds-button_reset path-node-link"
+                                                        data-recordid={pathNode.recordId}
+                                                        data-sobject={pathNode.sobject}
+                                                        title={pathNode.tooltip}
+                                                        onclick={handlePathNodeClick}>
+                                                        {pathNode.displayName}
+                                                    </button>
+                                                </span>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <div class="citation-snippet slds-text-body_regular">
+                                        {citation.snippet}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button variant="neutral" label="Close" title="Close citations"
+                        onclick={toggleCitationsDrawer}></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <!-- Citation Preview Panel -->
+    <template if:true={showCitationPreview}>
+        <section role="dialog" tabindex="-1" aria-labelledby="preview-heading" aria-modal="true"
+            class="slds-modal slds-fade-in-open slds-modal_large">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close" onclick={closeCitationPreview}>
+                        <lightning-icon icon-name="utility:close" alternative-text="close"
+                            size="small"></lightning-icon>
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                    <h2 id="preview-heading" class="slds-modal__title slds-hyphenate">
+                        {selectedCitation.title}
+                    </h2>
+                    <p class="slds-m-top_x-small">
+                        {selectedCitation.sobject} • {selectedCitation.recordId}
+                    </p>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium" id="preview-content">
+                    <template if:true={selectedCitation.previewUrl}>
+                        <iframe src={selectedCitation.previewUrl} title="Citation Preview"
+                            class="preview-iframe"></iframe>
+                    </template>
+                    <div class="slds-m-top_medium">
+                        <p class="slds-text-body_regular">{selectedCitation.snippet}</p>
+                    </div>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button variant="neutral" label="Close" title="Close preview"
+                        onclick={closeCitationPreview}></lightning-button>
+                    <lightning-button variant="brand" label="View in Salesforce" title="Open record in Salesforce"
+                        onclick={handleViewInSalesforce} icon-name="utility:new_window"></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <!-- Action Preview Modal (Phase 2) -->
+    <template if:true={showActionPreview}>
+        <section role="dialog" tabindex="-1" aria-labelledby="action-preview-heading" aria-modal="true"
+            class="slds-modal slds-fade-in-open slds-modal_medium">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close" onclick={closeActionPreview} disabled={isExecutingAction}>
+                        <lightning-icon icon-name="utility:close" alternative-text="close"
+                            size="small"></lightning-icon>
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                    <h2 id="action-preview-heading" class="slds-modal__title slds-hyphenate action-preview-title">
+                        <lightning-icon icon-name="utility:preview" size="small"
+                            class="slds-m-right_x-small"></lightning-icon>
+                        <span class="action-preview-title-text">{actionPreviewTitle}</span>
+                    </h2>
+                    <p class="slds-m-top_x-small slds-text-body_small">
+                        Review the proposed changes before confirming
+                    </p>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium" id="action-preview-content">
+                    <!-- Action Details -->
+                    <div class="action-preview-details">
+                        <div class="slds-text-heading_small slds-m-bottom_small">
+                            Proposed Changes
+                        </div>
+
+                        <!-- Field Values Table -->
+                        <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                            <thead>
+                                <tr class="slds-line-height_reset">
+                                    <th scope="col" class="slds-text-title_caps">Field</th>
+                                    <th scope="col" class="slds-text-title_caps">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody class="action-preview-fields">
+                                <template for:each={actionPreviewFields} for:item="field">
+                                    <tr key={field.key} class="slds-hint-parent action-field">
+                                        <th scope="row">
+                                            <div class="slds-truncate" title={field.label}>{field.label}</div>
+                                        </th>
+                                        <td>
+                                            <div class="slds-truncate" title={field.value}>{field.value}</div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+
+                        <!-- Warning Message -->
+                        <div class="slds-m-top_medium">
+                            <div class="slds-notify slds-notify_alert slds-alert_warning" role="alert">
+                                <span class="slds-assistive-text">Warning</span>
+                                <lightning-icon icon-name="utility:warning" size="x-small" variant="warning"
+                                    class="slds-m-right_x-small"></lightning-icon>
+                                <h2>
+                                    This action will modify data in Salesforce. Please review carefully before
+                                    confirming.
+                                </h2>
+                            </div>
+                        </div>
+
+                        <!-- Error Message in Modal -->
+                        <template if:true={actionResultMessage}>
+                            <div class="slds-m-top_medium">
+                                <div class="action-result-error">
+                                    <lightning-icon icon-name="utility:error" alternative-text="Error" size="small"
+                                        class="slds-m-right_x-small"></lightning-icon>
+                                    <span>{actionResultMessage}</span>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Executing Spinner -->
+                        <template if:true={isExecutingAction}>
+                            <div class="slds-m-top_medium slds-align_absolute-center">
+                                <lightning-spinner alternative-text="Executing action..."
+                                    size="small"></lightning-spinner>
+                                <div class="slds-m-top_small slds-text-align_center">
+                                    Executing action...
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button variant="neutral" label="Cancel" title="Cancel action"
+                        onclick={handleActionCancel} disabled={isExecutingAction}></lightning-button>
+                    <lightning-button variant="brand" label={actionConfirmLabel} title="Execute action"
+                        onclick={handleActionConfirm} disabled={isExecutingAction} icon-name="utility:check"
+                        class="slds-m-left_x-small"></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+</template>

@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>59.0</apiVersion>
+    <description>Autolaunched Flow to update an Opportunity stage with validation, edit access check, and optimistic concurrency. Used by AI Agent Actions.</description>
+    <label>Update Opportunity Stage Flow</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <runInMode>SystemModeWithSharing</runInMode>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Validate_Required_Inputs</targetReference>
+        </connector>
+    </start>
+    <status>Active</status>
+    
+    <!-- Input Variables -->
+    <variables>
+        <name>OpportunityId</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    
+    <variables>
+        <name>StageName</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    
+    <variables>
+        <name>Probability</name>
+        <dataType>Number</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+        <scale>0</scale>
+    </variables>
+    
+    <!-- Output Variables -->
+    <variables>
+        <name>Success</name>
+        <dataType>Boolean</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+        <value>
+            <booleanValue>false</booleanValue>
+        </value>
+    </variables>
+    
+    <variables>
+        <name>ErrorMessage</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+    
+    <!-- Internal Variables -->
+    <variables>
+        <name>ExistingOpportunity</name>
+        <dataType>SObject</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <objectType>Opportunity</objectType>
+    </variables>
+    
+    <!-- Decision: Validate Required Inputs -->
+    <decisions>
+        <name>Validate_Required_Inputs</name>
+        <label>Validate Required Inputs</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <defaultConnector>
+            <targetReference>Set_Validation_Error</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Invalid</defaultConnectorLabel>
+        <rules>
+            <name>All_Required_Fields_Present</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>OpportunityId</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>StageName</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Get_Existing_Opportunity</targetReference>
+            </connector>
+            <label>All Required Fields Present</label>
+        </rules>
+    </decisions>
+    
+    <!-- Decision: Check Opportunity Found -->
+    <decisions>
+        <name>Check_Opportunity_Found</name>
+        <label>Check Opportunity Found</label>
+        <locationX>308</locationX>
+        <locationY>350</locationY>
+        <defaultConnector>
+            <targetReference>Set_Not_Found_Error</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Not Found</defaultConnectorLabel>
+        <rules>
+            <name>Opportunity_Found</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Existing_Opportunity</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Update_Opportunity_Record</targetReference>
+            </connector>
+            <label>Opportunity Found</label>
+        </rules>
+    </decisions>
+    
+
+    
+    <!-- Assignment: Set Validation Error -->
+    <assignments>
+        <name>Set_Validation_Error</name>
+        <label>Set Validation Error</label>
+        <locationX>50</locationX>
+        <locationY>242</locationY>
+        <assignmentItems>
+            <assignToReference>Success</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <booleanValue>false</booleanValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>ErrorMessage</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Required fields are missing: OpportunityId and StageName are required</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    
+    <!-- Assignment: Set Not Found Error -->
+    <assignments>
+        <name>Set_Not_Found_Error</name>
+        <label>Set Not Found Error</label>
+        <locationX>440</locationX>
+        <locationY>458</locationY>
+        <assignmentItems>
+            <assignToReference>Success</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <booleanValue>false</booleanValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>ErrorMessage</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Opportunity not found or you do not have access to edit it</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    
+    <!-- Assignment: Set Lookup Error -->
+    <assignments>
+        <name>Set_Lookup_Error</name>
+        <label>Set Lookup Error</label>
+        <locationX>440</locationX>
+        <locationY>350</locationY>
+        <assignmentItems>
+            <assignToReference>Success</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <booleanValue>false</booleanValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>ErrorMessage</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Error accessing Opportunity: {!$Flow.FaultMessage}</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    
+    <!-- Assignment: Set Success Output -->
+    <assignments>
+        <name>Set_Success_Output</name>
+        <label>Set Success Output</label>
+        <locationX>50</locationX>
+        <locationY>674</locationY>
+        <assignmentItems>
+            <assignToReference>Success</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <booleanValue>true</booleanValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    
+    <!-- Assignment: Set Update Error -->
+    <assignments>
+        <name>Set_Update_Error</name>
+        <label>Set Update Error</label>
+        <locationX>308</locationX>
+        <locationY>566</locationY>
+        <assignmentItems>
+            <assignToReference>Success</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <booleanValue>false</booleanValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>ErrorMessage</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Failed to update Opportunity: {!$Flow.FaultMessage}</stringValue>
+            </value>
+        </assignmentItems>
+    </assignments>
+    
+    <!-- Record Lookup: Get Existing Opportunity -->
+    <recordLookups>
+        <name>Get_Existing_Opportunity</name>
+        <label>Get Existing Opportunity</label>
+        <locationX>308</locationX>
+        <locationY>242</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Check_Opportunity_Found</targetReference>
+        </connector>
+        <faultConnector>
+            <targetReference>Set_Lookup_Error</targetReference>
+        </faultConnector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>OpportunityId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Opportunity</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    
+
+    
+
+    
+
+    
+    <!-- Record Update: Update Opportunity -->
+    <recordUpdates>
+        <name>Update_Opportunity_Record</name>
+        <label>Update Opportunity Record</label>
+        <locationX>176</locationX>
+        <locationY>458</locationY>
+        <connector>
+            <targetReference>Set_Success_Output</targetReference>
+        </connector>
+        <faultConnector>
+            <targetReference>Set_Update_Error</targetReference>
+        </faultConnector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>OpportunityId</elementReference>
+            </value>
+        </filters>
+        <inputAssignments>
+            <field>StageName</field>
+            <value>
+                <elementReference>StageName</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Probability</field>
+            <value>
+                <elementReference>Probability</elementReference>
+            </value>
+        </inputAssignments>
+        <object>Opportunity</object>
+    </recordUpdates>
+    
+
+    
+
+    
+
+</Flow>

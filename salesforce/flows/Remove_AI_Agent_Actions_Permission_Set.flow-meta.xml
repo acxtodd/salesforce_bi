@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>59.0</apiVersion>
+    <description>Flow to remove AI_Agent_Actions_Editor permission set from all users as part of kill switch mechanism</description>
+    <label>Remove AI Agent Actions Permission Set</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>Flow</processType>
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Confirm_Removal_Screen</targetReference>
+        </connector>
+    </start>
+    <status>Active</status>
+    
+    <!-- Confirmation Screen -->
+    <screens>
+        <name>Confirm_Removal_Screen</name>
+        <label>Confirm Permission Set Removal</label>
+        <locationX>50</locationX>
+        <locationY>134</locationY>
+        <allowBack>true</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <connector>
+            <targetReference>Remove_Permission_Set_Action</targetReference>
+        </connector>
+        <fields>
+            <name>Warning_Message</name>
+            <fieldText>&lt;p&gt;&lt;b style=&quot;color: rgb(194, 57, 52);&quot;&gt;⚠️ WARNING: Kill Switch Activation&lt;/b&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;This action will remove the AI_Agent_Actions_Editor permission set from ALL users, immediately disabling their ability to execute agent actions.&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Impact:&lt;/b&gt;&lt;/p&gt;&lt;ul&gt;&lt;li&gt;All users will lose access to create/update actions&lt;/li&gt;&lt;li&gt;Read-only search and answer capabilities will remain functional&lt;/li&gt;&lt;li&gt;This operation cannot be undone automatically&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;Click &lt;b&gt;Next&lt;/b&gt; to proceed with removal, or &lt;b&gt;Previous&lt;/b&gt; to cancel.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <fields>
+            <name>Confirmation_Checkbox</name>
+            <dataType>Boolean</dataType>
+            <fieldText>I understand the impact and want to proceed with removing the permission set</fieldText>
+            <fieldType>InputField</fieldType>
+            <isRequired>true</isRequired>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+    
+    <!-- Result Screen -->
+    <screens>
+        <name>Result_Screen</name>
+        <label>Removal Result</label>
+        <locationX>50</locationX>
+        <locationY>350</locationY>
+        <allowBack>false</allowBack>
+        <allowFinish>true</allowFinish>
+        <allowPause>false</allowPause>
+        <fields>
+            <name>Result_Message</name>
+            <fieldText>&lt;p&gt;&lt;b&gt;Permission Set Removal Complete&lt;/b&gt;&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;{!Remove_Permission_Set_Action.message}&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Success Count:&lt;/b&gt; {!Remove_Permission_Set_Action.successCount}&lt;/p&gt;&lt;p&gt;&lt;b&gt;Failure Count:&lt;/b&gt; {!Remove_Permission_Set_Action.failureCount}&lt;/p&gt;&lt;p&gt;&lt;br&gt;&lt;/p&gt;&lt;p&gt;Agent actions are now disabled for all users. To re-enable, manually reassign the AI_Agent_Actions_Editor permission set to authorized users.&lt;/p&gt;</fieldText>
+            <fieldType>DisplayText</fieldType>
+        </fields>
+        <showFooter>true</showFooter>
+        <showHeader>true</showHeader>
+    </screens>
+    
+    <!-- Apex Action to Remove Permission Set -->
+    <actionCalls>
+        <name>Remove_Permission_Set_Action</name>
+        <label>Remove Permission Set</label>
+        <locationX>50</locationX>
+        <locationY>242</locationY>
+        <actionName>ActionPermissionSetRemoval</actionName>
+        <actionType>apex</actionType>
+        <connector>
+            <targetReference>Result_Screen</targetReference>
+        </connector>
+        <flowTransactionModel>CurrentTransaction</flowTransactionModel>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </actionCalls>
+    
+
+</Flow>

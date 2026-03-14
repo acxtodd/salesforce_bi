@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customSettingsType>List</customSettingsType>
+    <enableFeeds>false</enableFeeds>
+    <label>Action Enablement Setting</label>
+    <visibility>Public</visibility>
+    
+    <!-- ActionName__c - Text 80 -->
+    <fields>
+        <fullName>ActionName__c</fullName>
+        <label>Action Name</label>
+        <type>Text</type>
+        <length>80</length>
+        <required>true</required>
+        <externalId>false</externalId>
+        <unique>false</unique>
+    </fields>
+    
+    <!-- Enabled__c - Checkbox -->
+    <fields>
+        <fullName>Enabled__c</fullName>
+        <label>Enabled</label>
+        <type>Checkbox</type>
+        <required>false</required>
+        <defaultValue>true</defaultValue>
+        <externalId>false</externalId>
+    </fields>
+    
+    <!-- MaxPerUserPerDay__c - Number -->
+    <fields>
+        <fullName>MaxPerUserPerDay__c</fullName>
+        <label>Max Per User Per Day</label>
+        <type>Number</type>
+        <precision>4</precision>
+        <scale>0</scale>
+        <required>false</required>
+        <externalId>false</externalId>
+    </fields>
+    
+    <!-- LastModifiedByAdmin__c - Text 80 -->
+    <fields>
+        <fullName>LastModifiedByAdmin__c</fullName>
+        <label>Last Modified By Admin</label>
+        <type>Text</type>
+        <length>80</length>
+        <required>false</required>
+        <externalId>false</externalId>
+    </fields>
+</CustomObject>

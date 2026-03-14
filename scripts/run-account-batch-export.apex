@@ -1,0 +1,1 @@
+Database.executeBatch(new AISearchBatchExport('Account', 8760), 200);

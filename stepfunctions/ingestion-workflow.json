@@ -1,0 +1,238 @@
+{
+  "Comment": "Ingestion workflow for Salesforce CDC data - validates, transforms, chunks, enriches, embeds, and syncs to Bedrock KB",
+  "StartAt": "Validate",
+  "States": {
+    "Validate": {
+      "Type": "Task",
+      "Resource": "${ValidateLambdaArn}",
+      "Comment": "Validate record structure and required fields",
+      "ResultPath": "$.validateResult",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "HandleValidationError"
+        }
+      ],
+      "Next": "CheckValidRecords"
+    },
+    "CheckValidRecords": {
+      "Type": "Choice",
+      "Comment": "Check if there are valid records to process",
+      "Choices": [
+        {
+          "Variable": "$.validateResult.validCount",
+          "NumericGreaterThan": 0,
+          "Next": "Transform"
+        }
+      ],
+      "Default": "NoValidRecords"
+    },
+    "Transform": {
+      "Type": "Task",
+      "Resource": "${TransformLambdaArn}",
+      "Comment": "Flatten relationships and extract text fields",
+      "InputPath": "$.validateResult",
+      "ResultPath": "$.transformResult",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "HandleTransformError"
+        }
+      ],
+      "Next": "Chunk"
+    },
+    "Chunk": {
+      "Type": "Task",
+      "Resource": "${ChunkingLambdaArn}",
+      "Comment": "Split text into 300-500 token chunks with heading retention",
+      "Parameters": {
+        "records.$": "$.transformResult.transformedRecords"
+      },
+      "ResultPath": "$.chunkResult",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "HandleChunkError"
+        }
+      ],
+      "Next": "ParseChunkResult"
+    },
+    "ParseChunkResult": {
+      "Type": "Pass",
+      "Comment": "Parse chunk result from JSON string",
+      "Parameters": {
+        "chunks.$": "States.StringToJson($.chunkResult.body)"
+      },
+      "ResultPath": "$.parsedChunks",
+      "Next": "Enrich"
+    },
+    "Enrich": {
+      "Type": "Task",
+      "Resource": "${EnrichLambdaArn}",
+      "Comment": "Add metadata for sobject, recordId, parentIds, ownerId, territory, businessUnit, region, sharingBuckets, flsProfileTags",
+      "InputPath": "$.parsedChunks.chunks",
+      "ResultPath": "$.enrichResult",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "HandleEnrichError"
+        }
+      ],
+      "Next": "Embed"
+    },
+    "Embed": {
+      "Type": "Task",
+      "Resource": "${EmbedLambdaArn}",
+      "Comment": "Generate embeddings using Titan Text Embeddings v2",
+      "InputPath": "$.enrichResult",
+      "ResultPath": "$.embedResult",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 5,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "HandleEmbedError"
+        }
+      ],
+      "Next": "Sync"
+    },
+    "Sync": {
+      "Type": "Task",
+      "Resource": "${SyncLambdaArn}",
+      "Comment": "Write to S3 in Bedrock KB format and trigger KB sync",
+      "InputPath": "$.embedResult",
+      "ResultPath": "$.syncResult",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "SendToDLQ"
+        }
+      ],
+      "Next": "Success"
+    },
+    "Success": {
+      "Type": "Succeed",
+      "Comment": "Ingestion completed successfully"
+    },
+    "NoValidRecords": {
+      "Type": "Succeed",
+      "Comment": "No valid records to process"
+    },
+    "HandleValidationError": {
+      "Type": "Pass",
+      "Comment": "Log validation error",
+      "Next": "SendToDLQ"
+    },
+    "HandleTransformError": {
+      "Type": "Pass",
+      "Comment": "Log transform error",
+      "Next": "SendToDLQ"
+    },
+    "HandleChunkError": {
+      "Type": "Pass",
+      "Comment": "Log chunk error",
+      "Next": "SendToDLQ"
+    },
+    "HandleEnrichError": {
+      "Type": "Pass",
+      "Comment": "Log enrich error",
+      "Next": "SendToDLQ"
+    },
+    "HandleEmbedError": {
+      "Type": "Pass",
+      "Comment": "Log embed error",
+      "Next": "SendToDLQ"
+    },
+    "SendToDLQ": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Parameters": {
+        "QueueUrl": "${DLQUrl}",
+        "MessageBody.$": "$"
+      },
+      "ResultPath": "$.dlqResult",
+      "Next": "Fail"
+    },
+    "Fail": {
+      "Type": "Fail",
+      "Comment": "Ingestion failed, sent to DLQ"
+    }
+  }
+}

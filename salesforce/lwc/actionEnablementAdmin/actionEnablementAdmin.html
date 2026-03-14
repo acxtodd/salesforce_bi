@@ -1,0 +1,53 @@
+<template>
+    <lightning-card title="AI Agent Actions Administration" icon-name="standard:settings">
+        <div class="slds-m-around_medium">
+            <!-- Instructions -->
+            <div class="slds-box slds-box_x-small slds-theme_info slds-m-bottom_medium">
+                <p class="slds-text-body_regular">
+                    <strong>Kill Switch Instructions:</strong> Toggle the Enabled checkbox to immediately enable/disable actions. 
+                    Adjust Max Per User Per Day to control rate limits. 
+                    Changes take effect immediately via Custom Setting overrides.
+                    "Override Active" shows if runtime settings differ from metadata defaults.
+                </p>
+            </div>
+
+            <!-- Loading Spinner -->
+            <template if:true={isLoading}>
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </template>
+
+            <!-- Action Enablement Table -->
+            <lightning-datatable
+                key-field="Id"
+                data={actions}
+                columns={columns}
+                draft-values={draftValues}
+                onsave={handleSave}
+                onrowselection={handleRowSelection}
+                max-row-selection="1"
+            >
+            </lightning-datatable>
+
+            <!-- Test Action Button -->
+            <div class="slds-m-top_medium">
+                <lightning-button
+                    variant="brand"
+                    label="Test Action"
+                    title="Test the selected action configuration"
+                    onclick={handleTestAction}
+                    disabled={isTestDisabled}
+                    icon-name="utility:check"
+                >
+                </lightning-button>
+            </div>
+
+            <!-- Help Text -->
+            <div class="slds-m-top_medium slds-text-color_weak">
+                <p class="slds-text-body_small">
+                    <strong>Note:</strong> Changes to Enabled and Max Per User Per Day take effect immediately. 
+                    Custom Metadata Type updates may take a few minutes to propagate across all instances.
+                </p>
+            </div>
+        </div>
+    </lightning-card>
+</template>

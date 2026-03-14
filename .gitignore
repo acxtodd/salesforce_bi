@@ -1,0 +1,59 @@
+# Build outputs
+dist/
+*.d.ts
+!jest.config.js
+.cdk.staging
+cdk.out/
+cdk.out.*/
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.hypothesis/
+.pytest_cache/
+*.egg-info/
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+salesforce/deployment-config.json
+
+# IDE & AI tools
+.vscode/
+.idea/
+.claude/
+.gemini-clipboard/
+.kiro/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Salesforce CLI state
+.sf/
+
+# Salesforce deploy outputs
+salesforce/deploy_output*.txt
+salesforce/deploy_validate_output*.txt
+
+# Generated test results & reports
+results/
+deployment.log
+*_audit_*.json
+*_audit_*.md
+audit_report.json
+audit_report.md
+
+# Temp
+temp_check*/
+*.jsonl
+
+# Large binaries
+*.pptx

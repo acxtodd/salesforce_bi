@@ -1,0 +1,310 @@
+{
+  "toolName": "update_opportunity_stage",
+  "displayName": "Update Opportunity Stage",
+  "description": "Updates an existing Opportunity's stage and probability with validation, edit access check, and optimistic concurrency control. Requires two-step confirmation before execution. Enforces CRUD permissions and field-level security.",
+  "category": "Agent Actions",
+  "endpoint": {
+    "method": "POST",
+    "path": "/action",
+    "namedCredential": "Ascendix_RAG_API"
+  },
+  "requiresConfirmation": true,
+  "inputSchema": {
+    "type": "object",
+    "required": ["actionName", "inputs", "salesforceUserId", "confirmationToken"],
+    "properties": {
+      "actionName": {
+        "type": "string",
+        "const": "update_opportunity_stage",
+        "description": "Action name identifier. Must be 'update_opportunity_stage'."
+      },
+      "inputs": {
+        "type": "object",
+        "description": "Opportunity update values",
+        "required": ["OpportunityId", "StageName"],
+        "properties": {
+          "OpportunityId": {
+            "type": "string",
+            "pattern": "^006[a-zA-Z0-9]{15}$",
+            "description": "Opportunity ID (18 characters, required). Must be a valid Opportunity the user has edit access to.",
+            "examples": ["006xx000001234567"]
+          },
+          "StageName": {
+            "type": "string",
+            "description": "New opportunity stage (required). Must be one of the allowed stages: Prospecting, Qualification, Proposal, Negotiation, Closed Won, or Closed Lost.",
+            "enum": [
+              "Prospecting",
+              "Qualification",
+              "Proposal",
+              "Negotiation",
+              "Closed Won",
+              "Closed Lost"
+            ],
+            "examples": ["Negotiation", "Closed Won", "Proposal"]
+          },
+          "Probability": {
+            "type": "integer",
+            "description": "Win probability percentage (optional, 0-100)",
+            "minimum": 0,
+            "maximum": 100,
+            "examples": [75, 90, 50]
+          }
+        }
+      },
+      "salesforceUserId": {
+        "type": "string",
+        "pattern": "^005[a-zA-Z0-9]{12,15}$",
+        "description": "Salesforce User ID (15 or 18 characters) for authorization enforcement. REQUIRED for security.",
+        "examples": ["005xx000001234567"]
+      },
+      "sessionId": {
+        "type": "string",
+        "description": "Optional chat session ID for tracking multi-turn conversations",
+        "maxLength": 100,
+        "examples": ["session-2025-11-13-abc123"]
+      },
+      "confirmationToken": {
+        "type": "string",
+        "description": "Confirmation token generated during preview step. Required to prevent replay attacks.",
+        "minLength": 1,
+        "examples": ["token-abc123def456"]
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "success": {
+        "type": "boolean",
+        "description": "Whether the action executed successfully"
+      },
+      "recordIds": {
+        "type": "array",
+        "description": "Array of updated Opportunity IDs",
+        "items": {
+          "type": "string",
+          "pattern": "^006[a-zA-Z0-9]{15}$",
+          "description": "Opportunity ID (18 characters)"
+        }
+      },
+      "outputValues": {
+        "type": "object",
+        "description": "Output values from the Flow execution",
+        "properties": {
+          "Success": {
+            "type": "boolean",
+            "description": "Flow execution success status"
+          },
+          "ErrorMessage": {
+            "type": "string",
+            "description": "Error message if Flow failed"
+          }
+        }
+      },
+      "actionName": {
+        "type": "string",
+        "description": "Name of the executed action"
+      },
+      "requestId": {
+        "type": "string",
+        "description": "Unique request ID for tracking and support"
+      },
+      "trace": {
+        "type": "object",
+        "description": "Performance timing metrics",
+        "properties": {
+          "executionMs": {
+            "type": "number",
+            "description": "Flow execution time in milliseconds"
+          },
+          "totalMs": {
+            "type": "number",
+            "description": "Total request time in milliseconds"
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "name": "Move ACME renewal to Negotiation stage",
+      "input": {
+        "actionName": "update_opportunity_stage",
+        "inputs": {
+          "OpportunityId": "006xx000001234567",
+          "StageName": "Negotiation",
+          "Probability": 75
+        },
+        "salesforceUserId": "005xx000001234567",
+        "sessionId": "session-2025-11-13-abc123",
+        "confirmationToken": "token-abc123def456"
+      },
+      "output": {
+        "success": true,
+        "recordIds": ["006xx000001234567"],
+        "outputValues": {
+          "Success": true
+        },
+        "actionName": "update_opportunity_stage",
+        "requestId": "req-uuid-12345",
+        "trace": {
+          "executionMs": 320,
+          "totalMs": 385
+        }
+      }
+    },
+    {
+      "name": "Update stage to Closed Won",
+      "input": {
+        "actionName": "update_opportunity_stage",
+        "inputs": {
+          "OpportunityId": "006xx000001234567",
+          "StageName": "Closed Won",
+          "Probability": 100
+        },
+        "salesforceUserId": "005xx000001234567",
+        "sessionId": "session-2025-11-13-xyz789",
+        "confirmationToken": "token-xyz789ghi012"
+      },
+      "output": {
+        "success": true,
+        "recordIds": ["006xx000001234567"],
+        "outputValues": {
+          "Success": true
+        },
+        "actionName": "update_opportunity_stage",
+        "requestId": "req-uuid-67890",
+        "trace": {
+          "executionMs": 295,
+          "totalMs": 350
+        }
+      }
+    },
+    {
+      "name": "Access denied - user cannot edit Opportunity",
+      "input": {
+        "actionName": "update_opportunity_stage",
+        "inputs": {
+          "OpportunityId": "006xx000001234567",
+          "StageName": "Closed Won"
+        },
+        "salesforceUserId": "005xx000001234567",
+        "confirmationToken": "token-test123"
+      },
+      "output": {
+        "error": "Flow execution failed: Opportunity not found or you do not have access to edit it"
+      },
+      "statusCode": 502
+    },
+    {
+      "name": "Rate limit exceeded error",
+      "input": {
+        "actionName": "update_opportunity_stage",
+        "inputs": {
+          "OpportunityId": "006xx000001234567",
+          "StageName": "Negotiation/Review"
+        },
+        "salesforceUserId": "005xx000001234567",
+        "confirmationToken": "token-test456"
+      },
+      "output": {
+        "error": "You've reached the daily limit of 50 for this action. Try again tomorrow."
+      },
+      "statusCode": 429
+    },
+    {
+      "name": "Validation error - missing required field",
+      "input": {
+        "actionName": "update_opportunity_stage",
+        "inputs": {
+          "OpportunityId": "006xx000001234567"
+        },
+        "salesforceUserId": "005xx000001234567",
+        "confirmationToken": "token-invalid"
+      },
+      "output": {
+        "error": "Required field 'StageName' is missing"
+      },
+      "statusCode": 400
+    }
+  ],
+  "usageGuidelines": {
+    "whenToUse": [
+      "When the user explicitly requests to update an Opportunity's stage",
+      "When the user wants to move a deal forward in the sales process",
+      "When the user wants to mark an Opportunity as won or lost",
+      "As a follow-up action after searching for an Opportunity"
+    ],
+    "bestPractices": [
+      "Always show a preview of the proposed changes before executing",
+      "Require explicit user confirmation via the two-step confirmation flow",
+      "Validate that the OpportunityId exists and the user has edit access to it",
+      "Show the current stage and the new stage in the preview",
+      "Provide clear feedback about what will be changed",
+      "Include a link to the updated Opportunity in the success message",
+      "If user doesn't provide Probability, let the Flow use the default for that stage"
+    ],
+    "limitations": [
+      "Maximum 50 updates can be performed per user per day (configurable via ActionEnablement metadata)",
+      "User must have Edit permission on the Opportunity object",
+      "User must have edit access to the specific Opportunity (owner, sharing rules, etc.)",
+      "StageName must be a valid value from the org's Opportunity Stage picklist",
+      "Action can be disabled by administrators via ActionEnablement metadata",
+      "Optimistic concurrency: if Opportunity is modified by another user between lookup and update, the update may fail"
+    ],
+    "confirmationFlow": [
+      "1. Agent proposes updating an Opportunity stage with specific values",
+      "2. LWC displays preview modal showing current stage → new stage",
+      "3. User reviews and clicks 'Confirm' or 'Cancel'",
+      "4. On confirm, LWC generates confirmation token and calls /action endpoint",
+      "5. Action Lambda validates token, checks rate limits, and executes Flow",
+      "6. Flow looks up Opportunity to verify edit access, then updates",
+      "7. LWC displays success message with link to updated Opportunity"
+    ]
+  },
+  "securityNotes": {
+    "authorization": "This action enforces Salesforce CRUD permissions and sharing rules. Users can only update Opportunities if they have Edit permission on the Opportunity object and edit access to the specific record (owner, sharing rules, etc.).",
+    "confirmation": "Two-step confirmation is REQUIRED. The action will fail if confirmationToken is missing or invalid.",
+    "rateLimiting": "Rate limits are enforced per user per day. Default limit is 50 updates per day, configurable via ActionEnablement metadata.",
+    "auditLogging": "All action executions are logged to AI_Action_Audit__c custom object with user ID, inputs (hashed if PII detected), success status, and timing metrics.",
+    "dataPrivacy": "All communication occurs over private networking (PrivateLink). No data traverses the public internet.",
+    "killSwitch": "Administrators can disable this action immediately by setting Enabled__c=false in ActionEnablement metadata.",
+    "concurrency": "The Flow uses optimistic concurrency control. It looks up the Opportunity first to verify it exists and the user has access, then performs the update. If another user modifies the Opportunity between lookup and update, the update may fail with a concurrency error."
+  },
+  "performanceTargets": {
+    "execution": "p95 ≤ 1.5s",
+    "rateLimitCheck": "< 20ms",
+    "auditLogging": "async, non-blocking"
+  },
+  "agentInstructions": {
+    "general": [
+      "Always show preview before executing actions",
+      "Only suggest this action when user explicitly requests to update an Opportunity stage",
+      "Gather required information (OpportunityId, new StageName) before proposing the action",
+      "If user doesn't provide an OpportunityId, search for it first using retrieve_knowledge tool",
+      "Show both the current stage and the new stage in the preview",
+      "Use natural language to describe what will be changed"
+    ],
+    "examplePrompts": [
+      "Move the ACME renewal to Negotiation stage",
+      "Update stage to Closed Won",
+      "Mark this opportunity as lost",
+      "Change the stage to Proposal/Price Quote",
+      "Move this deal to the next stage"
+    ],
+    "responseFormat": [
+      "When proposing the action, say: 'I can update the Opportunity \"[Name]\" from [Current Stage] to [New Stage]. Would you like me to proceed?'",
+      "After successful update, say: 'I've updated the Opportunity \"[Name]\" to [New Stage]. You can view it here: [link]'",
+      "If rate limited, say: 'You've reached the daily limit for updating Opportunities. You can make more updates tomorrow.'",
+      "If access denied, say: 'You don't have permission to edit this Opportunity. It may be owned by another user or outside your sharing rules.'",
+      "If validation fails, say: 'I need more information to update the Opportunity: [missing fields]'",
+      "NOTE: Due to confirmationToken requirement, this action currently requires the LWC component (ascendixAiSearch) to execute. Direct Agentforce invocation will fail until a wrapper is implemented."
+    ],
+    "stageProgression": [
+      "Understand typical stage progression: Prospecting → Qualification → Proposal → Negotiation → Closed Won/Lost",
+      "When user says 'move to next stage', infer the next logical stage based on current stage",
+      "When user says 'mark as won', use 'Closed Won' stage",
+      "When user says 'mark as lost', use 'Closed Lost' stage"
+    ]
+  }
+}

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Update Opportunity Stage</label>
+    <protected>false</protected>
+    <values>
+        <field>ActionName__c</field>
+        <value xsi:type="xsd:string">update_opportunity_stage</value>
+    </values>
+    <values>
+        <field>Enabled__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>MaxPerUserPerDay__c</field>
+        <value xsi:type="xsd:double">50.0</value>
+    </values>
+    <values>
+        <field>RequiresConfirm__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>FlowName__c</field>
+        <value xsi:type="xsd:string">Update_Opportunity_Stage_Flow</value>
+    </values>
+    <values>
+        <field>InputSchemaJson__c</field>
+        <value xsi:type="xsd:string">{
+  "type": "object",
+  "required": ["OpportunityId", "StageName"],
+  "properties": {
+    "OpportunityId": {
+      "type": "string",
+      "pattern": "^006[a-zA-Z0-9]{15}$",
+      "description": "Opportunity ID (18 chars)"
+    },
+    "StageName": {
+      "type": "string",
+      "enum": ["Prospecting", "Qualification", "Proposal", "Negotiation", "Closed Won", "Closed Lost"],
+      "description": "New sales stage"
+    },
+    "Probability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Win probability percentage"
+    }
+  }
+}</value>
+    </values>
+    <values>
+        <field>OutputSchemaJson__c</field>
+        <value xsi:type="xsd:string">{
+  "type": "object",
+  "properties": {
+    "success": {"type": "boolean"},
+    "error": {"type": "string"}
+  }
+}</value>
+    </values>
+    <values>
+        <field>AllowedFields__c</field>
+        <value xsi:type="xsd:string">StageName, Probability</value>
+    </values>
+</CustomMetadata>

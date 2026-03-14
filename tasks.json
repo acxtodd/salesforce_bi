@@ -115,10 +115,10 @@
           "id": "0.4",
           "title": "Build bulk loader",
           "description": "Orchestrator task — split into subtasks 0.4.1 through 0.4.3.",
-          "status": "pending",
+          "status": "blocked",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T22:26:59.800769+00:00",
+          "updatedAt": "2026-03-14T22:40:24.034972+00:00",
           "startedAt": null,
           "completedAt": null,
           "depends_on": [
@@ -129,7 +129,12 @@
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": []
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-14T22:40:24.035258+00:00",
+              "note": "Blocked: Salesforce sandbox access token expired, no Client Credentials flow configured. See memory/blocker_sf_credentials.md for resolution options."
+            }
+          ]
         },
         {
           "id": "0.4.1",

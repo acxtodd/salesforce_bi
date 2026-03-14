@@ -265,6 +265,7 @@ Two retrieval paths:
 | Query Lambda | Claude tool-use orchestration + streaming SSE | New (replaces retrieve + answer Lambdas) |
 | Sync Lambda | CDC → Transform → Embed → Upsert | New (simplified from 8-step pipeline) |
 | Bulk Loader | Initial Salesforce → Turbopuffer load | New (adapts existing batch export logic) |
+| Denorm Config Generator | Metadata-driven field discovery → YAML config | New (runs at initial load; adapts signal_harvester.py) |
 | LWC (ascendixAiSearch) | Chat UI in Salesforce | Existing (adapt API contract) |
 | Apex controller | SSE parsing, callout logic | Existing (adapt endpoint) |
 
@@ -278,7 +279,7 @@ Two retrieval paths:
 | Query orchestration | Custom planner + decomposer + entity linker + intent router | LLM tool-use (Claude chooses which tools to call) |
 | Authorization | Sharing bucket computation + FLS enforcement | Per-user OAuth + live SOQL for permission-sensitive queries |
 | Multi-tenant | Shared OpenSearch collection (expensive idle) | Namespace-per-org (pennies when cold) |
-| Schema management | Nightly Salesforce Describe API | Static mapping (we own the schema) + validation at initial load |
+| Schema management | Nightly Salesforce Describe API | Metadata-driven field discovery at initial load → generated denorm config (see §8.5) |
 | Ingestion | 8-step Step Functions pipeline | 3-step Lambda: Transform → Embed → Upsert |
 | Infrastructure | 6 CDK stacks, 16+ Lambdas, 12+ DynamoDB tables | ≤2 CDK stacks, ~3 Lambdas, 1-2 DynamoDB tables |
 
@@ -497,6 +498,180 @@ When a parent record changes, child documents must be updated with the new paren
 
 **POC:** Cascade is deferred. Accept ~1hr staleness. Most parent fields (city, class, type) change rarely.
 **v1:** Implement hybrid cascade — eager for name/address/type fields, lazy for less critical fields.
+
+### Metadata-Driven Field Selection (Denorm Config Generator)
+
+The document schemas above are illustrative. In practice, which fields to embed and which parent fields to denormalize should be **derived automatically from Salesforce metadata**, not hand-curated. Salesforce already tells you what's important through its own UI configuration.
+
+This approach follows the **Coveo pattern** — a declarative, metadata-driven configuration of which fields to index and which parent/child relationships to traverse, generated from the source system's own metadata rather than requiring manual field-by-field curation.
+
+#### Signal sources (ranked by strength)
+
+| Tier | Source | Salesforce API | Signal | Weight |
+|------|--------|---------------|--------|--------|
+| **T1** | Compact Layouts | `GET /sobjects/{obj}/describe/compactLayouts/` | The 4-10 fields an admin hand-picked as "most important." Highlights panel, hover cards, mobile. | 15 |
+| **T2** | Search Layouts | `GET /search/layout/?q={obj}` | Fields shown in global search results. Direct proxy for "what matters when searching." | 10 |
+| **T3** | Page Layouts (first section) | `GET /sobjects/{obj}/describe/layouts` | Fields on the add/edit form. Required fields (`nillable=false`) are near-universal. | Required=20, Other=5 |
+| **T4** | List View columns + filters | `GET /sobjects/{obj}/listviews/{id}/describe` | Aggregate across all views — frequently-appearing fields are high-signal. Filter fields = facet candidates. | columns=10/view, filters=10/view |
+| **T5** | Report Types | `GET /analytics/reportTypes` | Fields users report on. Aggregation and grouping candidates. | 5 |
+| **T6** | Quick Actions | Tooling API `QuickAction` | Default field values on entity creation = high-priority context. | 5 |
+| **T7** | Field Describe intrinsics | `GET /sobjects/{obj}/describe` → `fields[]` | `nameField`, `filterable`, `groupable`, `nillable=false`, `type=reference`, `calculated=true` | Baseline (see below) |
+
+#### Intrinsic field properties (Tier 7 baseline)
+
+These properties from the sObject Describe API provide a floor signal even without layout metadata:
+
+| Property | Denormalization Signal |
+|----------|----------------------|
+| `nameField=true` | **Always index.** Primary name field. |
+| `nillable=false` + `createable=true` | **Always index.** Required field — admin decided it matters. |
+| `idLookup=true` | **Always index.** Unique identifier (Email, CaseNumber). |
+| `externalId=true` | **Always index.** External system ID. |
+| `type=reference` + `referenceTo` | **Denormalization trigger.** Fetch parent's compact layout fields. |
+| `filterable=true` + `groupable=true` | Good facet/filter candidate for metadata attributes. |
+| `calculated=true` | Formula field — someone thought it mattered enough to compute. |
+| `type` in `(picklist, multipicklist)` | Facet candidate. Store as filterable attribute. |
+| `deprecatedAndHidden=true` | **Exclude.** |
+
+#### Parent field denormalization rules
+
+For each `reference` (lookup/master-detail) field on the target object:
+
+1. **Always denormalize** the parent's `nameField` (e.g., Account.Name on a Deal).
+2. **Fetch the parent's compact layout** → denormalize those fields (e.g., Property compact layout fields onto Lease).
+3. **Check the child's list views** for dot-notation columns (e.g., `Account.Industry` on a Contact list view) → denormalize those fields. This is the strongest cross-object signal because the admin explicitly placed the parent field on the child's view.
+4. **For master-detail relationships** (`cascadeDelete=true` on the child relationship): denormalize more aggressively than for lookups. These are tightly coupled objects.
+5. **For the parent's search layout fields**: include as secondary candidates.
+
+#### Child data aggregation rules
+
+For child relationships (from parent's `childRelationships[]` array):
+
+1. **If the child object is in the target set** (e.g., Lease is a target object and a child of Property): skip — it has its own search document.
+2. **If the child is a "detail" object** (e.g., Lease Period, Note, Activity, Task):
+   - Pull the child's compact layout fields.
+   - Concatenate child text into the parent's `text` representation.
+   - Optionally store aggregates as metadata attributes (count, latest date).
+
+#### Scoring formula
+
+```
+field_score = (
+    compact_layout_appearances * 15 +
+    search_layout_appearances * 10 +
+    list_view_column_appearances * 10 +
+    list_view_filter_appearances * 10 +
+    report_type_appearances * 5 +
+    quick_action_appearances * 5 +
+    is_required * 20 +
+    is_name_field * 15 +
+    is_filterable * 2 +
+    is_formula * 3
+)
+```
+
+Fields scoring above a threshold (e.g., ≥10) are included in the denormalized document. Fields scoring ≥20 are included in the `text` representation (for embedding). All scored fields are included as typed metadata attributes (for filtering).
+
+#### Generated config format
+
+The generator outputs a YAML config per object, human-reviewable before use:
+
+```yaml
+# Auto-generated from Salesforce org 00DXXX metadata
+# Generated: 2026-03-14T10:30:00Z
+# Review and commit before use
+
+Property:
+  embed_fields:        # Included in text representation + metadata attributes
+    - Name             # nameField, compact, search, score=55
+    - RecordType.Name  # compact, list_view(3), score=45
+    - City__c          # compact, list_view(5), filter(3), score=80
+    - State__c         # compact, list_view(4), filter(2), score=65
+    - PropertyClass__c # compact, search, list_view(4), filter(4), score=85
+    - PropertySubType__c # compact, list_view(2), score=40
+    - Description__c   # long_text, page_layout(first_section), score=25
+  metadata_fields:     # Metadata attributes only (for filtering)
+    - TotalSF__c       # numeric, list_view(3), filter(2), score=30
+    - YearBuilt__c     # numeric, list_view(1), score=15
+    - Floors__c        # numeric, score=12
+  parents:
+    OwnerLandlord__c:  # reference field → Account
+      - Name           # parent compact
+      - Industry       # parent compact
+    Market__c:         # reference field → Market
+      - Name           # parent nameField
+  children:
+    Availability__c:
+      aggregate: [count, earliest(AvailableDate__c)]
+    Lease__c:
+      aggregate: [count, earliest(TermExpirationDate__c)]
+
+Lease:
+  embed_fields:
+    - Name
+    - LeaseType__c
+    - Description__c
+  metadata_fields:
+    - LeasedSF__c
+    - RatePSF__c
+    - TermCommencementDate__c
+    - TermExpirationDate__c
+  parents:
+    Property__c:       # master-detail → aggressive denorm
+      - Name           # parent compact
+      - City__c        # parent compact + child list_view dot notation
+      - State__c       # parent compact
+      - PropertyClass__c # parent compact + child list_view dot notation
+      - PropertySubType__c # parent compact
+      - TotalSF__c     # parent compact
+      - SubMarket__c   # child list_view dot notation (Property__r.SubMarket__c)
+    Tenant__c:         # lookup → Account
+      - Name           # parent nameField
+    OwnerLandlord__c:  # lookup → Account
+      - Name           # parent nameField
+  children:
+    LeasePeriod__c:
+      embed: [RentAmount__c, PeriodType__c, StartDate__c, EndDate__c]
+      aggregate: [count]
+```
+
+#### Execution flow
+
+```
+At initial load (Step 0, before bulk export):
+
+1. Authenticate to Salesforce org.
+2. For each target object:
+   a. GET /sobjects/{obj}/describe → fields, childRelationships
+   b. GET /sobjects/{obj}/describe/compactLayouts/ → T1 fields
+   c. GET /search/layout/?q={obj} → T2 fields
+   d. GET /sobjects/{obj}/describe/layouts → T3 fields (first section, required)
+   e. GET /sobjects/{obj}/listviews → iterate → describe each → T4 columns + filters
+   f. Score all fields using formula above.
+3. For each reference field:
+   a. Identify parent object from referenceTo[].
+   b. Fetch parent's compact layout → parent denorm fields.
+   c. Check child list views for parent.field dot notation → additional parent denorm fields.
+4. For each child relationship (childRelationships[]):
+   a. If child is in target set → skip.
+   b. If child is detail object → fetch child's compact layout → child embed/aggregate fields.
+5. Generate YAML config.
+6. Human review → commit to repo.
+7. Bulk loader reads config → drives denormalization at index time.
+
+Subsequent runs (monthly cron, production):
+- Re-run generator → diff against committed config → alert on changes.
+- Human reviews diff → approves/adjusts → commits.
+- Next sync cycle picks up new config.
+```
+
+#### Prior art in this codebase
+
+The existing `signal_harvester.py` already reads Saved Searches, SearchLayouts, ListView columns, and sortable fields to compute relevance scores (1-10). The existing `IndexConfiguration__mdt` metadata provides manual override. The denorm config generator subsumes and extends this work:
+
+- **What it replaces:** The nightly schema discovery pipeline (discoverer.py, cache.py, schema_loader.py) and the signal_harvester.py scoring. These fed a graph builder + chunking pipeline; the new generator feeds a denormalization builder.
+- **What it reuses:** The signal harvesting logic (adapted for the new scoring formula), the Salesforce OAuth/API patterns, and the fallback chain concept (generated config → manual override → defaults).
+- **What it adds:** Compact layout and page layout signals (not in the current system), parent-field denormalization rules, child aggregation rules, and YAML config generation.
 
 ---
 
@@ -740,11 +915,11 @@ Guidelines:
 ### Initial load
 
 1. Authenticate to Salesforce org via OAuth (Connected App).
-2. **Validate schema:** Confirm expected fields exist on target objects via a one-time Describe API call. Log warnings for missing fields; fail on missing required fields. This is a lightweight validation, not the nightly schema discovery of the current system (see [Decision D-01](#19-decision-log)).
+2. **Generate denorm config:** Run the Denorm Config Generator (see §8.5) against the org. This harvests compact layouts, search layouts, page layouts, list views, and field describe metadata to produce a YAML config defining which fields to embed, which parent fields to denormalize, and which child aggregations to compute. Human reviews and commits the config. On subsequent orgs with the same schema, the existing config is reused with a validation pass to confirm field existence. See [Decision D-01](#19-decision-log).
 3. Query all supported objects via Bulk API 2.0.
 4. For each record:
-   - Flatten and denormalize (inline parent fields).
-   - Generate text representation for embedding.
+   - Flatten and denormalize (inline parent fields per denorm config).
+   - Generate text representation for embedding (from `embed_fields` in config).
    - Embed via Bedrock Titan v2 (1024-dim).
    - Batch upsert to search backend namespace `org_{salesforce_org_id}`.
 5. Estimated time: ~1M records/hour at Turbopuffer write throughput.
@@ -860,9 +1035,13 @@ This is not an incremental migration inside the existing system. It is a paralle
 - [ ] Create Turbopuffer account (Launch plan, $64/mo).
 - [ ] Implement `SearchBackend` protocol + `TurbopufferBackend`.
 - [ ] Define namespace schema for POC org.
+- [ ] Write denorm config generator (adapting signal_harvester.py):
+  - Connect to Salesforce sandbox.
+  - Harvest compact layouts, search layouts, page layouts, list views, field describe.
+  - Score fields, identify parent denorm fields, identify child aggregations.
+  - Generate YAML config → human review → commit.
 - [ ] Write bulk loader script:
   - Connect to Salesforce sandbox via Bulk API 2.0.
-  - Validate schema (one-time Describe API check).
   - Export Property, Lease, Availability records.
   - Denormalize (inline parent Property fields on Lease/Availability).
   - Generate text representation per record.
@@ -996,6 +1175,7 @@ This is not an incremental migration inside the existing system. It is a paralle
 **In scope:**
 
 - [ ] SearchBackend protocol + TurbopufferBackend implementation
+- [ ] Denorm config generator — harvest Salesforce metadata → generate YAML config for POC org
 - [ ] Turbopuffer namespace creation + bulk load of 1 Salesforce org's data
 - [ ] Denormalized document model for Property, Lease, Availability (3 objects)
 - [ ] Embedding pipeline (Bedrock Titan v2 → SearchBackend upsert)
@@ -1064,7 +1244,7 @@ This section documents where the source PRD and PDR disagreed, and how this unif
 
 **PRD said:** Keep schema discovery as a connector responsibility. Preserve the nightly Describe API integration.
 **PDR said:** Delete schema discovery entirely — we own the schema, it's over-engineering.
-**Resolution:** Side with PDR for known CRE objects. Ascendix owns the schema for Property, Lease, Availability, Sale, Deal. However, add a **one-time schema validation step** at initial load that confirms expected fields exist via Describe API. This protects against Salesforce orgs with customized field names or missing fields. No nightly discovery, no schema cache, no drift checker.
+**Resolution:** Neither fully. Replace nightly schema discovery with a **metadata-driven denorm config generator** (see §8.5) that runs at initial load and optionally monthly. This recovers the PRD's intent (use Salesforce metadata to inform indexing) without the PDR's complaint (over-engineered nightly Describe cycle). The generator reads compact layouts, search layouts, page layouts, list views, and field intrinsics to automatically determine which fields to embed, which parent fields to denormalize, and which child data to aggregate. Output is a human-reviewable YAML config. The existing `signal_harvester.py` logic is adapted into the new generator. No schema cache, no drift checker, no nightly job — but the metadata signals that made schema discovery valuable are preserved and extended.
 
 ### RC-02: Chunking
 
@@ -1128,7 +1308,7 @@ Decisions made in this spec. Each has an ID for cross-reference.
 
 | ID | Decision | Rationale | Reversibility |
 |----|----------|-----------|---------------|
-| **D-01** | Schema validation at initial load only, not nightly discovery | We own the CRE schema. Nightly discovery added complexity for generality we don't need. One-time validation catches misconfigured orgs. | Easy — add nightly job if connector-per-tenant customization requires it. |
+| **D-01** | Metadata-driven denorm config generation at initial load, not nightly discovery | Salesforce metadata (compact layouts, search layouts, page layouts, list views) tells us which fields matter. Generate a YAML config automatically, human-review it, use it to drive denormalization. Replaces both the PRD's nightly discovery and the PDR's static mapping. Monthly re-generation in production to catch view/layout changes. | Easy — increase frequency or add drift alerting if schemas evolve faster than expected. |
 | **D-02** | No chunking for POC; `chunk_id` reserved in schema | CRE records are structured data, not long prose. Full-text per record is sufficient. Chunking adds ingestion complexity. | Easy — activate by populating `chunk_id` if retrieval quality degrades on Notes/Descriptions. |
 | **D-03** | Denormalization replaces graph for cross-object queries | Most cross-object queries (lease comps by property, deals by submarket) are handled by pre-joining parent fields. Remaining cases use sequential LLM tool calls. | Medium — would need to build graph infrastructure if complex multi-hop traversals prove necessary. Phase 4 gate is the decision point. |
 | **D-04** | `SearchBackend` protocol with Turbopuffer implementation | Prevents vendor coupling (lesson learned from Bedrock KB). Thin ABC adds ~1 day of effort. | Easy — swap implementation to any vector database. |
@@ -1171,9 +1351,9 @@ These are unresolved decision points for collaborative discussion.
 
 **Alternatives:** Terraform, SST, or Pulumi if team prefers.
 
-### Q4: What fields to denormalize?
+### Q4: Denorm config generator — threshold tuning
 
-The document schemas in Section 8 are a starting point based on common CRE queries. **Ascendix team should validate and adjust** which parent fields are denormalized onto which children.
+The scoring formula in §8.5 uses a threshold (proposed: ≥10 for metadata attributes, ≥20 for text embedding) to decide which fields make it into the denormalized document. **These thresholds need validation against a real Ascendix org.** Run the generator against the sandbox, review the YAML output, and tune thresholds until the config captures 80-90% of fields the team considers important without excessive noise. The document schemas in Section 8 serve as a manual baseline to compare against.
 
 ### Q5: Cascade strategy for production
 

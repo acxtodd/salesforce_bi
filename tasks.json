@@ -466,11 +466,11 @@
           "id": "1.3",
           "title": "Test query endpoint against acceptance tests",
           "description": "Run the existing acceptance test queries against the new /query endpoint via curl/script. Measure pass rate and latency. This is the first real quality signal.",
-          "status": "completed",
+          "status": "in_progress",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-15T21:25:58.610503+00:00",
-          "startedAt": null,
+          "updatedAt": "2026-03-15T21:48:07.562104+00:00",
+          "startedAt": "2026-03-15T21:48:07.497586+00:00",
           "completedAt": "2026-03-15T21:25:58.547367+00:00",
           "depends_on": [
             "1.1",
@@ -496,6 +496,10 @@
             {
               "timestamp": "2026-03-15T21:25:58.610287+00:00",
               "note": "Code complete: run_acceptance_tests.py + acceptance_tests.yaml (15 cases) + 43 tests. CLI with category/test/output filters. Live run pending Bedrock credentials. Commit: 6f30994"
+            },
+            {
+              "timestamp": "2026-03-15T21:48:07.561881+00:00",
+              "note": "Reopened: evaluation checks fixed (min_results now checks search_result_count, tool_used checks actual tools_used list). Live run pending."
             }
           ]
         }

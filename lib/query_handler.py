@@ -60,6 +60,12 @@ class QueryResult:
     turns: int = 0
     """Number of Bedrock Converse API calls made."""
 
+    tools_used: list[str] = field(default_factory=list)
+    """Names of tools that were actually called (e.g. ["search_records"])."""
+
+    search_result_count: int = 0
+    """Total number of records returned by search_records calls."""
+
 
 # ---------------------------------------------------------------------------
 # Query handler
@@ -120,6 +126,8 @@ class QueryHandler:
         tool_calls_made = 0
         turns = 0
         all_search_results: list[dict] = []
+        tools_used: list[str] = []
+        search_result_count = 0
 
         while turns < MAX_TURNS:
             # --- Call Bedrock Converse API ---
@@ -149,6 +157,8 @@ class QueryHandler:
                     citations=citations,
                     tool_calls_made=tool_calls_made,
                     turns=turns,
+                    tools_used=tools_used,
+                    search_result_count=search_result_count,
                 )
 
             if stop_reason == "tool_use":
@@ -177,10 +187,12 @@ class QueryHandler:
                     )
 
                     tool_calls_made += 1
+                    tools_used.append(tool_name)
 
                     # Collect search results for citation extraction.
                     if tool_name == "search_records" and "results" in dispatch_result:
                         all_search_results.extend(dispatch_result["results"])
+                        search_result_count += len(dispatch_result["results"])
 
                     tool_result_contents.append({
                         "toolResult": {
@@ -203,6 +215,8 @@ class QueryHandler:
                     citations=[],
                     tool_calls_made=tool_calls_made,
                     turns=turns,
+                    tools_used=tools_used,
+                    search_result_count=search_result_count,
                 )
 
         # Exhausted MAX_TURNS -- return whatever we have.
@@ -214,6 +228,8 @@ class QueryHandler:
             citations=citations,
             tool_calls_made=tool_calls_made,
             turns=turns,
+            tools_used=tools_used,
+            search_result_count=search_result_count,
         )
 
     # ------------------------------------------------------------------

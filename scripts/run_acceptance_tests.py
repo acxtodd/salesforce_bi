@@ -168,35 +168,25 @@ def evaluate_result(
             "detail": "digit found" if has_number else "no digits in answer",
         })
 
-    # --- min_results (tool_calls_made > 0) ---
+    # --- min_results (actual search result count) ---
     if "min_results" in expected:
         min_r = expected["min_results"]
-        ok = query_result.tool_calls_made >= min_r
+        actual = query_result.search_result_count
+        ok = actual >= min_r
         checks.append({
             "name": "min_results",
             "pass": ok,
-            "detail": f"tool_calls_made={query_result.tool_calls_made} (need >={min_r})",
+            "detail": f"search_result_count={actual} (need >={min_r})",
         })
 
-    # --- tool_used ---
+    # --- tool_used (check actual tool names called) ---
     if "tool_used" in expected:
         expected_tool = expected["tool_used"]
-        # Heuristic: infer which tool was used from the answer content and
-        # the number of tool calls.  For search_records the answer typically
-        # mentions records or "found".  For aggregate_records the answer
-        # typically includes counts / numbers.
-        # With the real pipeline, tool_calls_made > 0 confirms tools ran.
-        # We check that the answer is consistent with the expected tool.
-        if expected_tool == "search_records":
-            ok = query_result.tool_calls_made >= 1
-        elif expected_tool == "aggregate_records":
-            ok = query_result.tool_calls_made >= 1
-        else:
-            ok = query_result.tool_calls_made >= 1
+        ok = expected_tool in query_result.tools_used
         checks.append({
             "name": "tool_used",
             "pass": ok,
-            "detail": f"expected {expected_tool}, tool_calls={query_result.tool_calls_made}",
+            "detail": f"expected '{expected_tool}' in {query_result.tools_used}",
         })
 
     # --- no_error ---

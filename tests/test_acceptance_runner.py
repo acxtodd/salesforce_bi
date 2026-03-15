@@ -101,12 +101,16 @@ def _make_query_result(
     citations: list | None = None,
     tool_calls_made: int = 1,
     turns: int = 2,
+    tools_used: list | None = None,
+    search_result_count: int = 5,
 ) -> QueryResult:
     return QueryResult(
         answer=answer,
         citations=citations or [],
         tool_calls_made=tool_calls_made,
         turns=turns,
+        tools_used=tools_used if tools_used is not None else ["search_records"],
+        search_result_count=search_result_count,
     )
 
 
@@ -259,28 +263,35 @@ class TestEvaluation:
 
     def test_min_results_passes(self):
         tc = _make_test_case(expected={"min_results": 1})
-        qr = _make_query_result(tool_calls_made=2)
+        qr = _make_query_result(search_result_count=3)
         result = evaluate_result(tc, qr, latency_s=1.0)
         check = next(c for c in result.checks if c["name"] == "min_results")
         assert check["pass"] is True
 
     def test_min_results_fails(self):
         tc = _make_test_case(expected={"min_results": 1})
-        qr = _make_query_result(tool_calls_made=0)
+        qr = _make_query_result(search_result_count=0)
         result = evaluate_result(tc, qr, latency_s=1.0)
         check = next(c for c in result.checks if c["name"] == "min_results")
         assert check["pass"] is False
 
     def test_tool_used_passes(self):
         tc = _make_test_case(expected={"tool_used": "search_records"})
-        qr = _make_query_result(tool_calls_made=1)
+        qr = _make_query_result(tools_used=["search_records"])
         result = evaluate_result(tc, qr, latency_s=1.0)
         check = next(c for c in result.checks if c["name"] == "tool_used")
         assert check["pass"] is True
 
+    def test_tool_used_fails_when_wrong_tool(self):
+        tc = _make_test_case(expected={"tool_used": "search_records"})
+        qr = _make_query_result(tools_used=["aggregate_records"])
+        result = evaluate_result(tc, qr, latency_s=1.0)
+        check = next(c for c in result.checks if c["name"] == "tool_used")
+        assert check["pass"] is False
+
     def test_tool_used_fails_when_no_tools(self):
         tc = _make_test_case(expected={"tool_used": "search_records"})
-        qr = _make_query_result(tool_calls_made=0)
+        qr = _make_query_result(tools_used=[])
         result = evaluate_result(tc, qr, latency_s=1.0)
         check = next(c for c in result.checks if c["name"] == "tool_used")
         assert check["pass"] is False
@@ -595,6 +606,8 @@ class TestIntegrationMocked:
             tool_calls_made=2,
             turns=3,
             citations=[{"id": "a0x001", "name": "Tower One"}],
+            tools_used=["search_records", "aggregate_records"],
+            search_result_count=5,
         )
 
         preloaded_cases = load_test_cases(yaml_file)

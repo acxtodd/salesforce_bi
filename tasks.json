@@ -4,7 +4,7 @@
       "phase": 0,
       "name": "Foundations",
       "description": "Turbopuffer account, SearchBackend protocol, denorm config generator, bulk loader, data validation.",
-      "status": "pending",
+      "status": "completed",
       "tasks": [
         {
           "id": "0.1",
@@ -246,12 +246,12 @@
           "id": "0.5",
           "title": "Validate data in Turbopuffer",
           "description": "Run direct queries against Turbopuffer to verify data integrity: metadata filter queries, hybrid BM25+vector queries, aggregation queries. Compare results against known Salesforce data.",
-          "status": "pending",
+          "status": "completed",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T22:28:30.658107+00:00",
+          "updatedAt": "2026-03-15T10:29:39.184488+00:00",
           "startedAt": null,
-          "completedAt": null,
+          "completedAt": "2026-03-15T10:29:39.122243+00:00",
           "depends_on": [
             "0.4"
           ],
@@ -267,7 +267,16 @@
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": []
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-15T10:29:39.122400+00:00",
+              "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-15T10:29:39.184292+00:00",
+              "note": "Code complete: validate_data.py (8 checks) + 33 unit tests. Commit: 1435857"
+            }
+          ]
         }
       ]
     },

@@ -1,0 +1,87 @@
+# Denormalization config for Ascendix CRE objects
+# Corrected against live sandbox org 00Ddl000003yx57EAA
+# Generated: 2026-03-15
+# Review and commit before use
+
+ascendix__Property__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__City__c              # filterable, key search field
+    - ascendix__State__c             # filterable
+    - ascendix__PropertyClass__c     # picklist, filterable
+    - ascendix__PropertySubType__c   # picklist, filterable
+    - ascendix__Description__c       # textarea, long text for semantic search
+    - ascendix__Street__c            # address
+    - ascendix__BuildingStatus__c    # picklist, filterable
+  metadata_fields:
+    - ascendix__TotalBuildingArea__c  # double, filterable (total SF)
+    - ascendix__YearBuilt__c         # string, filterable
+    - ascendix__Floors__c            # double, filterable
+    - ascendix__PostalCode__c        # string, filterable
+    - ascendix__County__c            # string, filterable
+    - ascendix__Occupancy__c         # double, filterable
+    - ascendix__LandArea__c          # double, filterable
+    - ascendix__ConstructionType__c  # picklist, filterable
+    - ascendix__Tenancy__c           # picklist, filterable
+  parents:
+    ascendix__OwnerLandlord__c:      # -> Account
+      - Name                         # parent nameField
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # parent nameField
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # parent nameField
+
+ascendix__Lease__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__LeaseType__c         # picklist, filterable
+    - ascendix__Description__c       # textarea, long text
+    - ascendix__UnitType__c          # picklist, filterable
+  metadata_fields:
+    - ascendix__Size__c              # double, filterable (leased SF)
+    - ascendix__LeaseRatePerUOM__c   # currency, filterable (rate PSF)
+    - ascendix__AverageRent__c       # currency, filterable
+    - ascendix__TermCommencementDate__c  # date, filterable
+    - ascendix__TermExpirationDate__c    # date, filterable
+    - ascendix__TermMonths__c        # double, filterable
+    - ascendix__OccupancyDate__c     # date, filterable
+    - ascendix__LeaseSigned__c       # date, filterable
+  parents:
+    ascendix__Property__c:           # -> ascendix__Property__c (master-detail)
+      - Name                         # property name
+      - ascendix__City__c            # property city
+      - ascendix__State__c           # property state
+      - ascendix__PropertyClass__c   # property class
+      - ascendix__PropertySubType__c # property subtype
+      - ascendix__TotalBuildingArea__c  # property total SF
+    ascendix__Tenant__c:             # -> Account
+      - Name                         # tenant name
+    ascendix__OwnerLandlord__c:      # -> Account
+      - Name                         # owner/landlord name
+
+ascendix__Availability__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__UseType__c           # picklist, filterable (space type)
+    - ascendix__UseSubType__c        # picklist, filterable
+    - ascendix__Status__c            # picklist, filterable
+    - ascendix__SpaceDescription__c  # textarea, long text
+    - ascendix__LeaseType__c         # picklist, filterable
+  metadata_fields:
+    - ascendix__AvailableArea__c     # double, filterable (available SF)
+    - ascendix__RentLow__c           # currency, filterable (asking rate low)
+    - ascendix__RentHigh__c          # currency, filterable (asking rate high)
+    - ascendix__AskingPrice__c       # currency, filterable
+    - ascendix__AvailableFrom__c     # date, filterable
+    - ascendix__MaxContiguousArea__c # double, filterable
+    - ascendix__MinDivisibleArea__c  # double, filterable
+    - ascendix__LeaseTermMin__c      # double, filterable
+    - ascendix__LeaseTermMax__c      # double, filterable
+  parents:
+    ascendix__Property__c:           # -> ascendix__Property__c (master-detail)
+      - Name                         # property name
+      - ascendix__City__c            # property city
+      - ascendix__State__c           # property state
+      - ascendix__PropertyClass__c   # property class
+      - ascendix__PropertySubType__c # property subtype
+      - ascendix__TotalBuildingArea__c  # property total SF

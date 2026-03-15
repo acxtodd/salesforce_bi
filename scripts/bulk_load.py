@@ -44,7 +44,27 @@ EMBED_BATCH_SIZE = 25
 
 # Upsert constants
 UPSERT_BATCH_SIZE = 100
-FULL_TEXT_SEARCH_SCHEMA = {"text": {"type": "string", "full_text_search": True}}
+FULL_TEXT_SEARCH_SCHEMA = {
+    "text": {"type": "string", "full_text_search": True},
+    # Declare numeric fields as float to avoid int/float inference conflicts
+    "totalbuildingarea": {"type": "float"},
+    "floors": {"type": "float"},
+    "occupancy": {"type": "float"},
+    "landarea": {"type": "float"},
+    "size": {"type": "float"},
+    "leaserateperuom": {"type": "float"},
+    "averagerent": {"type": "float"},
+    "termmonths": {"type": "float"},
+    "availablearea": {"type": "float"},
+    "rentlow": {"type": "float"},
+    "renthigh": {"type": "float"},
+    "askingprice": {"type": "float"},
+    "maxcontiguousarea": {"type": "float"},
+    "mindivisiblearea": {"type": "float"},
+    "leasetermmin": {"type": "float"},
+    "leasetermmax": {"type": "float"},
+    "property_totalbuildingarea": {"type": "float"},
+}
 
 
 # ===================================================================

@@ -11,18 +11,20 @@ public with sharing class AscendixAISearchController {
     public static Map<String, Object> callAnswerEndpoint(String requestBodyJson) {
         try {
             Map<String, Object> requestBody = (Map<String, Object>) JSON.deserializeUntyped(requestBodyJson);
-            
-            if (!requestBody.containsKey('salesforceUserId') || requestBody.get('salesforceUserId') == null) {
-                requestBody.put('salesforceUserId', UserInfo.getUserId());
-            }
-            
+
+            // Build payload for /query endpoint: question, org_id, session_id
+            Map<String, Object> newPayload = new Map<String, Object>();
+            newPayload.put('question', (String) requestBody.get('query'));
+            newPayload.put('org_id', UserInfo.getOrganizationId());
+            newPayload.put('session_id', (String) requestBody.get('sessionId'));
+
             HttpRequest req = new HttpRequest();
-            req.setEndpoint(NAMED_CREDENTIAL + '/answer');
+            req.setEndpoint(NAMED_CREDENTIAL + '/query');
             req.setMethod('POST');
             req.setHeader('Content-Type', 'application/json');
             req.setHeader('x-api-key', API_KEY); // Manual header for POC
             req.setTimeout(TIMEOUT_MS);
-            req.setBody(JSON.serialize(requestBody));
+            req.setBody(JSON.serialize(newPayload));
             
             Http http = new Http();
             HttpResponse res = http.send(req);
@@ -81,15 +83,24 @@ public with sharing class AscendixAISearchController {
                     Map<String, Object> data = (Map<String, Object>) JSON.deserializeUntyped(dataJson);
                     
                     if (currentEvent == 'token') {
-                        if (data.containsKey('token')) {
-                            answerBuilder.append((String)data.get('token'));
+                        if (data.containsKey('text')) {
+                            answerBuilder.append((String)data.get('text'));
                         }
-                    } else if (currentEvent == 'citation') {
-                        if (data.containsKey('citation')) {
+                    } else if (currentEvent == 'citations') {
+                        if (data.containsKey('citations')) {
+                            List<Object> rawCitations = (List<Object>) data.get('citations');
                             if (!result.containsKey('citations')) {
                                 result.put('citations', new List<Object>());
                             }
-                            ((List<Object>)result.get('citations')).add(data.get('citation'));
+                            List<Object> citationsList = (List<Object>) result.get('citations');
+                            for (Object rawCitation : rawCitations) {
+                                Map<String, Object> citationMap = (Map<String, Object>) rawCitation;
+                                Map<String, Object> transformed = new Map<String, Object>();
+                                transformed.put('recordId', citationMap.get('id'));
+                                transformed.put('title', citationMap.get('name'));
+                                transformed.put('id', citationMap.get('id'));
+                                citationsList.add(transformed);
+                            }
                         }
                     } else if (currentEvent == 'done') {
                         // Merge any final metadata

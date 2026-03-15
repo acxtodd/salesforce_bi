@@ -223,6 +223,12 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         return formatted;
     }
 
+    // Filter UI is hidden — /query endpoint does not accept filter params.
+    // Set to true when backend supports filters to re-enable the UI.
+    get isFilterUIEnabled() {
+        return false;
+    }
+
     get hasActiveFilters() {
         return Boolean(
             this.selectedFilters.region ||
@@ -462,24 +468,9 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             }
 
             const requestBody = {
-                sessionId: this.sessionId,
                 query: this.queryText,
-                salesforceUserId: this.getUserId(),
-                topK: 8,
-                policy: {
-                    require_citations: true,
-                    max_tokens: 1000
-                }
+                sessionId: this.sessionId
             };
-
-            if (this.recordId) {
-                requestBody.recordContext = { recordId: this.recordId };
-            }
-
-            const filters = this.getActiveFilters();
-            if (filters) {
-                requestBody.filters = filters;
-            }
 
             // Store for retry
             this.lastRequestBody = requestBody;

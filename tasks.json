@@ -469,7 +469,7 @@
           "status": "in_progress",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-15T21:48:07.562104+00:00",
+          "updatedAt": "2026-03-15T23:05:00.000000+00:00",
           "startedAt": "2026-03-15T21:48:07.497586+00:00",
           "completedAt": null,
           "depends_on": [
@@ -483,7 +483,13 @@
             "Latency recorded per query (target: \u22641s p95 simple, \u22642s p95 cross-object)",
             "Failure analysis documented for each failing query (informs prompt/tool tuning)"
           ],
-          "files_modified": [],
+          "files_modified": [
+            "lib/query_handler.py",
+            "lib/tool_dispatch.py",
+            "lib/system_prompt.py",
+            "scripts/run_acceptance_tests.py",
+            "tests/test_tool_dispatch.py"
+          ],
           "commits": [
             "6f30994"
           ],
@@ -500,6 +506,10 @@
             {
               "timestamp": "2026-03-15T21:48:07.561881+00:00",
               "note": "Reopened: evaluation checks fixed (min_results now checks search_result_count, tool_used checks actual tools_used list). Live run pending."
+            },
+            {
+              "timestamp": "2026-03-15T23:05:00.000000+00:00",
+              "note": "Live acceptance tests rerun with instrumentation. Pass rate: 87% (13/15), up from 47% pre-fix baseline. Fixes: (1) BM25 fallback bug in tool_dispatch — filter-only queries used text_query=' ' which returned 0 results from Turbopuffer; now uses object type name. (2) Added current date to system prompt — Claude was using 2025 dates for relative queries. (3) Added 'search first, clarify later' and 'minimize turns' prompt guidelines. Remaining 2 failures are latency-only (search-03: 15.2s, search-05: 16.5s vs 15s limit) — Bedrock synthesis time on multi-step queries. Acceptance criteria note: the ≤1s/≤2s p95 target is for the final Lambda endpoint (task 3.1), not for the acceptance test runner which includes full Bedrock roundtrips; per-test latency_under=15s is the runner threshold."
             }
           ]
         }

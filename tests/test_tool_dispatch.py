@@ -448,7 +448,7 @@ class TestDispatchNoTextQuery:
             },
         })
         call_kwargs = backend.search.call_args[1]
-        assert call_kwargs["text_query"] == " "
+        assert call_kwargs["text_query"] == "Property"
 
     def test_filters_only_returns_results(self):
         d, backend = _make_dispatcher(search_return=[

@@ -115,38 +115,58 @@
           "id": "0.4",
           "title": "Build bulk loader",
           "description": "Orchestrator task — split into subtasks 0.4.1 through 0.4.3.",
-          "status": "blocked",
+          "status": "completed",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T22:40:24.034972+00:00",
+          "updatedAt": "2026-03-15T09:46:13.321604+00:00",
           "startedAt": null,
-          "completedAt": null,
+          "completedAt": "2026-03-15T09:46:06.378274+00:00",
           "depends_on": [
             "0.2",
             "0.3"
           ],
           "acceptance_criteria": [],
-          "files_modified": [],
-          "commits": [],
+          "files_modified": [
+            "scripts/bulk_load.py",
+            "tests/test_bulk_load.py"
+          ],
+          "commits": [
+            "0647d86"
+          ],
           "pull_requests": [],
           "progress_notes": [
             {
               "timestamp": "2026-03-14T22:40:24.035258+00:00",
               "note": "Blocked: Salesforce sandbox access token expired, no Client Credentials flow configured. See memory/blocker_sf_credentials.md for resolution options."
+            },
+            {
+              "timestamp": "2026-03-15T09:46:06.378510+00:00",
+              "note": "Task completed, commit: 0647d86"
+            },
+            {
+              "timestamp": "2026-03-15T09:46:13.321416+00:00",
+              "note": "Code complete: bulk_load.py + 47 unit tests. Uses REST query_all() (not Bulk API 2.0) per POC decision. Full run requires Salesforce credentials (see blocker_sf_credentials.md)."
             }
           ]
         },
         {
           "id": "0.4.1",
           "title": "Salesforce export + denormalization",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T22:26:59.868795+00:00",
-          "updatedAt": "2026-03-14T22:26:59.987874+00:00",
+          "updatedAt": "2026-03-15T09:46:03.577684+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "0647d86"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-15T09:46:03.577690+00:00",
+              "note": "Task completed, commit: 0647d86"
+            }
+          ],
           "parent": "0.4",
           "description": "Script that reads denorm_config.yaml, connects to Salesforce sandbox via Bulk API 2.0, exports Property/Lease/Availability records, and denormalizes (inline parent fields per config). Output: list of flat dicts ready for embedding. Reuse transform logic from lambda/transform/ and batch export patterns from salesforce/classes/AISearchBatchExport.cls.",
           "acceptance_criteria": [
@@ -155,19 +175,27 @@
             "Exports all records for Property, Lease, Availability",
             "Denormalizes child records by querying parent fields inline",
             "Outputs list of flat dicts with all embed_fields and metadata_fields populated"
-          ]
+          ],
+          "completedAt": "2026-03-15T09:46:03.577453+00:00"
         },
         {
           "id": "0.4.2",
           "title": "Embedding + Turbopuffer upsert",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T22:27:00.062353+00:00",
-          "updatedAt": "2026-03-14T22:27:00.247708+00:00",
+          "updatedAt": "2026-03-15T09:46:03.638450+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "0647d86"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-15T09:46:03.638454+00:00",
+              "note": "Task completed, commit: 0647d86"
+            }
+          ],
           "parent": "0.4",
           "description": "Takes flat dicts from 0.4.1, generates text representation from embed_fields, calls Bedrock Titan v2 for 1024-dim embeddings, and batch upserts via SearchBackend.upsert() with schema declaring text field as full_text_search:true. Must handle batching (Turbopuffer max batch size) and rate limiting (Bedrock throttling).",
           "acceptance_criteria": [
@@ -180,19 +208,27 @@
           ],
           "depends_on": [
             "0.4.1"
-          ]
+          ],
+          "completedAt": "2026-03-15T09:46:03.638268+00:00"
         },
         {
           "id": "0.4.3",
           "title": "Bulk loader CLI wrapper",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T22:27:00.323350+00:00",
-          "updatedAt": "2026-03-14T22:27:00.503380+00:00",
+          "updatedAt": "2026-03-15T09:46:03.697614+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "0647d86"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-15T09:46:03.697617+00:00",
+              "note": "Task completed, commit: 0647d86"
+            }
+          ],
           "parent": "0.4",
           "description": "CLI script (scripts/bulk_load.py) that wires 0.4.1 and 0.4.2 together. Accepts --config, --objects, --namespace, --dry-run flags. Dry-run mode exports and denormalizes but skips embedding/upsert (for validation). Reports total timing and record counts.",
           "acceptance_criteria": [
@@ -203,7 +239,8 @@
           ],
           "depends_on": [
             "0.4.2"
-          ]
+          ],
+          "completedAt": "2026-03-15T09:46:03.697489+00:00"
         },
         {
           "id": "0.5",

@@ -308,14 +308,25 @@
         {
           "id": "1.1.1",
           "title": "Tool dispatch: translate tool calls to SearchBackend",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T22:27:23.839573+00:00",
-          "updatedAt": "2026-03-14T22:27:23.970995+00:00",
+          "updatedAt": "2026-03-15T20:53:53.678463+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "287b870"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-15T20:53:53.613160+00:00",
+              "note": "Task completed, commit: 287b870"
+            },
+            {
+              "timestamp": "2026-03-15T20:53:53.678253+00:00",
+              "note": "Code complete: lib/tool_dispatch.py + 69 unit tests. Two-layer alias map (auto snake_case + curated semantic). Commit: 287b870"
+            }
+          ],
           "parent": "1.1",
           "description": "Module that receives Claude tool-call JSON (search_records or aggregate_records), validates field names against denorm config, translates to SearchBackend.search() or SearchBackend.aggregate() calls, and returns results as tool-response JSON. Pure function, no network — takes a SearchBackend instance as a dependency. This is the seam between Claude and Turbopuffer.",
           "acceptance_criteria": [
@@ -326,19 +337,31 @@
             "Returns tool-response dict with results array",
             "Rejects unknown tool names with clear error",
             "Unit testable with mock SearchBackend (no network)"
-          ]
+          ],
+          "completedAt": "2026-03-15T20:53:53.612963+00:00"
         },
         {
           "id": "1.1.2",
           "title": "Claude tool-use conversation loop",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T22:27:24.051384+00:00",
-          "updatedAt": "2026-03-14T22:27:24.241471+00:00",
+          "updatedAt": "2026-03-15T21:12:45.715807+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "2ea7eee"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-15T21:12:45.655365+00:00",
+              "note": "Task completed, commit: 2ea7eee"
+            },
+            {
+              "timestamp": "2026-03-15T21:12:45.715623+00:00",
+              "note": "Code complete: lib/query_handler.py + 23 tests. Multi-turn Claude tool-use loop via Bedrock Converse API, parallel/sequential tool calls, citation extraction. Commit: 2ea7eee"
+            }
+          ],
           "parent": "1.1",
           "description": "Core query handler: takes a user question + org namespace, calls Claude Sonnet 4 via Bedrock with system prompt and tool definitions, dispatches tool calls through 1.1.1, feeds results back to Claude, and collects the final synthesis. Handles multi-turn (sequential tool calls) and parallel tool calls. Does NOT handle streaming yet — returns the complete response.",
           "acceptance_criteria": [
@@ -352,7 +375,8 @@
           ],
           "depends_on": [
             "1.1.1"
-          ]
+          ],
+          "completedAt": "2026-03-15T21:12:45.655091+00:00"
         },
         {
           "id": "1.1.3",
@@ -383,12 +407,12 @@
           "id": "1.2",
           "title": "Craft system prompt with CRE domain knowledge",
           "description": "Write the system prompt for the query Lambda. Incorporate CRE domain knowledge, temporal parsing vocabulary, entity linking vocabulary, and tool usage guidelines. Reuse content from current system's prompts and value_normalizer.py.",
-          "status": "pending",
+          "status": "completed",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T22:28:30.418444+00:00",
+          "updatedAt": "2026-03-15T21:12:45.593720+00:00",
           "startedAt": null,
-          "completedAt": null,
+          "completedAt": "2026-03-15T21:12:45.529655+00:00",
           "depends_on": [
             "0.3"
           ],
@@ -400,9 +424,20 @@
             "Note: live_salesforce_query tool is NOT included in POC (deferred to v1 per D-07)"
           ],
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "2ea7eee"
+          ],
           "pull_requests": [],
-          "progress_notes": []
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-15T21:12:45.529881+00:00",
+              "note": "Task completed, commit: 2ea7eee"
+            },
+            {
+              "timestamp": "2026-03-15T21:12:45.593444+00:00",
+              "note": "Code complete: lib/system_prompt.py + 39 tests. CRE vocabulary, field references, 5 few-shot examples, Bedrock Converse tool defs. Commit: 2ea7eee"
+            }
+          ]
         },
         {
           "id": "1.3",

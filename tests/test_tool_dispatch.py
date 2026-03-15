@@ -400,16 +400,14 @@ class TestDispatchSearchRecords:
         assert "termcommencementdate_gte" in filters
         assert filters["size_gte"] == 10000
 
-    def test_include_attributes_populated(self):
+    def test_include_attributes_returns_all(self):
         d, backend = _make_dispatcher()
         d.dispatch({
             "name": "search_records",
             "parameters": {"object_type": "Property", "text_query": "x"},
         })
         call_kwargs = backend.search.call_args[1]
-        attrs = call_kwargs["include_attributes"]
-        assert "city" in attrs
-        assert "name" in attrs
+        assert call_kwargs["include_attributes"] is True
 
     def test_unknown_filter_field_returns_error(self):
         d, _ = _make_dispatcher()

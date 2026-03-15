@@ -35,7 +35,7 @@ _PROPERTY_FIELDS = """\
   - name: record name / building name
   - city, state: location
   - property_class: building class (A, B, C)
-  - property_type: property subtype (Office, Industrial, Retail, etc.)
+  - property_type: property subtype (General, Business Park, Mixed Use, etc.) — NOT the primary type. Use text_query for "office"/"industrial"/"retail" searches.
   - total_sf: total building area in square feet
   - year_built: year the building was constructed
   - floors: number of floors
@@ -67,7 +67,7 @@ _LEASE_FIELDS = """\
   - property_city: parent property city (denormalized)
   - property_state: parent property state (denormalized)
   - property_class: parent property class (denormalized)
-  - property_type: parent property subtype (denormalized)
+  - property_type: parent property subtype (denormalized) — subtypes, not primary type
   - property_total_sf: parent property total building area (denormalized)"""
 
 _AVAILABILITY_FIELDS = """\
@@ -88,7 +88,7 @@ _AVAILABILITY_FIELDS = """\
   - property_city: parent property city (denormalized)
   - property_state: parent property state (denormalized)
   - property_class: parent property class (denormalized)
-  - property_type: parent property subtype (denormalized)
+  - property_type: parent property subtype (denormalized) — subtypes, not primary type
   - property_total_sf: parent property total building area (denormalized)"""
 
 # ---------------------------------------------------------------------------
@@ -103,7 +103,8 @@ User: "Show me Class A office buildings in Dallas over 100,000 SF"
 Tool call:
   search_records(
     object_type="Property",
-    filters={"city": "Dallas", "property_class": "A", "property_type": "Office", "total_sf_gte": 100000}
+    filters={"city": "Dallas", "property_class": "A", "total_sf_gte": 100000},
+    text_query="office"
   )
 
 **2. Lease comp search (cross-object with property filters)**
@@ -113,7 +114,6 @@ Tool call:
     object_type="Lease",
     filters={
       "property_city": "Dallas",
-      "property_type": "Office",
       "leased_sf_gte": 10000,
       "start_date_gte": "2025-03-15"
     },
@@ -152,13 +152,15 @@ User: "Compare average asking rates for Class A office in Dallas vs Houston"
 Tool calls (parallel):
   aggregate_records(
     object_type="Availability",
-    filters={"property_class": "A", "use_type": "Office", "property_city": "Dallas"},
+    filters={"property_class": "A", "property_city": "Dallas"},
+    text_query="office",
     aggregate="avg",
     aggregate_field="rent_high"
   )
   aggregate_records(
     object_type="Availability",
-    filters={"property_class": "A", "use_type": "Office", "property_city": "Houston"},
+    filters={"property_class": "A", "property_city": "Houston"},
+    text_query="office",
     aggregate="avg",
     aggregate_field="rent_high"
   )

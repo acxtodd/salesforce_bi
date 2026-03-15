@@ -362,14 +362,12 @@ class ToolDispatcher:
 
         limit = min(int(params.get("limit", _DEFAULT_LIMIT)), _MAX_LIMIT)
 
-        include_attrs = sorted(self._registry[object_type].filterable)
-
         results = self._backend.search(
             self._namespace,
             text_query=text_query,
             filters=resolved,
             top_k=limit,
-            include_attributes=include_attrs,
+            include_attributes=True,
         )
         return {"results": results}
 

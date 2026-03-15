@@ -120,18 +120,28 @@ class TurbopufferBackend(SearchBackend):
         if tpuf_filters is not None:
             kwargs["filters"] = tpuf_filters
 
-        if include_attributes is not None:
+        # include_attributes: list → explicit attrs, True → all, None → id+dist only
+        if include_attributes is True:
+            kwargs["include_attributes"] = True
+        elif include_attributes is not None:
             kwargs["include_attributes"] = include_attributes
 
         # Execute ---------------------------------------------------------
         result = self._ns(namespace).query(**kwargs)
 
         # Convert to plain dicts ------------------------------------------
+        return_all = include_attributes is True
         rows: list[dict] = []
         for row in result.rows:
             # SDK uses '$dist' as the distance attribute name
             doc: dict[str, Any] = {"id": row.id, "dist": getattr(row, "$dist", None)}
-            if include_attributes:
+            if return_all:
+                # Row is a Pydantic model; dynamic attributes live in model_extra.
+                extras = getattr(row, "model_extra", {}) or {}
+                for attr_name, val in extras.items():
+                    if attr_name != "$dist" and val is not None:
+                        doc[attr_name] = val
+            elif include_attributes:
                 for attr in include_attributes:
                     doc[attr] = getattr(row, attr, None)
             rows.append(doc)

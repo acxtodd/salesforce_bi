@@ -491,7 +491,8 @@
             "tests/test_tool_dispatch.py"
           ],
           "commits": [
-            "6f30994"
+            "6f30994",
+            "b3530f1"
           ],
           "pull_requests": [],
           "progress_notes": [
@@ -509,7 +510,7 @@
             },
             {
               "timestamp": "2026-03-15T23:05:00.000000+00:00",
-              "note": "Live acceptance tests rerun with instrumentation. Pass rate: 87% (13/15), up from 47% pre-fix baseline. Fixes: (1) BM25 fallback bug in tool_dispatch — filter-only queries used text_query=' ' which returned 0 results from Turbopuffer; now uses object type name. (2) Added current date to system prompt — Claude was using 2025 dates for relative queries. (3) Added 'search first, clarify later' and 'minimize turns' prompt guidelines. Remaining 2 failures are latency-only (search-03: 15.2s, search-05: 16.5s vs 15s limit) — Bedrock synthesis time on multi-step queries. Acceptance criteria note: the ≤1s/≤2s p95 target is for the final Lambda endpoint (task 3.1), not for the acceptance test runner which includes full Bedrock roundtrips; per-test latency_under=15s is the runner threshold."
+              "note": "Behaviorally validated. Pass rate 87% (13/15), up from 47% pre-fix. All query-behavior failures resolved: BM25 fallback bug fixed (tool_dispatch.py), current date added to prompt, 'search first' and 'minimize turns' guidelines added. Diagnostic traces in results/acceptance_traced_run.json, post-fix artifact in results/acceptance_test_results.json. Commit: b3530f1. Latency exception outstanding: 2 tests (search-03: 15.2s, search-05: 16.5s) miss the per-test 15s latency_under threshold. Traces show this is Bedrock synthesis time (10\u201312s final turns) on inherently multi-step queries, not retrieval latency (tool dispatch <1s). Artifact p95=16.51s. Remaining work is optimization or policy (relax threshold for multi-step queries), not correctness."
             }
           ]
         }

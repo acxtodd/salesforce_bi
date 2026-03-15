@@ -1,0 +1,701 @@
+{
+  "pass_rate": 0.5333,
+  "total": 15,
+  "passed": 8,
+  "failed": 7,
+  "skipped": 0,
+  "results": [
+    {
+      "test_id": "search-01",
+      "question": "Find Class A office properties in Dallas",
+      "category": "simple_search",
+      "status": "PASS",
+      "latency_s": 13.407950708002318,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['Dallas', 'Class A', 'office']"
+        },
+        {
+          "name": "min_results",
+          "pass": true,
+          "detail": "search_result_count=8 (need >=1)"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'search_records' in ['search_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "13.4s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "I found 8 Class A office properties in Dallas. Here are the results:\n\n## Class A Office Properties in Dallas\n\n**1. Renaissance Tower** (ID: a0afk000000PvnUAAS)\n- Address: 1201 Elm Street, Dallas, TX 7",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 8,
+      "error": ""
+    },
+    {
+      "test_id": "search-02",
+      "question": "Show me properties over 100,000 square feet",
+      "category": "simple_search",
+      "status": "FAIL",
+      "latency_s": 6.317721667001024,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['100,000', 'square feet', 'SF']"
+        },
+        {
+          "name": "answer_contains_number",
+          "pass": true,
+          "detail": "digit found"
+        },
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'search_records' in ['search_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "6.3s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "I didn't find any properties over 100,000 square feet in your database. This could mean:\n\n1. There are no properties of this size in your current data\n2. The square footage data may be stored differen",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "search-03",
+      "question": "What leases are expiring in the next year?",
+      "category": "simple_search",
+      "status": "FAIL",
+      "latency_s": 5.875057999975979,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['lease', 'expir', '2026']"
+        },
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'search_records' in ['search_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "5.9s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "I found no leases expiring by March 15, 2026 in your system. This could mean:\n\n1. **No expiring leases**: You may not have any leases expiring in the next year\n2. **Data timing**: The lease data may n",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "search-04",
+      "question": "Show me available office spaces",
+      "category": "simple_search",
+      "status": "FAIL",
+      "latency_s": 4.506815416039899,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['available', 'office', 'space']"
+        },
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'search_records' in ['search_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "4.5s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "I didn't find any office spaces currently marked as available in your system. This could mean:\n\n1. There are no active office availabilities in your portfolio\n2. Office spaces might be classified unde",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "search-05",
+      "question": "Find properties owned by the largest landlord in our database",
+      "category": "simple_search",
+      "status": "FAIL",
+      "latency_s": 19.93149354099296,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['propert', 'landlord']"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'search_records' in ['aggregate_records', 'search_records', 'search_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": false,
+          "detail": "19.9s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "Perfect! I found the properties owned by Storm Properties, the largest landlord in your database. Here are the **9 properties** owned by **Storm Properties**:\n\n## Storm Properties Portfolio (9 Propert",
+      "tool_calls_made": 3,
+      "turns": 4,
+      "citations_count": 10,
+      "error": ""
+    },
+    {
+      "test_id": "cross-01",
+      "question": "Find lease comps in Dallas on office property over 10,000 SF",
+      "category": "cross_object",
+      "status": "PASS",
+      "latency_s": 14.718770291015971,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['Dallas', 'lease', 'office']"
+        },
+        {
+          "name": "answer_contains_number",
+          "pass": true,
+          "detail": "digit found"
+        },
+        {
+          "name": "min_results",
+          "pass": true,
+          "detail": "search_result_count=20 (need >=1)"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'search_records' in ['search_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "14.7s (limit 30s)"
+        }
+      ],
+      "answer_snippet": "I found 20 lease comps in Dallas for office properties over 10,000 SF. Here are the key findings:\n\n## Recent Lease Comps (2023-2025):\n\n**Merit Tower** - Class A+ Properties:\n- **Suite 1760** (a0Vfk000",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 12,
+      "error": ""
+    },
+    {
+      "test_id": "cross-02",
+      "question": "What spaces are available in Class A buildings?",
+      "category": "cross_object",
+      "status": "FAIL",
+      "latency_s": 5.169654999976046,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['available', 'Class A', 'space']"
+        },
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'search_records' in ['search_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "5.2s (limit 30s)"
+        }
+      ],
+      "answer_snippet": "I didn't find any available spaces in Class A buildings in the current dataset. This could mean:\n\n1. There are currently no Class A availabilities in the database\n2. The available spaces might be clas",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "cross-03",
+      "question": "Show me leases on properties in Dallas",
+      "category": "cross_object",
+      "status": "FAIL",
+      "latency_s": 7.233266832947265,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['lease', 'Dallas']"
+        },
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'search_records' in ['search_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "7.2s (limit 30s)"
+        }
+      ],
+      "answer_snippet": "I found no lease records for properties in Dallas in the current dataset. This could mean:\n\n1. There are no lease records currently in the system for Dallas properties\n2. The leases might be recorded ",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "agg-01",
+      "question": "How many properties are there by city?",
+      "category": "aggregation",
+      "status": "PASS",
+      "latency_s": 9.019808665965684,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['propert', 'city', 'cities']"
+        },
+        {
+          "name": "answer_contains_number",
+          "pass": true,
+          "detail": "digit found"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'aggregate_records' in ['aggregate_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "9.0s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "Here's the breakdown of properties by city:\n\n**Top cities by property count:**\n- **__none__**: 44 properties (no city specified)\n- **Dallas**: 43 properties\n- **New York**: 15 properties\n- **Los Angel",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "agg-02",
+      "question": "Give me a count of properties by class",
+      "category": "aggregation",
+      "status": "PASS",
+      "latency_s": 5.274609290994704,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['propert', 'class', 'Class A', 'Class B']"
+        },
+        {
+          "name": "answer_contains_number",
+          "pass": true,
+          "detail": "digit found"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'aggregate_records' in ['aggregate_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "5.3s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "Here's the breakdown of properties by class:\n\n- **Class A**: 66 properties\n- **Class A+**: 8 properties  \n- **Class B**: 7 properties\n- **Unclassified**: 521 properties\n\nThe majority of properties (52",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "agg-03",
+      "question": "How many leases are there by lease type?",
+      "category": "aggregation",
+      "status": "PASS",
+      "latency_s": 5.794575000007171,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['lease', 'type']"
+        },
+        {
+          "name": "answer_contains_number",
+          "pass": true,
+          "detail": "digit found"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'aggregate_records' in ['aggregate_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "5.8s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "Here's the breakdown of leases by lease type:\n\n| Lease Type | Count |\n|------------|-------|\n| **Unspecified** | 182 |\n| **Full Service Gross** | 30 |\n| **NNN (Triple Net)** | 8 |\n| **Modified Gross**",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "comp-01",
+      "question": "Compare the number of properties in Dallas versus Houston",
+      "category": "comparison",
+      "status": "PASS",
+      "latency_s": 7.6844670419814065,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['Dallas', 'Houston']"
+        },
+        {
+          "name": "answer_contains_number",
+          "pass": true,
+          "detail": "digit found"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'aggregate_records' in ['aggregate_records', 'aggregate_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "7.7s (limit 30s)"
+        }
+      ],
+      "answer_snippet": "Based on the data in your Salesforce org, here's the comparison of properties between Dallas and Houston:\n\n**Dallas**: 43 properties\n**Houston**: 8 properties\n\nDallas has significantly more properties",
+      "tool_calls_made": 2,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "comp-02",
+      "question": "Compare availability counts by use type",
+      "category": "comparison",
+      "status": "PASS",
+      "latency_s": 7.730854875000659,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['availab', 'type', 'office', 'retail']"
+        },
+        {
+          "name": "answer_contains_number",
+          "pass": true,
+          "detail": "digit found"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'aggregate_records' in ['aggregate_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "7.7s (limit 30s)"
+        }
+      ],
+      "answer_snippet": "Here's the breakdown of availability counts by use type:\n\n**Availability Count by Use Type:**\n\n- **Office**: 58 availabilities\n- **Retail**: 9 availabilities  \n- **Multi-Family**: 1 availability\n- **U",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "nlp-01",
+      "question": "What's available downtown?",
+      "category": "semantic",
+      "status": "FAIL",
+      "latency_s": 3.6783132079872303,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['available', 'downtown', 'space']"
+        },
+        {
+          "name": "tool_used",
+          "pass": false,
+          "detail": "expected 'search_records' in []"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "3.7s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "I'd be happy to help you find what's available downtown! To give you the most relevant results, could you please let me know:\n\n1. Which city's downtown area are you interested in? (e.g., Dallas, Houst",
+      "tool_calls_made": 0,
+      "turns": 1,
+      "citations_count": 0,
+      "error": ""
+    },
+    {
+      "test_id": "nlp-02",
+      "question": "Tell me about the largest properties",
+      "category": "semantic",
+      "status": "PASS",
+      "latency_s": 5.0530499999877065,
+      "checks": [
+        {
+          "name": "answer_contains_any",
+          "pass": true,
+          "detail": "matched ['propert', 'SF']"
+        },
+        {
+          "name": "answer_contains_number",
+          "pass": true,
+          "detail": "digit found"
+        },
+        {
+          "name": "tool_used",
+          "pass": true,
+          "detail": "expected 'search_records' in ['search_records']"
+        },
+        {
+          "name": "no_error",
+          "pass": true,
+          "detail": "no error prefix"
+        },
+        {
+          "name": "latency_under",
+          "pass": true,
+          "detail": "5.1s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "I searched for properties in your database but didn't find any results. This could mean:\n\n1. There are no Property records currently indexed in your AscendixIQ database\n2. The data may still be indexi",
+      "tool_calls_made": 1,
+      "turns": 2,
+      "citations_count": 0,
+      "error": ""
+    }
+  ],
+  "latency_stats": {
+    "min": 3.68,
+    "max": 19.93,
+    "mean": 8.09,
+    "median": 6.32,
+    "p95": 19.93
+  },
+  "failures": [
+    {
+      "test_id": "search-02",
+      "question": "Show me properties over 100,000 square feet",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        }
+      ],
+      "answer_snippet": "I didn't find any properties over 100,000 square feet in your database. This could mean:\n\n1. There are no properties of this size in your current data\n2. The square footage data may be stored differen"
+    },
+    {
+      "test_id": "search-03",
+      "question": "What leases are expiring in the next year?",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        }
+      ],
+      "answer_snippet": "I found no leases expiring by March 15, 2026 in your system. This could mean:\n\n1. **No expiring leases**: You may not have any leases expiring in the next year\n2. **Data timing**: The lease data may n"
+    },
+    {
+      "test_id": "search-04",
+      "question": "Show me available office spaces",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        }
+      ],
+      "answer_snippet": "I didn't find any office spaces currently marked as available in your system. This could mean:\n\n1. There are no active office availabilities in your portfolio\n2. Office spaces might be classified unde"
+    },
+    {
+      "test_id": "search-05",
+      "question": "Find properties owned by the largest landlord in our database",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "latency_under",
+          "pass": false,
+          "detail": "19.9s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "Perfect! I found the properties owned by Storm Properties, the largest landlord in your database. Here are the **9 properties** owned by **Storm Properties**:\n\n## Storm Properties Portfolio (9 Propert"
+    },
+    {
+      "test_id": "cross-02",
+      "question": "What spaces are available in Class A buildings?",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        }
+      ],
+      "answer_snippet": "I didn't find any available spaces in Class A buildings in the current dataset. This could mean:\n\n1. There are currently no Class A availabilities in the database\n2. The available spaces might be clas"
+    },
+    {
+      "test_id": "cross-03",
+      "question": "Show me leases on properties in Dallas",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        }
+      ],
+      "answer_snippet": "I found no lease records for properties in Dallas in the current dataset. This could mean:\n\n1. There are no lease records currently in the system for Dallas properties\n2. The leases might be recorded "
+    },
+    {
+      "test_id": "nlp-01",
+      "question": "What's available downtown?",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "tool_used",
+          "pass": false,
+          "detail": "expected 'search_records' in []"
+        }
+      ],
+      "answer_snippet": "I'd be happy to help you find what's available downtown! To give you the most relevant results, could you please let me know:\n\n1. Which city's downtown area are you interested in? (e.g., Dallas, Houst"
+    }
+  ]
+}

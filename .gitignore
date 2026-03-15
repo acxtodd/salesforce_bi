@@ -46,6 +46,7 @@ salesforce/deploy_validate_output*.txt
 
 # Generated test results & reports
 results/
+!results/acceptance_test_results.json
 deployment.log
 *_audit_*.json
 *_audit_*.md

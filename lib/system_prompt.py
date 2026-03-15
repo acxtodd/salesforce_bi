@@ -148,19 +148,17 @@ Tool call:
   )
 
 **5. Comparison (parallel aggregate calls)**
-User: "Compare average asking rates for Class A office in Dallas vs Houston"
+User: "Compare average asking rates for Class A properties in Dallas vs Houston"
 Tool calls (parallel):
   aggregate_records(
     object_type="Availability",
     filters={"property_class": "A", "property_city": "Dallas"},
-    text_query="office",
     aggregate="avg",
     aggregate_field="rent_high"
   )
   aggregate_records(
     object_type="Availability",
     filters={"property_class": "A", "property_city": "Houston"},
-    text_query="office",
     aggregate="avg",
     aggregate_field="rent_high"
   )

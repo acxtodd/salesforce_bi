@@ -613,7 +613,7 @@
           "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-16T00:00:00.000000+00:00",
+          "updatedAt": "2026-03-16T09:29:02.054560+00:00",
           "startedAt": "2026-03-15T23:46:26.441049+00:00",
           "completedAt": null,
           "depends_on": [
@@ -645,6 +645,10 @@
             {
               "timestamp": "2026-03-15T23:46:26.502848+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-16T09:29:02.054392+00:00",
+              "note": "Live E2E run 2026-03-16: 0 passed, 1 failed, 2 skipped. CREATE failed — CDC sync Lambda not deployed to AWS. UPDATE/DELETE skipped (depend on CREATE). Root cause: lambda/cdc_sync/index.py exists in repo but has no CDK deployment. Blocker is infrastructure, not code. Results artifact: results/e2e_test_results.json. Script fixed: UPDATE/DELETE now skip when CREATE fails (prevents false DELETE PASS)."
             }
           ]
         }

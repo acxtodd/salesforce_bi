@@ -180,6 +180,8 @@ def run_e2e_tests(
     results = {"passed": 0, "failed": 0, "tests": []}
     record_id = None
 
+    create_succeeded = False
+
     try:
         # Test 1: CREATE
         LOG.info("=== Test 1: CREATE ===")
@@ -189,50 +191,60 @@ def run_e2e_tests(
             LOG.info("PASS: Record found in Turbopuffer after CREATE")
             results["passed"] += 1
             results["tests"].append({"name": "CREATE", "status": "PASS"})
+            create_succeeded = True
         else:
             LOG.error("FAIL: Record not found within %ds", POLL_TIMEOUT_SECONDS)
             results["failed"] += 1
             results["tests"].append({"name": "CREATE", "status": "FAIL",
                                      "reason": "Record not found within timeout"})
 
-        # Test 2: UPDATE
-        LOG.info("=== Test 2: UPDATE ===")
-        new_city = f"UpdatedCity_{test_id}"
-        update_test_property(sf_client, record_id, new_city)
-        # Poll for updated value
-        start = time.time()
-        updated = False
-        while time.time() - start < POLL_TIMEOUT_SECONDS:
-            record = poll_for_record(backend, namespace, record_id, record_name=record_name, timeout=30)
-            if record and record.get("city") == new_city:
-                updated = True
-                break
-            time.sleep(POLL_INTERVAL_SECONDS)
+        # Test 2: UPDATE (depends on CREATE succeeding)
+        if create_succeeded:
+            LOG.info("=== Test 2: UPDATE ===")
+            new_city = f"UpdatedCity_{test_id}"
+            update_test_property(sf_client, record_id, new_city)
+            start = time.time()
+            updated = False
+            while time.time() - start < POLL_TIMEOUT_SECONDS:
+                record = poll_for_record(backend, namespace, record_id, record_name=record_name, timeout=30)
+                if record and record.get("city") == new_city:
+                    updated = True
+                    break
+                time.sleep(POLL_INTERVAL_SECONDS)
 
-        if updated:
-            LOG.info("PASS: Record updated in Turbopuffer after UPDATE")
-            results["passed"] += 1
-            results["tests"].append({"name": "UPDATE", "status": "PASS"})
+            if updated:
+                LOG.info("PASS: Record updated in Turbopuffer after UPDATE")
+                results["passed"] += 1
+                results["tests"].append({"name": "UPDATE", "status": "PASS"})
+            else:
+                LOG.error("FAIL: Updated value not reflected within %ds", POLL_TIMEOUT_SECONDS)
+                results["failed"] += 1
+                results["tests"].append({"name": "UPDATE", "status": "FAIL",
+                                         "reason": "Updated value not reflected within timeout"})
         else:
-            LOG.error("FAIL: Updated value not reflected within %ds", POLL_TIMEOUT_SECONDS)
-            results["failed"] += 1
-            results["tests"].append({"name": "UPDATE", "status": "FAIL",
-                                     "reason": "Updated value not reflected within timeout"})
+            LOG.warning("SKIP: UPDATE skipped because CREATE failed")
+            results["tests"].append({"name": "UPDATE", "status": "SKIP",
+                                     "reason": "CREATE failed — cannot validate UPDATE"})
 
-        # Test 3: DELETE
-        LOG.info("=== Test 3: DELETE ===")
-        delete_test_property(sf_client, record_id)
-        absent = poll_for_record_absent(backend, namespace, record_id, record_name=record_name)
-        if absent:
-            LOG.info("PASS: Record removed from Turbopuffer after DELETE")
-            results["passed"] += 1
-            results["tests"].append({"name": "DELETE", "status": "PASS"})
-            record_id = None  # Already cleaned up
+        # Test 3: DELETE (depends on CREATE succeeding)
+        if create_succeeded:
+            LOG.info("=== Test 3: DELETE ===")
+            delete_test_property(sf_client, record_id)
+            absent = poll_for_record_absent(backend, namespace, record_id, record_name=record_name)
+            if absent:
+                LOG.info("PASS: Record removed from Turbopuffer after DELETE")
+                results["passed"] += 1
+                results["tests"].append({"name": "DELETE", "status": "PASS"})
+                record_id = None  # Already cleaned up
+            else:
+                LOG.error("FAIL: Record still present after %ds", POLL_TIMEOUT_SECONDS)
+                results["failed"] += 1
+                results["tests"].append({"name": "DELETE", "status": "FAIL",
+                                         "reason": "Record still present after timeout"})
         else:
-            LOG.error("FAIL: Record still present after %ds", POLL_TIMEOUT_SECONDS)
-            results["failed"] += 1
-            results["tests"].append({"name": "DELETE", "status": "FAIL",
-                                     "reason": "Record still present after timeout"})
+            LOG.warning("SKIP: DELETE skipped because CREATE failed (would be vacuously true)")
+            results["tests"].append({"name": "DELETE", "status": "SKIP",
+                                     "reason": "CREATE failed — DELETE would be vacuously true"})
 
     except Exception as e:
         LOG.error("E2E test error: %s", e)

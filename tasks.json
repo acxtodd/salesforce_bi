@@ -533,7 +533,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-15T23:46:26.563432+00:00",
+          "updatedAt": "2026-03-16T11:30:38.213731+00:00",
           "startedAt": "2026-03-15T23:39:57.949022+00:00",
           "completedAt": "2026-03-15T23:46:26.563293+00:00",
           "depends_on": [
@@ -561,6 +561,10 @@
             {
               "timestamp": "2026-03-15T23:46:26.563436+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-16T11:30:38.213568+00:00",
+              "note": "Merged to main: a314217"
             }
           ]
         },
@@ -571,7 +575,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-15T23:46:26.623886+00:00",
+          "updatedAt": "2026-03-16T11:30:38.269630+00:00",
           "startedAt": "2026-03-15T23:40:02.019012+00:00",
           "completedAt": "2026-03-15T23:46:26.623709+00:00",
           "depends_on": [
@@ -603,6 +607,10 @@
             {
               "timestamp": "2026-03-15T23:46:26.623890+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-16T11:30:38.269446+00:00",
+              "note": "Merged to main: a314217"
             }
           ]
         },
@@ -613,7 +621,7 @@
           "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-16T10:55:08.693555+00:00",
+          "updatedAt": "2026-03-16T11:30:38.323977+00:00",
           "startedAt": "2026-03-15T23:46:26.441049+00:00",
           "completedAt": null,
           "depends_on": [
@@ -661,6 +669,10 @@
             {
               "timestamp": "2026-03-16T10:55:08.693197+00:00",
               "note": "QA correction: downgrading to in_progress. The live run validates the downstream sync path (S3→EventBridge→Lambda→Turbopuffer: 11s CREATE, 12s UPDATE, 11s DELETE) but bypasses two legs: (1) real SF CDC/AppFlow delivery to S3 (script writes synthetic CDC payloads directly), (2) observable propagation through LWC/query UI (script queries Turbopuffer directly, not through /query endpoint). Remaining gaps require: AppFlow Connected App configuration, and a manual or scripted LWC smoke test."
+            },
+            {
+              "timestamp": "2026-03-16T11:30:38.323824+00:00",
+              "note": "Merged to main: a314217. Downstream sync path shipped. Two validation gaps remain (AppFlow CDC delivery, LWC UI smoke test)."
             }
           ]
         }

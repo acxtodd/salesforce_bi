@@ -41,15 +41,19 @@ The LLM decides the query strategy — single search, parallel cross-object sear
 
 - Reuse the existing `AppFlow -> S3 -> EventBridge` transport and the new `lambda/cdc_sync` processor for the Turbopuffer-based connector.
 - Treat the older `/ingest` endpoint, `AISearchBatchExport`, and Step Functions ingestion chain as legacy or fallback infrastructure, not the primary path for new connector work.
-- Phase 2 is not closed yet. The remaining tasks are:
-  - `2.4` activate real Salesforce CDC/AppFlow delivery into the CDC bucket
-  - `2.5` prove the updated records are observable through the deployed Salesforce LWC and `/query` path
+- Phase 2 code tasks merged (`1f7dd3f`, PR #4, 2026-03-16):
+  - `2.4.1` AppFlow props wired via deploy-time CfnDynamicReference
+  - `2.4.2` CDC object list aligned to 5-object POC scope (JWT_BEARER auth)
+  - `2.5.1` /query Lambda with SSE streaming + API key auth deployed
+- Remaining deploy/validate tasks:
+  - `2.4.3` deploy AppFlow flows, `2.4.4` validate real CDC delivery
+  - `2.5.2` deploy /query Lambda, `2.5.3` validate LWC observability
 
 ## Supported Objects
 
 | POC (Phase 0-3) | v1 (Phase 5+) |
 |-----------------|----------------|
-| Property, Lease, Availability | + Sale, Deal, Account, Contact |
+| Property, Lease, Availability, Deal, Sale | + Account, Contact |
 
 ## Key Design Decisions
 
@@ -162,7 +166,7 @@ python3 scripts/task_manager.py phases
 |-------|------|--------|
 | 0 | Foundations | Completed |
 | 1 | Intelligence Layer | In progress (`1.3` live validation still open) |
-| 2 | Salesforce Integration | In progress (`2.4` AppFlow activation, `2.5` LWC smoke still open) |
+| 2 | Salesforce Integration | In progress (code merged; `2.4.3`/`2.4.4` deploy + `2.5.2`/`2.5.3` validate remain) |
 | 3 | Validation Gate | Pending |
 
 See [`TASK_TRACKING.md`](TASK_TRACKING.md) for task management commands and workflow.

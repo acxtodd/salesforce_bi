@@ -699,10 +699,10 @@
         {
           "id": "2.4",
           "title": "Activate real Salesforce CDC to AppFlow to S3 delivery",
-          "status": "pending",
+          "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T12:09:39.111074+00:00",
-          "updatedAt": "2026-03-16T18:34:23.671695+00:00",
+          "updatedAt": "2026-03-16T20:39:38.402288+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -722,6 +722,10 @@
             {
               "timestamp": "2026-03-16T18:34:23.671512+00:00",
               "note": "CDC subscriptions configured 2026-03-16 via Tooling API: Property, Lease, Availability, Deal, Sale. Account dropped due to 10-entity CDC limit (5 slots consumed by unremovable sf_devops managed package entries). Acceptable for POC; production will need the devops entries removed or a higher-edition limit to cover Account + Contact."
+            },
+            {
+              "timestamp": "2026-03-16T20:39:38.402456+00:00",
+              "note": "2.4.1 and 2.4.2 code-complete in 1f7dd3f (PR #4). Remaining: 2.4.3 deploy AppFlow flows + 2.4.4 validate real CDC delivery."
             }
           ],
           "description": "Finish the upstream source leg for the new connector by wiring the existing Salesforce Connected App credentials and instance URL into the ingestion CDK/app config, creating active AppFlow CDC flows in us-west-2, and proving that a normal Salesforce record change lands in the CDC S3 bucket without synthetic test writes.",
@@ -737,15 +741,16 @@
             "lib/ingestion-stack.ts",
             "lambda/cdc_sync/index.py",
             "denorm_config.yaml"
-          ]
+          ],
+          "startedAt": "2026-03-16T20:39:38.402453+00:00"
         },
         {
           "id": "2.4.1",
           "title": "Wire existing Salesforce AppFlow props into IngestionStack",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T13:47:56.821732+00:00",
-          "updatedAt": "2026-03-16T18:24:12.028836+00:00",
+          "updatedAt": "2026-03-16T20:39:16.188187+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -757,6 +762,10 @@
             {
               "timestamp": "2026-03-16T18:24:12.028668+00:00",
               "note": "Pre-req validated: Connected App credentials in AWS Secrets Manager (salesforce-ai-search/salesforce-connected-app) and instance URL in SSM (/salesforce/instance_url) are confirmed working. Ready to wire into IngestionStack."
+            },
+            {
+              "timestamp": "2026-03-16T20:39:16.188377+00:00",
+              "note": "Merged to main in 1f7dd3f (PR #4). AppFlow props wired via CfnDynamicReference deploy-time resolution."
             }
           ],
           "description": "Pass the existing Salesforce instance URL and connected-app credential references into IngestionStack so the AppFlow connector profile and flows can be synthesized and deployed in us-west-2.",
@@ -765,15 +774,16 @@
           "acceptance_criteria": [
             "bin/app.ts passes salesforceInstanceUrl, salesforceConnectedAppClientId, and salesforceConnectedAppClientSecretArn into IngestionStack for the dev deployment in us-west-2",
             "The implementation reuses the existing secret and SSM parameter material instead of introducing a new CDC transport or duplicate credential store"
-          ]
+          ],
+          "completedAt": "2026-03-16T20:39:16.188374+00:00"
         },
         {
           "id": "2.4.2",
           "title": "Align AppFlow CDC object list with current POC scope",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T13:48:13.223743+00:00",
-          "updatedAt": "2026-03-16T19:18:48.600889+00:00",
+          "updatedAt": "2026-03-16T20:39:20.639336+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -785,6 +795,10 @@
             {
               "timestamp": "2026-03-16T18:35:31.009940+00:00",
               "note": "CDC subscriptions aligned in sandbox 2026-03-16: Property, Lease, Availability, Deal, Sale all subscribed. Account dropped (CDC slot limit). Remaining work: update ingestion-stack.ts flow definitions and cdc_sync CDC_ENTITY_MAP + denorm_config.yaml to match this expanded scope."
+            },
+            {
+              "timestamp": "2026-03-16T20:39:20.639527+00:00",
+              "note": "Merged to main in 1f7dd3f (PR #4). 5-object CDC scope aligned: Property, Lease, Availability, Deal, Sale. JWT_BEARER auth, entity map + denorm config extended."
             }
           ],
           "description": "Update the AppFlow flow definitions so the real CDC path matches the active connector scope and the cdc_sync parser expectations before any deployment validation.",
@@ -794,7 +808,8 @@
             "The AppFlow flow list matches the active POC object scope: Property, Lease, Availability, Deal, Sale",
             "The AppFlow object names and S3 prefixes are compatible with lambda/cdc_sync/index.py CDC_ENTITY_MAP and denorm_config.yaml object names",
             "denorm_config.yaml includes entries for all 5 POC objects"
-          ]
+          ],
+          "completedAt": "2026-03-16T20:39:20.639524+00:00"
         },
         {
           "id": "2.4.3",
@@ -856,10 +871,10 @@
         {
           "id": "2.5",
           "title": "Verify live LWC query observability after CDC sync",
-          "status": "pending",
+          "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T12:10:04.313617+00:00",
-          "updatedAt": "2026-03-16T13:47:45.328178+00:00",
+          "updatedAt": "2026-03-16T20:39:42.683302+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -867,6 +882,10 @@
             {
               "timestamp": "2026-03-16T13:47:34.231857+00:00",
               "note": "QA readiness finding on 2026-03-16: the Salesforce UI path is not live. AscendixAISearchController calls NAMED_CREDENTIAL + '/query', but the named credential metadata points at the old answer Function URL and the deployed API Gateway has no /query route. AWS probes returned 404 Not Found from the function URL /query path and 403 MissingAuthenticationToken from API Gateway /prod/query. Controller tests currently mock /query SSE behavior, so they do not prove deployed readiness."
+            },
+            {
+              "timestamp": "2026-03-16T20:39:42.683453+00:00",
+              "note": "2.5.1 code-complete in 1f7dd3f (PR #4). /query Lambda with SSE streaming + API key auth ready for deploy. Remaining: 2.5.2 deploy + 2.5.3 LWC observability validation."
             }
           ],
           "description": "After real AppFlow delivery is active, validate the user-visible path by confirming that CREATE, UPDATE, and DELETE propagate through the deployed /query endpoint and are observable from the Salesforce LWC, not just Turbopuffer direct searches.",
@@ -886,15 +905,16 @@
             "salesforce/namedCredentials/Ascendix_RAG_API.namedCredential-meta.xml",
             "lib/api-stack.ts",
             "lambda/query/index.py"
-          ]
+          ],
+          "startedAt": "2026-03-16T20:39:42.683450+00:00"
         },
         {
           "id": "2.5.1",
           "title": "Deploy a real /query backend surface",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T13:49:31.049310+00:00",
-          "updatedAt": "2026-03-16T13:52:15.130011+00:00",
+          "updatedAt": "2026-03-16T20:39:24.863157+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -902,6 +922,10 @@
             {
               "timestamp": "2026-03-16T13:52:15.129818+00:00",
               "note": "There is repo code for lambda/query/index.py, but AWS currently has no deployed query Lambda and the deployed API Gateway has no /query resource. A live /query probe must stop returning 404 or MissingAuthenticationToken before this task can be considered done."
+            },
+            {
+              "timestamp": "2026-03-16T20:39:24.863314+00:00",
+              "note": "Merged to main in 1f7dd3f (PR #4). /query Lambda deployed via Docker + LWA + Function URL with SSE streaming and fail-closed API key auth."
             }
           ],
           "description": "Deploy the query Lambda and expose a live /query endpoint that matches the new SSE contract used by the Salesforce controller and LWC.",
@@ -910,7 +934,8 @@
           "acceptance_criteria": [
             "AWS has a deployed query Lambda or equivalent backend surface for the new query pipeline, not just lambda/query code in the repo",
             "A live probe to the deployed /query endpoint returns the expected SSE contract for a valid request instead of 404 or MissingAuthenticationToken"
-          ]
+          ],
+          "completedAt": "2026-03-16T20:39:24.863312+00:00"
         },
         {
           "id": "2.5.2",

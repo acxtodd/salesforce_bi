@@ -524,7 +524,7 @@
       "phase": 2,
       "name": "Salesforce Integration",
       "description": "LWC adaptation, Apex controller update, CDC sync Lambda, end-to-end testing.",
-      "status": "completed",
+      "status": "in_progress",
       "tasks": [
         {
           "id": "2.1",
@@ -610,12 +610,12 @@
           "id": "2.3",
           "title": "End-to-end integration test",
           "description": "Verify the full loop: change a record in Salesforce → CDC fires → sync Lambda processes → record appears in search results via LWC. Also test delete propagation.",
-          "status": "completed",
+          "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-16T10:13:47.498721+00:00",
+          "updatedAt": "2026-03-16T10:55:08.693555+00:00",
           "startedAt": "2026-03-15T23:46:26.441049+00:00",
-          "completedAt": "2026-03-16T10:13:47.498522+00:00",
+          "completedAt": null,
           "depends_on": [
             "2.1",
             "2.2"
@@ -657,6 +657,10 @@
             {
               "timestamp": "2026-03-16T10:13:47.498724+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-16T10:55:08.693197+00:00",
+              "note": "QA correction: downgrading to in_progress. The live run validates the downstream sync path (S3→EventBridge→Lambda→Turbopuffer: 11s CREATE, 12s UPDATE, 11s DELETE) but bypasses two legs: (1) real SF CDC/AppFlow delivery to S3 (script writes synthetic CDC payloads directly), (2) observable propagation through LWC/query UI (script queries Turbopuffer directly, not through /query endpoint). Remaining gaps require: AppFlow Connected App configuration, and a manual or scripted LWC smoke test."
             }
           ]
         }

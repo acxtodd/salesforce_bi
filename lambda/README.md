@@ -79,7 +79,7 @@ POC_OBJECT_FIELDS = {
 
 ## Step Functions Workflow
 
-The workflow is defined in `stepfunctions/ingestion-workflow.json` and orchestrates:
+The workflow is defined in `docs/archive/legacy/ingestion-workflow.json` and orchestrates:
 - Sequential execution of Lambda functions
 - Error handling and retry logic (exponential backoff)
 - Dead Letter Queue (DLQ) for failed records

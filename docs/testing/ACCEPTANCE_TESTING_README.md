@@ -43,7 +43,7 @@ python scripts/run_acceptance_tests.py \
 ---
 
 ### 2. Precision and Recall Evaluation
-**Script:** `scripts/evaluate_precision_recall.py`
+**Script:** `scripts/one-off/evaluate_precision_recall.py`
 
 Measures retrieval quality metrics:
 - Precision@1, @3, @5, @10
@@ -56,12 +56,12 @@ Measures retrieval quality metrics:
 **Usage:**
 ```bash
 # Evaluate with default ground truth
-python scripts/evaluate_precision_recall.py \
+python scripts/one-off/evaluate_precision_recall.py \
   --results results/acceptance_test_results.json \
   --output results/precision_recall_evaluation.json
 
 # Evaluate with custom ground truth
-python scripts/evaluate_precision_recall.py \
+python scripts/one-off/evaluate_precision_recall.py \
   --results results/acceptance_test_results.json \
   --ground-truth data/ground_truth.json \
   --output results/precision_recall_evaluation.json \
@@ -114,7 +114,7 @@ python scripts/run_security_tests.py \
 ---
 
 ### 4. Performance Measurement
-**Script:** `scripts/measure_performance.py`
+**Script:** `scripts/one-off/measure_performance.py`
 
 Measures system performance:
 - **First Token Latency:** p50, p95, p99
@@ -131,14 +131,14 @@ Measures system performance:
 **Usage:**
 ```bash
 # Run sequential performance test
-python scripts/measure_performance.py \
+python scripts/one-off/measure_performance.py \
   --api-url https://your-api-gateway.amazonaws.com \
   --api-key YOUR_API_KEY \
   --iterations 50 \
   --output results/performance_metrics.json
 
 # Run concurrent performance test
-python scripts/measure_performance.py \
+python scripts/one-off/measure_performance.py \
   --api-url https://your-api-gateway.amazonaws.com \
   --api-key YOUR_API_KEY \
   --iterations 100 \
@@ -146,7 +146,7 @@ python scripts/measure_performance.py \
   --output results/performance_metrics.json
 
 # Measure CDC freshness lag
-python scripts/measure_performance.py \
+python scripts/one-off/measure_performance.py \
   --api-url https://your-api-gateway.amazonaws.com \
   --api-key YOUR_API_KEY \
   --measure-cdc \
@@ -160,7 +160,7 @@ python scripts/measure_performance.py \
 
 ### 5. User Acceptance Testing (UAT)
 **Document:** [UAT_PLAN.md](./UAT_PLAN.md)  
-**Script:** `scripts/analyze_uat_feedback.py`
+**Script:** `scripts/one-off/analyze_uat_feedback.py`
 
 Conducts structured UAT with 10-20 pilot users:
 - **Phase 1:** Onboarding and training (2 days)
@@ -173,7 +173,7 @@ Conducts structured UAT with 10-20 pilot users:
 **Usage:**
 ```bash
 # Analyze UAT feedback
-python scripts/analyze_uat_feedback.py \
+python scripts/one-off/analyze_uat_feedback.py \
   --feedback data/uat_feedback.json \
   --output results/uat_report.json \
   --verbose
@@ -200,7 +200,7 @@ python scripts/run_acceptance_tests.py \
   --output results/acceptance_test_results.json
 
 # 2. Evaluate precision and recall
-python scripts/evaluate_precision_recall.py \
+python scripts/one-off/evaluate_precision_recall.py \
   --results results/acceptance_test_results.json \
   --output results/precision_recall_evaluation.json
 
@@ -211,7 +211,7 @@ python scripts/run_security_tests.py \
   --output results/security_test_results.json
 
 # 4. Measure performance
-python scripts/measure_performance.py \
+python scripts/one-off/measure_performance.py \
   --api-url $API_URL \
   --api-key $API_KEY \
   --iterations 100 \
@@ -227,7 +227,7 @@ python scripts/measure_performance.py \
 # 4. Conduct interviews and retrospective
 # 5. Analyze feedback
 
-python scripts/analyze_uat_feedback.py \
+python scripts/one-off/analyze_uat_feedback.py \
   --feedback data/uat_feedback.json \
   --output results/uat_report.json
 ```

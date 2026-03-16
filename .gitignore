@@ -1,6 +1,8 @@
 # Build outputs
 dist/
 lambda/cdc_sync/.bundle/
+lambda/query/lib/
+lambda/query/denorm_config.yaml
 *.d.ts
 !jest.config.js
 .cdk.staging

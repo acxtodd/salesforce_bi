@@ -25,6 +25,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "lambda"))
 
+import boto3
+
 from common.salesforce_client import SalesforceClient
 from lib.turbopuffer_backend import TurbopufferBackend
 
@@ -32,8 +34,14 @@ LOG = logging.getLogger("e2e_test")
 
 # Test record constants
 TEST_RECORD_PREFIX = "E2E_TEST_"
-POLL_INTERVAL_SECONDS = 15
+POLL_INTERVAL_SECONDS = 10
 POLL_TIMEOUT_SECONDS = 300  # 5 minutes
+
+# CDC bucket — used to simulate AppFlow delivery when AppFlow is not configured
+CDC_BUCKET = os.environ.get(
+    "CDC_BUCKET",
+    "salesforce-ai-search-cdc-382211616288-us-west-2",
+)
 
 
 def create_test_property(sf_client: SalesforceClient, test_id: str) -> str:
@@ -96,6 +104,30 @@ def delete_test_property(sf_client: SalesforceClient, record_id: str) -> None:
         pass  # 204 No Content on success
 
     LOG.info("Deleted Property %s", record_id)
+
+
+def write_cdc_event_to_s3(
+    record_id: str,
+    change_type: str,
+) -> None:
+    """Write a CDC event to S3 to trigger the CDC sync Lambda.
+
+    This simulates the AppFlow delivery path. When AppFlow CDC flows are
+    configured, this function becomes unnecessary — AppFlow writes the
+    event to S3 automatically.
+    """
+    s3 = boto3.client("s3")
+    cdc_payload = {
+        "ChangeEventHeader": {
+            "entityName": "ascendix__Property__ChangeEvent",
+            "changeType": change_type,
+            "recordIds": [record_id],
+            "commitTimestamp": int(time.time() * 1000),
+        },
+    }
+    key = f"cdc/Property__c/{time.strftime('%Y/%m/%d/%H')}/e2e-{change_type.lower()}-{int(time.time())}.json"
+    s3.put_object(Bucket=CDC_BUCKET, Key=key, Body=json.dumps(cdc_payload))
+    LOG.info("Wrote CDC %s event to s3://%s/%s", change_type, CDC_BUCKET, key)
 
 
 def poll_for_record(
@@ -186,6 +218,7 @@ def run_e2e_tests(
         # Test 1: CREATE
         LOG.info("=== Test 1: CREATE ===")
         record_id = create_test_property(sf_client, test_id)
+        write_cdc_event_to_s3(record_id, "CREATE")
         record = poll_for_record(backend, namespace, record_id, record_name=record_name)
         if record:
             LOG.info("PASS: Record found in Turbopuffer after CREATE")
@@ -203,6 +236,7 @@ def run_e2e_tests(
             LOG.info("=== Test 2: UPDATE ===")
             new_city = f"UpdatedCity_{test_id}"
             update_test_property(sf_client, record_id, new_city)
+            write_cdc_event_to_s3(record_id, "UPDATE")
             start = time.time()
             updated = False
             while time.time() - start < POLL_TIMEOUT_SECONDS:
@@ -230,6 +264,7 @@ def run_e2e_tests(
         if create_succeeded:
             LOG.info("=== Test 3: DELETE ===")
             delete_test_property(sf_client, record_id)
+            write_cdc_event_to_s3(record_id, "DELETE")
             absent = poll_for_record_absent(backend, namespace, record_id, record_name=record_name)
             if absent:
                 LOG.info("PASS: Record removed from Turbopuffer after DELETE")

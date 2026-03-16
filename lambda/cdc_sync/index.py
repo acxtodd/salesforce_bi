@@ -25,14 +25,18 @@ import boto3
 import yaml
 
 # ---------------------------------------------------------------------------
-# Path setup — project root + lambda dir for shared imports
+# Path setup — support both local dev (repo layout) and Lambda (flat bundle)
 # ---------------------------------------------------------------------------
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "lambda"))
+_this_dir = Path(__file__).resolve().parent
+_project_root = _this_dir.parent.parent
+# Local dev: add project root + lambda dir so lib.* and common.* resolve
+sys.path.insert(0, str(_project_root))
+sys.path.insert(0, str(_project_root / "lambda"))
+# Lambda bundle: shared modules are copied into the deployment package
+sys.path.insert(0, str(_this_dir))
 
-from common.salesforce_client import SalesforceClient
-from lib.denormalize import (
+from common.salesforce_client import SalesforceClient  # noqa: E402
+from lib.denormalize import (  # noqa: E402
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL_ID,
     FULL_TEXT_SEARCH_SCHEMA,
@@ -41,7 +45,7 @@ from lib.denormalize import (
     build_text,
     flatten,
 )
-from lib.turbopuffer_backend import TurbopufferBackend
+from lib.turbopuffer_backend import TurbopufferBackend  # noqa: E402
 
 LOG = logging.getLogger("cdc_sync")
 LOG.setLevel(os.getenv("LOG_LEVEL", "INFO"))

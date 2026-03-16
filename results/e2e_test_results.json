@@ -1,32 +1,37 @@
 {
-  "run_date": "2026-03-16T09:16:51Z",
+  "run_date": "2026-03-16T10:12:36Z",
   "namespace": "org_00Ddl000003yx57EAA",
   "target_org": "ascendix-beta-sandbox",
-  "timeout_seconds": 300,
-  "passed": 0,
-  "failed": 1,
-  "skipped": 2,
+  "timeout_seconds": 90,
+  "passed": 3,
+  "failed": 0,
   "tests": [
     {
       "name": "CREATE",
-      "status": "FAIL",
-      "reason": "Record not found within timeout. CDC sync Lambda (lambda/cdc_sync/index.py) is not deployed to AWS — only code exists in repo. The existing cdc_processor Lambda prepares records but does not embed+upsert to Turbopuffer.",
-      "record_id": "a0adl000009fNptAAE",
-      "record_name": "E2E_TEST_1773652611",
-      "duration_seconds": 315
+      "status": "PASS",
+      "record_id": "a0adl000009fR3tAAE",
+      "record_name": "E2E_TEST_1773655956",
+      "latency_seconds": 11,
+      "detail": "Record found in Turbopuffer via BM25 search 11s after CDC event written to S3"
     },
     {
       "name": "UPDATE",
-      "status": "SKIP",
-      "reason": "CREATE failed — cannot validate UPDATE without indexed record"
+      "status": "PASS",
+      "latency_seconds": 12,
+      "detail": "City field updated to UpdatedCity_1773655956, reflected in Turbopuffer within 12s"
     },
     {
       "name": "DELETE",
-      "status": "SKIP",
-      "reason": "CREATE failed — DELETE would be vacuously true (record was never indexed)"
+      "status": "PASS",
+      "latency_seconds": 11,
+      "detail": "Record removed from Turbopuffer search results within 11s of CDC DELETE event"
     }
   ],
-  "root_cause": "CDC sync Lambda (lambda/cdc_sync/index.py) has not been deployed to AWS. The AppFlow -> S3 -> EventBridge pipeline exists and fires, but the downstream Lambda that performs denormalize -> embed -> upsert is code-only. Deployment required: (1) CDK deploy of cdc_sync Lambda, (2) wire into EventBridge rule or Step Functions, (3) IAM permissions for S3/Bedrock/Turbopuffer/SQS/CloudWatch.",
-  "blocker": "infrastructure_deployment",
-  "prior_run_note": "First run on 2026-03-16 produced false DELETE PASS because record was never indexed. Script fixed to skip UPDATE/DELETE when CREATE fails."
+  "infrastructure": {
+    "cdc_sync_lambda": "salesforce-ai-search-cdc-sync",
+    "eventbridge_rule": "salesforce-ai-search-cdc-trigger",
+    "cdc_bucket": "salesforce-ai-search-cdc-382211616288-us-west-2",
+    "dlq": "salesforce-ai-search-ingestion-dlq"
+  },
+  "note": "CDC events written to S3 by the test script (simulating AppFlow delivery). AppFlow CDC flows not yet configured — requires Salesforce Connected App with Client Credentials. When AppFlow is configured, the write_cdc_event_to_s3() calls become unnecessary."
 }

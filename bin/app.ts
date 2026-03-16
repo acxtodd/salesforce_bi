@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { NetworkStack } from '../lib/network-stack';
 import { DataStack } from '../lib/data-stack';
@@ -66,20 +65,24 @@ const searchStack = new SearchStack(app, `${stackPrefix}-Search-${environment}`,
 
 searchStack.addDependency(dataStack);
 
-// Resolve Salesforce credentials from existing AWS config for AppFlow
-const salesforceInstanceUrl = ssm.StringParameter.valueFromLookup(
-  dataStack, '/salesforce/instance_url'
-);
+// Resolve Salesforce credentials at deploy time via CloudFormation dynamic references.
+// valueFromLookup is wrong here — it substitutes dummy placeholders at synth time.
+// Pre-deploy setup:
+//   aws ssm put-parameter --name /salesforce/instance_url --type String --value "https://…"
+//   aws ssm put-parameter --name /salesforce/appflow_jwt_token --type SecureString --value "<jwt>"
+//   aws secretsmanager create-secret --name salesforce-ai-search/salesforce-connected-app …
+const salesforceInstanceUrl = new cdk.CfnDynamicReference(
+  cdk.CfnDynamicReferenceService.SSM,
+  '/salesforce/instance_url',
+).toString();
 const salesforceSecret = secretsmanager.Secret.fromSecretNameV2(
   dataStack, 'SalesforceConnectedAppSecret',
-  'salesforce-ai-search/salesforce-connected-app'
+  'salesforce-ai-search/salesforce-connected-app',
 );
-// JWT token for AppFlow JWT_BEARER auth (no interactive login required).
-// Store via: aws ssm put-parameter --name /salesforce/appflow_jwt_token \
-//   --type SecureString --value "<jwt>"
-const salesforceJwtToken = ssm.StringParameter.valueFromLookup(
-  dataStack, '/salesforce/appflow_jwt_token'
-);
+const salesforceJwtToken = new cdk.CfnDynamicReference(
+  cdk.CfnDynamicReferenceService.SSM_SECURE,
+  '/salesforce/appflow_jwt_token',
+).toString();
 
 // Ingestion Stack - Lambda functions, Step Functions, DLQ
 const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${environment}`, {

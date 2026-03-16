@@ -16,6 +16,15 @@ write temporary scripts to query or modify tasks. The task manager handles
 atomic writes, ID allocation, phase completion, and dependency tracking — ad-hoc
 approaches bypass all of these.
 
+**Do not run multiple `task_manager.py` write commands in parallel.** Use a
+single writer for `create`, `update`, `add-note`, `add-ac`, `set-depends`, and
+similar commands. Parallel writes can race and drop task updates.
+
+When a task is code-complete but live validation is still missing, keep the
+parent task `in_progress` and create explicit follow-up tasks for the missing
+live legs. Do not mark the parent complete and carry the real work only in free
+text notes.
+
 ## Quick Reference
 
 | Action | Command |
@@ -86,6 +95,21 @@ Examples:
 | 3 | Validation Gate | §13 Phase 4 |
 
 Phase 4 (Production Cutover) and Phase 5 (Polish) from the spec will be added after the Phase 3 validation gate passes.
+
+## Current Project Path
+
+The current closing path for Phase 2 is:
+
+1. `2.4` Activate real Salesforce CDC/AppFlow delivery into the CDC S3 bucket
+2. `2.5` Verify the synced changes are observable through the deployed
+   Salesforce LWC and `/query` endpoint
+3. `3.1` Begin the side-by-side validation gate
+
+This project already has legacy ingestion infrastructure. For new connector
+work, treat `AppFlow -> S3 -> EventBridge -> cdc_sync` as the primary CDC path.
+Treat the older `/ingest` endpoint, `AISearchBatchExport`, and Step Functions
+chain as legacy or fallback infrastructure unless a task explicitly says
+otherwise.
 
 ## Delete Semantics
 

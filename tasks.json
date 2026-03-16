@@ -284,7 +284,7 @@
       "phase": 1,
       "name": "Intelligence Layer",
       "description": "Query Lambda with Claude tool-use, system prompt, citation extraction, streaming SSE.",
-      "status": "completed",
+      "status": "in_progress",
       "tasks": [
         {
           "id": "1.1",
@@ -617,11 +617,11 @@
         {
           "id": "2.3",
           "title": "End-to-end integration test",
-          "description": "Verify the full loop: change a record in Salesforce → CDC fires → sync Lambda processes → record appears in search results via LWC. Also test delete propagation.",
+          "description": "Verify the real end-to-end loop for the new connector: Salesforce record change -> Salesforce CDC/AppFlow delivers to S3 -> EventBridge invokes cdc_sync -> Turbopuffer updates -> the record is observable through the Salesforce LWC via /query. Remaining validation is now tracked explicitly in 2.4 (real AppFlow delivery) and 2.5 (LWC/query smoke).",
           "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-16T11:30:38.323977+00:00",
+          "updatedAt": "2026-03-16T12:14:17.560408+00:00",
           "startedAt": "2026-03-15T23:46:26.441049+00:00",
           "completedAt": null,
           "depends_on": [
@@ -673,7 +673,58 @@
             {
               "timestamp": "2026-03-16T11:30:38.323824+00:00",
               "note": "Merged to main: a314217. Downstream sync path shipped. Two validation gaps remain (AppFlow CDC delivery, LWC UI smoke test)."
+            },
+            {
+              "timestamp": "2026-03-16T12:12:36.675604+00:00",
+              "note": "Remaining Phase 2 strategy clarified after architecture review: reuse the existing AppFlow → S3 → EventBridge → cdc_sync path instead of designing a new CDC transport. Remaining work is explicit in 2.4 (activate real AppFlow delivery) and 2.5 (prove LWC/query observability)."
             }
+          ]
+        },
+        {
+          "id": "2.4",
+          "title": "Activate real Salesforce CDC to AppFlow to S3 delivery",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-16T12:09:39.111074+00:00",
+          "updatedAt": "2026-03-16T12:14:00.393083+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-16T12:14:00.392887+00:00",
+              "note": "Current blocker from repo/AWS inspection: the AppFlow branch exists in lib/ingestion-stack.ts, but bin/app.ts does not pass the Salesforce AppFlow props into IngestionStack, and no AppFlow flows currently exist in us-west-2. Reuse the existing secret/SSM values instead of creating a new transport."
+            }
+          ],
+          "description": "Finish the upstream source leg for the new connector by wiring the existing Salesforce Connected App credentials and instance URL into the ingestion CDK/app config, creating active AppFlow CDC flows in us-west-2, and proving that a normal Salesforce record change lands in the CDC S3 bucket without synthetic test writes.",
+          "acceptance_criteria": [
+            "CDK/app config passes Salesforce instance URL and Connected App secret into IngestionStack so AppFlow resources can be created",
+            "AppFlow connector profile and CDC flows exist in us-west-2 and are active for the sandbox org",
+            "A normal Salesforce record change lands in the CDC S3 bucket without synthetic test writes",
+            "scripts/integration_test_e2e.py rerun proves CREATE, UPDATE, and DELETE through the real AppFlow path within the 5-minute SLA"
+          ]
+        },
+        {
+          "id": "2.5",
+          "title": "Verify live LWC query observability after CDC sync",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-16T12:10:04.313617+00:00",
+          "updatedAt": "2026-03-16T12:12:31.205464+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "After real AppFlow delivery is active, validate the user-visible path by confirming that CREATE, UPDATE, and DELETE propagate through the deployed /query endpoint and are observable from the Salesforce LWC, not just Turbopuffer direct searches.",
+          "acceptance_criteria": [
+            "A record created or updated in Salesforce becomes observable through the deployed /query endpoint and LWC within 5 minutes after real CDC sync",
+            "A deleted record no longer appears in LWC results after sync",
+            "The smoke validation uses the Salesforce UI or Apex-controller path, not direct Turbopuffer queries",
+            "A committed artifact or progress note records the exact query and observed result"
+          ],
+          "depends_on": [
+            "2.1",
+            "2.4"
           ]
         }
       ]
@@ -831,7 +882,8 @@
     "next_task_index": {
       "0.4.": 4,
       "1.1.": 4,
-      "3.3.": 4
+      "3.3.": 4,
+      "2.": 6
     }
   }
 }

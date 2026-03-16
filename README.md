@@ -32,10 +32,18 @@ Salesforce Org                          AWS (us-west-2)
 
 1. **Denorm config generator** harvests Salesforce metadata (compact layouts, search layouts, page layouts, list views) to auto-determine which fields to embed and which parent fields to denormalize onto child records.
 2. **Bulk loader** exports records via Salesforce Bulk API 2.0, denormalizes per config, embeds via Bedrock Titan v2, and upserts to Turbopuffer.
-3. **CDC sync** keeps the index fresh — Salesforce Platform Events trigger a Lambda that denormalizes, embeds, and upserts changed records.
+3. **CDC sync** keeps the index fresh — the current target path is Salesforce CDC -> AppFlow -> S3 -> EventBridge -> `cdc_sync` Lambda, which fetches the full record, denormalizes, embeds, and upserts changed records.
 4. **Query Lambda** receives a natural language question, gives Claude three tools (`search_records`, `aggregate_records`, `live_salesforce_query`), and streams the synthesized answer with citations.
 
 The LLM decides the query strategy — single search, parallel cross-object searches, aggregations, or live SOQL — by choosing which tools to call. No custom planner or intent router needed.
+
+## Current CDC Strategy
+
+- Reuse the existing `AppFlow -> S3 -> EventBridge` transport and the new `lambda/cdc_sync` processor for the Turbopuffer-based connector.
+- Treat the older `/ingest` endpoint, `AISearchBatchExport`, and Step Functions ingestion chain as legacy or fallback infrastructure, not the primary path for new connector work.
+- Phase 2 is not closed yet. The remaining tasks are:
+  - `2.4` activate real Salesforce CDC/AppFlow delivery into the CDC bucket
+  - `2.5` prove the updated records are observable through the deployed Salesforce LWC and `/query` path
 
 ## Supported Objects
 
@@ -68,7 +76,8 @@ Full spec: [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-con
 ├── lambda/                         # Lambda handlers (Python 3.11)
 │   ├── retrieve/                   # [legacy] Query processing — being replaced by Query Lambda
 │   ├── answer/                     # [legacy] Streaming answers — being replaced by Query Lambda
-│   ├── cdc_processor/              # CDC event parsing (adapting for new pipeline)
+│   ├── cdc_sync/                   # Current CDC processor for Turbopuffer sync
+│   ├── cdc_processor/              # [legacy] CDC event parsing for old ingestion workflow
 │   ├── transform/                  # Record transformation (adapting for denormalization)
 │   ├── embed/                      # Bedrock Titan v2 embeddings (reusing)
 │   ├── schema_discovery/           # [legacy] Nightly Describe API — replaced by denorm config generator
@@ -151,9 +160,9 @@ python3 scripts/task_manager.py phases
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 0 | Foundations | In progress (3/5 tasks done) |
-| 1 | Intelligence Layer | Pending |
-| 2 | Salesforce Integration | Pending |
+| 0 | Foundations | Completed |
+| 1 | Intelligence Layer | In progress (`1.3` live validation still open) |
+| 2 | Salesforce Integration | In progress (`2.4` AppFlow activation, `2.5` LWC smoke still open) |
 | 3 | Validation Gate | Pending |
 
 See [`TASK_TRACKING.md`](TASK_TRACKING.md) for task management commands and workflow.

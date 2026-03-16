@@ -58,9 +58,14 @@ CDC_ENTITY_MAP: dict[str, str] = {
     "ascendix__Property__ChangeEvent": "ascendix__Property__c",
     "ascendix__Lease__ChangeEvent": "ascendix__Lease__c",
     "ascendix__Availability__ChangeEvent": "ascendix__Availability__c",
+    "ascendix__Deal__ChangeEvent": "ascendix__Deal__c",
+    "ascendix__Sale__ChangeEvent": "ascendix__Sale__c",
+    # Non-namespaced fallbacks
     "Property__ChangeEvent": "ascendix__Property__c",
     "Lease__ChangeEvent": "ascendix__Lease__c",
     "Availability__ChangeEvent": "ascendix__Availability__c",
+    "Deal__ChangeEvent": "ascendix__Deal__c",
+    "Sale__ChangeEvent": "ascendix__Sale__c",
 }
 
 # ---------------------------------------------------------------------------

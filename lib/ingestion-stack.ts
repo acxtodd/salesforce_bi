@@ -137,22 +137,19 @@ export class IngestionStack extends cdk.Stack {
         },
       );
 
-      // Define CDC objects to sync
+      // Define CDC objects to sync (POC scope: 5 Ascendix CRE objects)
       const cdcObjects = [
-        "AccountChangeEvent",
-        "OpportunityChangeEvent",
-        "CaseChangeEvent",
-        "NoteChangeEvent",
-        "Property__ChangeEvent",
-        "Lease__ChangeEvent",
-        "Contract__ChangeEvent",
+        "ascendix__Property__ChangeEvent",
+        "ascendix__Lease__ChangeEvent",
+        "ascendix__Availability__ChangeEvent",
+        "ascendix__Deal__ChangeEvent",
+        "ascendix__Sale__ChangeEvent",
       ];
 
       // Create AppFlow flow for each CDC object
       cdcObjects.forEach((objectName) => {
-        const sobjectName = objectName
-          .replace("ChangeEvent", "")
-          .replace("__", "__c");
+        // ascendix__Property__ChangeEvent → ascendix__Property__c
+        const sobjectName = objectName.replace("ChangeEvent", "c");
 
         new appflow.CfnFlow(this, `CDCFlow${objectName}`, {
           flowName: `salesforce-ai-search-cdc-${sobjectName.toLowerCase()}`,

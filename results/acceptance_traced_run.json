@@ -1,8 +1,8 @@
 {
-  "pass_rate": 0.8667,
+  "pass_rate": 0.4667,
   "total": 15,
-  "passed": 13,
-  "failed": 2,
+  "passed": 7,
+  "failed": 8,
   "skipped": 0,
   "results": [
     {
@@ -10,7 +10,7 @@
       "question": "Find Class A office properties in Dallas",
       "category": "simple_search",
       "status": "PASS",
-      "latency_s": 11.187673999986146,
+      "latency_s": 13.401394874963444,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -35,10 +35,10 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "11.2s (limit 15s)"
+          "detail": "13.4s (limit 15s)"
         }
       ],
-      "answer_snippet": "I found 8 Class A office properties in Dallas. Here's what's available:\n\n## Downtown Dallas Properties\n\n**Renaissance Tower** (ID: a0afk000000PvnUAAS)\n- Address: 1201 Elm Street, Dallas, TX 75270\n- 45",
+      "answer_snippet": "I found 8 Class A office properties in Dallas. Here are the results:\n\n## Class A Office Properties in Dallas\n\n**1. Renaissance Tower** (ID: a0afk000000PvnUAAS)\n- **Address:** 1201 Elm Street, Dallas, ",
       "tool_calls_made": 1,
       "turns": 2,
       "citations_count": 8,
@@ -52,26 +52,27 @@
               "city": "Dallas",
               "property_class": "A"
             },
-            "text_query": "office"
+            "text_query": "office",
+            "limit": 20
           },
           "result_count": 8,
           "has_error": false,
           "error": "",
-          "duration_s": 0.725,
+          "duration_s": 0.781,
           "turn": 1
         }
       ],
       "turn_durations": [
-        2.181,
-        8.281
+        3.087,
+        9.534
       ]
     },
     {
       "test_id": "search-02",
       "question": "Show me properties over 100,000 square feet",
       "category": "simple_search",
-      "status": "PASS",
-      "latency_s": 9.563978750025854,
+      "status": "FAIL",
+      "latency_s": 7.325289208034519,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -85,8 +86,8 @@
         },
         {
           "name": "min_results",
-          "pass": true,
-          "detail": "search_result_count=4 (need >=1)"
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
         },
         {
           "name": "tool_used",
@@ -101,13 +102,13 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "9.6s (limit 15s)"
+          "detail": "7.3s (limit 15s)"
         }
       ],
-      "answer_snippet": "Here are properties over 100,000 square feet from your database:\n\n## **Brickell City Tower** (ID: a0afk000000PvHpAAK)\n- **Size:** 290,000 SF\n- **Location:** 80 SW 8th Street, Miami, FL\n- **Owner:** Cr",
+      "answer_snippet": "I didn't find any properties over 100,000 square feet in the current data. This could mean:\n\n1. There are no properties of this size in your Salesforce org's data\n2. The data might be limited to a spe",
       "tool_calls_made": 1,
       "turns": 2,
-      "citations_count": 4,
+      "citations_count": 0,
       "error": "",
       "tool_call_log": [
         {
@@ -119,16 +120,16 @@
             },
             "limit": 20
           },
-          "result_count": 4,
+          "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.666,
+          "duration_s": 0.699,
           "turn": 1
         }
       ],
       "turn_durations": [
-        1.836,
-        7.062
+        2.56,
+        4.066
       ]
     },
     {
@@ -136,17 +137,17 @@
       "question": "What leases are expiring in the next year?",
       "category": "simple_search",
       "status": "FAIL",
-      "latency_s": 15.179171208001208,
+      "latency_s": 6.407535958045628,
       "checks": [
         {
           "name": "answer_contains_any",
           "pass": true,
-          "detail": "matched ['lease', 'expir', '2027', '2026']"
+          "detail": "matched ['lease', 'expir', '2026']"
         },
         {
           "name": "min_results",
-          "pass": true,
-          "detail": "search_result_count=10 (need >=1)"
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
         },
         {
           "name": "tool_used",
@@ -160,14 +161,14 @@
         },
         {
           "name": "latency_under",
-          "pass": false,
-          "detail": "15.2s (limit 15s)"
+          "pass": true,
+          "detail": "6.4s (limit 15s)"
         }
       ],
-      "answer_snippet": "Based on the search results, I found **10 leases expiring in the next year** (between March 15, 2026 and March 15, 2027). Here's a summary of the upcoming lease expirations:\n\n## Leases Expiring in Nex",
+      "answer_snippet": "I didn't find any leases expiring in the next year in your database. This could mean:\n\n1. There are currently no lease expirations scheduled between now and January 15, 2026\n2. The lease expiration da",
       "tool_calls_made": 1,
       "turns": 2,
-      "citations_count": 10,
+      "citations_count": 0,
       "error": "",
       "tool_call_log": [
         {
@@ -175,29 +176,29 @@
           "input": {
             "object_type": "Lease",
             "filters": {
-              "end_date_gte": "2026-03-15",
-              "end_date_lte": "2027-03-15"
+              "end_date_gte": "2025-01-15",
+              "end_date_lte": "2026-01-15"
             },
             "limit": 50
           },
-          "result_count": 10,
+          "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.72,
+          "duration_s": 0.722,
           "turn": 1
         }
       ],
       "turn_durations": [
-        2.834,
-        11.625
+        3.08,
+        2.605
       ]
     },
     {
       "test_id": "search-04",
       "question": "Show me available office spaces",
       "category": "simple_search",
-      "status": "PASS",
-      "latency_s": 13.360207207966596,
+      "status": "FAIL",
+      "latency_s": 5.034614041971508,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -206,8 +207,8 @@
         },
         {
           "name": "min_results",
-          "pass": true,
-          "detail": "search_result_count=20 (need >=1)"
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
         },
         {
           "name": "tool_used",
@@ -222,13 +223,13 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "13.4s (limit 15s)"
+          "detail": "5.0s (limit 15s)"
         }
       ],
-      "answer_snippet": "Here are the available office spaces I found:\n\n## Available Office Spaces\n\n**Dallas, TX:**\n- **Suite 545** at Northpointe Centre (ID: a0Ddl000003Y1pbEAC) - 3,434 SF\n- **Suite 676** at Northpointe Cent",
+      "answer_snippet": "I didn't find any office availability records in your system. This could mean:\n\n1. There are currently no office spaces available for lease\n2. The availability data hasn't been entered into the system",
       "tool_calls_made": 1,
       "turns": 2,
-      "citations_count": 20,
+      "citations_count": 0,
       "error": "",
       "tool_call_log": [
         {
@@ -237,19 +238,18 @@
             "object_type": "Availability",
             "filters": {
               "use_type": "Office"
-            },
-            "limit": 20
+            }
           },
-          "result_count": 20,
+          "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.763,
+          "duration_s": 0.149,
           "turn": 1
         }
       ],
       "turn_durations": [
-        2.314,
-        10.282
+        2.313,
+        2.573
       ]
     },
     {
@@ -257,7 +257,7 @@
       "question": "Find properties owned by the largest landlord in our database",
       "category": "simple_search",
       "status": "FAIL",
-      "latency_s": 16.51357191702118,
+      "latency_s": 21.87279833399225,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -267,7 +267,7 @@
         {
           "name": "tool_used",
           "pass": true,
-          "detail": "expected 'search_records' in ['aggregate_records', 'search_records']"
+          "detail": "expected 'search_records' in ['aggregate_records', 'search_records', 'search_records']"
         },
         {
           "name": "no_error",
@@ -277,12 +277,12 @@
         {
           "name": "latency_under",
           "pass": false,
-          "detail": "16.5s (limit 15s)"
+          "detail": "21.9s (limit 15s)"
         }
       ],
-      "answer_snippet": "Perfect! I found all 9 properties owned by **Storm Properties**, which is the largest landlord in your database. Here's the complete portfolio:\n\n## Storm Properties Portfolio (9 Properties)\n\n**Industr",
-      "tool_calls_made": 2,
-      "turns": 3,
+      "answer_snippet": "Perfect! I found the properties owned by Storm Properties, which is indeed the largest landlord in your database with 9 properties. Here are all the properties owned by Storm Properties:\n\n## Propertie",
+      "tool_calls_made": 3,
+      "turns": 4,
       "citations_count": 10,
       "error": "",
       "tool_call_log": [
@@ -291,12 +291,13 @@
           "input": {
             "object_type": "Property",
             "aggregate": "count",
-            "group_by": "owner_account_name"
+            "group_by": "owner_account_name",
+            "limit": 10
           },
           "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.675,
+          "duration_s": 0.696,
           "turn": 1
         },
         {
@@ -308,17 +309,31 @@
             },
             "limit": 20
           },
-          "result_count": 10,
+          "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.485,
+          "duration_s": 0.197,
           "turn": 2
+        },
+        {
+          "name": "search_records",
+          "input": {
+            "text_query": "Storm Properties",
+            "limit": 20,
+            "object_type": "Property"
+          },
+          "result_count": 20,
+          "has_error": false,
+          "error": "",
+          "duration_s": 0.405,
+          "turn": 3
         }
       ],
       "turn_durations": [
-        2.224,
-        2.532,
-        10.598
+        3.603,
+        2.696,
+        2.1,
+        12.176
       ]
     },
     {
@@ -326,7 +341,7 @@
       "question": "Find lease comps in Dallas on office property over 10,000 SF",
       "category": "cross_object",
       "status": "PASS",
-      "latency_s": 12.49635341699468,
+      "latency_s": 16.331992249994073,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -356,13 +371,13 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "12.5s (limit 30s)"
+          "detail": "16.3s (limit 30s)"
         }
       ],
-      "answer_snippet": "I found 20 lease comparables in Dallas for office properties over 10,000 SF. Here's a summary of the key lease comps:\n\n## Recent Lease Comparables (Dallas Office, 10,000+ SF)\n\n**Most Recent Leases (20",
+      "answer_snippet": "I found 20 lease comps in Dallas for office properties over 10,000 SF. Here's a summary of the key deals:\n\n## Recent Lease Comps (Dallas Office Properties >10,000 SF)\n\n### High-End Class A+ Properties",
       "tool_calls_made": 1,
       "turns": 2,
-      "citations_count": 6,
+      "citations_count": 12,
       "error": "",
       "tool_call_log": [
         {
@@ -379,21 +394,21 @@
           "result_count": 20,
           "has_error": false,
           "error": "",
-          "duration_s": 0.918,
+          "duration_s": 0.935,
           "turn": 1
         }
       ],
       "turn_durations": [
-        3.045,
-        8.534
+        2.861,
+        12.536
       ]
     },
     {
       "test_id": "cross-02",
       "question": "What spaces are available in Class A buildings?",
       "category": "cross_object",
-      "status": "PASS",
-      "latency_s": 8.647842584003229,
+      "status": "FAIL",
+      "latency_s": 4.917945583991241,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -402,8 +417,8 @@
         },
         {
           "name": "min_results",
-          "pass": true,
-          "detail": "search_result_count=10 (need >=1)"
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
         },
         {
           "name": "tool_used",
@@ -418,13 +433,13 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "8.6s (limit 30s)"
+          "detail": "4.9s (limit 30s)"
         }
       ],
-      "answer_snippet": "Here are the available spaces in Class A buildings:\n\n## Available Spaces in Class A Buildings\n\n**Preston Park Financial Center** (Plano, TX)\n- **test availability 1** - ID: a0Dfk000002JuDgEAK\n  - Buil",
+      "answer_snippet": "I didn't find any available spaces in Class A buildings in the current dataset. This could mean:\n\n1. There are currently no active availabilities in Class A properties\n2. The available spaces might no",
       "tool_calls_made": 1,
       "turns": 2,
-      "citations_count": 10,
+      "citations_count": 0,
       "error": "",
       "tool_call_log": [
         {
@@ -435,24 +450,24 @@
               "property_class": "A"
             }
           },
-          "result_count": 10,
+          "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.657,
+          "duration_s": 0.686,
           "turn": 1
         }
       ],
       "turn_durations": [
-        2.613,
-        5.378
+        1.572,
+        2.66
       ]
     },
     {
       "test_id": "cross-03",
       "question": "Show me leases on properties in Dallas",
       "category": "cross_object",
-      "status": "PASS",
-      "latency_s": 9.518902125011664,
+      "status": "FAIL",
+      "latency_s": 4.143715374986641,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -461,8 +476,8 @@
         },
         {
           "name": "min_results",
-          "pass": true,
-          "detail": "search_result_count=20 (need >=1)"
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
         },
         {
           "name": "tool_used",
@@ -477,13 +492,13 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "9.5s (limit 30s)"
+          "detail": "4.1s (limit 30s)"
         }
       ],
-      "answer_snippet": "Here are the leases on properties in Dallas that I found:\n\n## Key Lease Details\n\n**The Berkshire - Preston Center (Class A)**\n- **Lease for Suite 1500** (ID: a0Vdl000000ralJEAQ)\n- **Lease for Suite 16",
+      "answer_snippet": "I didn't find any lease records for properties in Dallas in the current dataset. This could mean:\n\n1. There are no lease records currently in the system for Dallas properties\n2. The lease records migh",
       "tool_calls_made": 1,
       "turns": 2,
-      "citations_count": 8,
+      "citations_count": 0,
       "error": "",
       "tool_call_log": [
         {
@@ -492,19 +507,18 @@
             "object_type": "Lease",
             "filters": {
               "property_city": "Dallas"
-            },
-            "limit": 20
+            }
           },
-          "result_count": 20,
+          "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.775,
+          "duration_s": 0.204,
           "turn": 1
         }
       ],
       "turn_durations": [
-        2.903,
-        5.841
+        1.612,
+        2.328
       ]
     },
     {
@@ -512,7 +526,7 @@
       "question": "How many properties are there by city?",
       "category": "aggregation",
       "status": "PASS",
-      "latency_s": 8.683388667006511,
+      "latency_s": 8.976586040982511,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -537,10 +551,10 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "8.7s (limit 15s)"
+          "detail": "9.0s (limit 15s)"
         }
       ],
-      "answer_snippet": "Based on the data, here's the breakdown of properties by city. Here are the cities with the most properties:\n\n**Top Cities by Property Count:**\n- **__none__**: 44 properties (no city specified)\n- **Da",
+      "answer_snippet": "Here's the breakdown of properties by city in your portfolio:\n\n**Top Cities by Property Count:**\n\n1. **Dallas** - 43 properties\n2. **New York** - 15 properties  \n3. **Los Angeles** - 13 properties\n4. ",
       "tool_calls_made": 1,
       "turns": 2,
       "citations_count": 0,
@@ -556,13 +570,13 @@
           "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.62,
+          "duration_s": 0.283,
           "turn": 1
         }
       ],
       "turn_durations": [
-        1.771,
-        6.292
+        1.867,
+        6.827
       ]
     },
     {
@@ -570,7 +584,7 @@
       "question": "Give me a count of properties by class",
       "category": "aggregation",
       "status": "PASS",
-      "latency_s": 6.79557975003263,
+      "latency_s": 8.616972916992381,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -595,10 +609,10 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "6.8s (limit 15s)"
+          "detail": "8.6s (limit 15s)"
         }
       ],
-      "answer_snippet": "Here's the breakdown of properties by class:\n\n- **Class A**: 66 properties\n- **Class A+**: 8 properties  \n- **Class B**: 7 properties\n- **Unclassified**: 521 properties (no class assigned)\n\n**Total**:",
+      "answer_snippet": "Here's the breakdown of properties by class in your portfolio:\n\n| Property Class | Count |\n|---------------|-------|\n| **Unclassified** | 521 |\n| **Class A** | 66 |\n| **Class A+** | 8 |\n| **Class B** ",
       "tool_calls_made": 1,
       "turns": 2,
       "citations_count": 0,
@@ -614,13 +628,13 @@
           "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.618,
+          "duration_s": 0.625,
           "turn": 1
         }
       ],
       "turn_durations": [
-        2.516,
-        3.662
+        2.75,
+        5.242
       ]
     },
     {
@@ -628,7 +642,7 @@
       "question": "How many leases are there by lease type?",
       "category": "aggregation",
       "status": "PASS",
-      "latency_s": 5.647956917004194,
+      "latency_s": 7.3657956249662675,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -653,10 +667,10 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "5.6s (limit 15s)"
+          "detail": "7.4s (limit 15s)"
         }
       ],
-      "answer_snippet": "Here's the breakdown of leases by lease type:\n\n- **No lease type specified**: 182 leases\n- **Full Service Gross**: 30 leases  \n- **NNN (Triple Net)**: 8 leases\n- **Modified Gross**: 4 leases\n- **Other",
+      "answer_snippet": "Here's the breakdown of leases by lease type:\n\n| Lease Type | Count |\n|------------|-------|\n| Full Service Gross | 30 |\n| NNN (Triple Net) | 8 |\n| Modified Gross | 4 |\n| Other | 1 |\n| **No Lease Type",
       "tool_calls_made": 1,
       "turns": 2,
       "citations_count": 0,
@@ -672,13 +686,13 @@
           "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.649,
+          "duration_s": 0.643,
           "turn": 1
         }
       ],
       "turn_durations": [
-        2.789,
-        2.21
+        1.87,
+        4.853
       ]
     },
     {
@@ -686,7 +700,7 @@
       "question": "Compare the number of properties in Dallas versus Houston",
       "category": "comparison",
       "status": "PASS",
-      "latency_s": 7.490463791997172,
+      "latency_s": 6.828240750008263,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -711,10 +725,10 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "7.5s (limit 30s)"
+          "detail": "6.8s (limit 30s)"
         }
       ],
-      "answer_snippet": "Here's the comparison of properties between Dallas and Houston:\n\n**Property Count Comparison:**\n- **Dallas**: 43 properties\n- **Houston**: 8 properties\n\nDallas has significantly more properties in you",
+      "answer_snippet": "Based on the property data in your Salesforce org:\n\n**Property Count Comparison:**\n- **Dallas**: 43 properties\n- **Houston**: 8 properties\n\nDallas has significantly more properties in your database th",
       "tool_calls_made": 2,
       "turns": 2,
       "citations_count": 0,
@@ -732,7 +746,7 @@
           "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.67,
+          "duration_s": 0.637,
           "turn": 1
         },
         {
@@ -747,13 +761,13 @@
           "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.243,
+          "duration_s": 0.155,
           "turn": 1
         }
       ],
       "turn_durations": [
-        3.126,
-        3.452
+        3.01,
+        3.026
       ]
     },
     {
@@ -761,7 +775,7 @@
       "question": "Compare availability counts by use type",
       "category": "comparison",
       "status": "PASS",
-      "latency_s": 6.440932624973357,
+      "latency_s": 8.572342915984336,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -786,10 +800,10 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "6.4s (limit 30s)"
+          "detail": "8.6s (limit 30s)"
         }
       ],
-      "answer_snippet": "Here's the breakdown of availability counts by use type:\n\n## Availability Counts by Use Type\n\n| Use Type | Count |\n|----------|-------|\n| **Office** | 58 |\n| **Retail** | 9 |\n| **Multi-Family** | 1 |\n",
+      "answer_snippet": "Here's the breakdown of availability counts by use type:\n\n## Availability Count by Use Type\n\n| Use Type | Count |\n|----------|-------|\n| **Office** | 58 |\n| **Retail** | 9 |\n| **Multi-Family** | 1 |\n|",
       "tool_calls_made": 1,
       "turns": 2,
       "citations_count": 0,
@@ -805,31 +819,31 @@
           "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.639,
+          "duration_s": 0.625,
           "turn": 1
         }
       ],
       "turn_durations": [
-        2.643,
-        3.159
+        2.878,
+        5.069
       ]
     },
     {
       "test_id": "nlp-01",
       "question": "What's available downtown?",
       "category": "semantic",
-      "status": "PASS",
-      "latency_s": 13.70076162496116,
+      "status": "FAIL",
+      "latency_s": 4.3185562499566,
       "checks": [
         {
           "name": "answer_contains_any",
           "pass": true,
-          "detail": "matched ['available', 'downtown', 'space', 'propert']"
+          "detail": "matched ['available', 'downtown', 'space']"
         },
         {
           "name": "tool_used",
-          "pass": true,
-          "detail": "expected 'search_records' in ['search_records']"
+          "pass": false,
+          "detail": "expected 'search_records' in []"
         },
         {
           "name": "no_error",
@@ -839,40 +853,25 @@
         {
           "name": "latency_under",
           "pass": true,
-          "detail": "13.7s (limit 15s)"
+          "detail": "4.3s (limit 15s)"
         }
       ],
-      "answer_snippet": "Here's what's available downtown across various markets:\n\n## Dallas Downtown Area\n**3 Park Central** - Multiple office suites available:\n- **Suite 2000** (a0Dfk000002JuEWEA0): 26,199 SF office space, ",
-      "tool_calls_made": 1,
-      "turns": 2,
-      "citations_count": 19,
+      "answer_snippet": "I'd be happy to help you find available spaces downtown! To give you the most relevant results, could you please specify:\n\n1. **Which city** are you interested in? (e.g., Dallas, Houston, Austin, etc.",
+      "tool_calls_made": 0,
+      "turns": 1,
+      "citations_count": 0,
       "error": "",
-      "tool_call_log": [
-        {
-          "name": "search_records",
-          "input": {
-            "object_type": "Availability",
-            "text_query": "downtown CBD central business district",
-            "limit": 20
-          },
-          "result_count": 20,
-          "has_error": false,
-          "error": "",
-          "duration_s": 1.092,
-          "turn": 1
-        }
-      ],
+      "tool_call_log": [],
       "turn_durations": [
-        2.402,
-        10.206
+        4.319
       ]
     },
     {
       "test_id": "nlp-02",
       "question": "Tell me about the largest properties",
       "category": "semantic",
-      "status": "PASS",
-      "latency_s": 14.152360291976947,
+      "status": "FAIL",
+      "latency_s": 20.159395041991957,
       "checks": [
         {
           "name": "answer_contains_any",
@@ -896,42 +895,40 @@
         },
         {
           "name": "latency_under",
-          "pass": true,
-          "detail": "14.2s (limit 15s)"
+          "pass": false,
+          "detail": "20.2s (limit 15s)"
         }
       ],
-      "answer_snippet": "Based on my search of your property database, here are the largest properties by square footage:\n\n## Top Largest Properties\n\n**1. Brickell City Tower** (ID: a0afk000000PvHpAAK)\n- **Size**: 290,000 SF\n",
+      "answer_snippet": "Based on my analysis of your property portfolio, here are the key insights about the largest properties:\n\n## Top Largest Properties by Building Size\n\n**1. 500 North Brand (Glendale, CA)** - ID: a0afk0",
       "tool_calls_made": 3,
       "turns": 3,
-      "citations_count": 4,
+      "citations_count": 3,
       "error": "",
       "tool_call_log": [
         {
           "name": "search_records",
           "input": {
             "object_type": "Property",
-            "filters": {},
-            "limit": 20,
-            "text_query": "largest square footage"
+            "text_query": "largest properties",
+            "limit": 20
           },
           "result_count": 20,
           "has_error": false,
           "error": "",
-          "duration_s": 1.437,
+          "duration_s": 0.854,
           "turn": 1
         },
         {
           "name": "aggregate_records",
           "input": {
             "object_type": "Property",
-            "aggregate": "sum",
-            "aggregate_field": "total_sf",
-            "filters": {}
+            "aggregate": "avg",
+            "aggregate_field": "total_sf"
           },
           "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.277,
+          "duration_s": 0.651,
           "turn": 2
         },
         {
@@ -939,32 +936,46 @@
           "input": {
             "object_type": "Property",
             "filters": {
-              "total_sf_gte": 100000
+              "total_sf_gte": 300000
             },
-            "limit": 15
+            "limit": 10
           },
-          "result_count": 4,
+          "result_count": 0,
           "has_error": false,
           "error": "",
-          "duration_s": 0.364,
+          "duration_s": 0.157,
           "turn": 2
         }
       ],
       "turn_durations": [
-        2.911,
-        2.903,
-        6.26
+        2.598,
+        6.401,
+        9.498
       ]
     }
   ],
   "latency_stats": {
-    "min": 5.65,
-    "max": 16.51,
-    "mean": 10.63,
-    "median": 9.56,
-    "p95": 16.51
+    "min": 4.14,
+    "max": 21.87,
+    "mean": 9.62,
+    "median": 7.37,
+    "p95": 21.87
   },
   "failures": [
+    {
+      "test_id": "search-02",
+      "question": "Show me properties over 100,000 square feet",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        }
+      ],
+      "answer_snippet": "I didn't find any properties over 100,000 square feet in the current data. This could mean:\n\n1. There are no properties of this size in your Salesforce org's data\n2. The data might be limited to a spe"
+    },
     {
       "test_id": "search-03",
       "question": "What leases are expiring in the next year?",
@@ -972,12 +983,26 @@
       "error": "",
       "failed_checks": [
         {
-          "name": "latency_under",
+          "name": "min_results",
           "pass": false,
-          "detail": "15.2s (limit 15s)"
+          "detail": "search_result_count=0 (need >=1)"
         }
       ],
-      "answer_snippet": "Based on the search results, I found **10 leases expiring in the next year** (between March 15, 2026 and March 15, 2027). Here's a summary of the upcoming lease expirations:\n\n## Leases Expiring in Nex"
+      "answer_snippet": "I didn't find any leases expiring in the next year in your database. This could mean:\n\n1. There are currently no lease expirations scheduled between now and January 15, 2026\n2. The lease expiration da"
+    },
+    {
+      "test_id": "search-04",
+      "question": "Show me available office spaces",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        }
+      ],
+      "answer_snippet": "I didn't find any office availability records in your system. This could mean:\n\n1. There are currently no office spaces available for lease\n2. The availability data hasn't been entered into the system"
     },
     {
       "test_id": "search-05",
@@ -988,10 +1013,66 @@
         {
           "name": "latency_under",
           "pass": false,
-          "detail": "16.5s (limit 15s)"
+          "detail": "21.9s (limit 15s)"
         }
       ],
-      "answer_snippet": "Perfect! I found all 9 properties owned by **Storm Properties**, which is the largest landlord in your database. Here's the complete portfolio:\n\n## Storm Properties Portfolio (9 Properties)\n\n**Industr"
+      "answer_snippet": "Perfect! I found the properties owned by Storm Properties, which is indeed the largest landlord in your database with 9 properties. Here are all the properties owned by Storm Properties:\n\n## Propertie"
+    },
+    {
+      "test_id": "cross-02",
+      "question": "What spaces are available in Class A buildings?",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        }
+      ],
+      "answer_snippet": "I didn't find any available spaces in Class A buildings in the current dataset. This could mean:\n\n1. There are currently no active availabilities in Class A properties\n2. The available spaces might no"
+    },
+    {
+      "test_id": "cross-03",
+      "question": "Show me leases on properties in Dallas",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "min_results",
+          "pass": false,
+          "detail": "search_result_count=0 (need >=1)"
+        }
+      ],
+      "answer_snippet": "I didn't find any lease records for properties in Dallas in the current dataset. This could mean:\n\n1. There are no lease records currently in the system for Dallas properties\n2. The lease records migh"
+    },
+    {
+      "test_id": "nlp-01",
+      "question": "What's available downtown?",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "tool_used",
+          "pass": false,
+          "detail": "expected 'search_records' in []"
+        }
+      ],
+      "answer_snippet": "I'd be happy to help you find available spaces downtown! To give you the most relevant results, could you please specify:\n\n1. **Which city** are you interested in? (e.g., Dallas, Houston, Austin, etc."
+    },
+    {
+      "test_id": "nlp-02",
+      "question": "Tell me about the largest properties",
+      "status": "FAIL",
+      "error": "",
+      "failed_checks": [
+        {
+          "name": "latency_under",
+          "pass": false,
+          "detail": "20.2s (limit 15s)"
+        }
+      ],
+      "answer_snippet": "Based on my analysis of your property portfolio, here are the key insights about the largest properties:\n\n## Top Largest Properties by Building Size\n\n**1. 500 North Brand (Glendale, CA)** - ID: a0afk0"
     }
   ]
 }

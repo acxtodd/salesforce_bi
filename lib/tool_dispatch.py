@@ -358,7 +358,12 @@ class ToolDispatcher:
 
         text_query = params.get("text_query")
         if text_query is None:
-            text_query = " "  # broad BM25 scan
+            # Use the object type name as a broad BM25 scan.  Every
+            # document's text field starts with "Property:", "Lease:", or
+            # "Availability:", so this guarantees non-zero BM25 scores for
+            # filter-only queries (a bare " " returns 0 results on
+            # Turbopuffer).
+            text_query = object_type.capitalize()
 
         limit = min(int(params.get("limit", _DEFAULT_LIMIT)), _MAX_LIMIT)
 

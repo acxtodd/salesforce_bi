@@ -90,6 +90,8 @@ class AcceptanceTestResult:
     turns: int = 0
     citations_count: int = 0
     error: str = ""
+    tool_call_log: list[dict] = field(default_factory=list)
+    turn_durations: list[float] = field(default_factory=list)
 
 
 TestCaseResult = AcceptanceTestResult
@@ -231,6 +233,8 @@ def evaluate_result(
         tool_calls_made=query_result.tool_calls_made,
         turns=query_result.turns,
         citations_count=len(query_result.citations),
+        tool_call_log=query_result.tool_call_log,
+        turn_durations=query_result.turn_durations,
     )
 
 

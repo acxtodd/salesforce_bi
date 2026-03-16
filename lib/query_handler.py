@@ -13,6 +13,7 @@ response before returning.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -65,6 +66,12 @@ class QueryResult:
 
     search_result_count: int = 0
     """Total number of records returned by search_records calls."""
+
+    tool_call_log: list[dict] = field(default_factory=list)
+    """Log of each tool call: {"name", "input", "result_count", "has_error", "error", "duration_s", "turn"}."""
+
+    turn_durations: list[float] = field(default_factory=list)
+    """Duration of each Bedrock Converse API call in seconds."""
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +135,8 @@ class QueryHandler:
         all_search_results: list[dict] = []
         tools_used: list[str] = []
         search_result_count = 0
+        tool_call_log: list[dict] = []
+        turn_durations: list[float] = []
 
         while turns < MAX_TURNS:
             # --- Call Bedrock Converse API ---
@@ -139,8 +148,11 @@ class QueryHandler:
             if self._tool_definitions:
                 converse_kwargs["toolConfig"] = {"tools": self._tool_definitions}
 
+            turn_start = time.perf_counter()
             response = self._client.converse(**converse_kwargs)
+            turn_duration = time.perf_counter() - turn_start
             turns += 1
+            turn_durations.append(round(turn_duration, 3))
 
             stop_reason = response.get("stopReason", "end_turn")
             assistant_message = response["output"]["message"]
@@ -159,6 +171,8 @@ class QueryHandler:
                     turns=turns,
                     tools_used=tools_used,
                     search_result_count=search_result_count,
+                    tool_call_log=tool_call_log,
+                    turn_durations=turn_durations,
                 )
 
             if stop_reason == "tool_use":
@@ -182,12 +196,24 @@ class QueryHandler:
                         tool_name, tool_use_id, tool_input,
                     )
 
+                    dispatch_start = time.perf_counter()
                     dispatch_result = self._dispatcher.dispatch(
                         {"name": tool_name, "parameters": tool_input}
                     )
+                    dispatch_duration = time.perf_counter() - dispatch_start
 
                     tool_calls_made += 1
                     tools_used.append(tool_name)
+
+                    tool_call_log.append({
+                        "name": tool_name,
+                        "input": tool_input,
+                        "result_count": len(dispatch_result.get("results", [])),
+                        "has_error": "error" in dispatch_result,
+                        "error": dispatch_result.get("error", ""),
+                        "duration_s": round(dispatch_duration, 3),
+                        "turn": turns,
+                    })
 
                     # Collect search results for citation extraction.
                     if tool_name == "search_records" and "results" in dispatch_result:
@@ -217,6 +243,8 @@ class QueryHandler:
                     turns=turns,
                     tools_used=tools_used,
                     search_result_count=search_result_count,
+                    tool_call_log=tool_call_log,
+                    turn_durations=turn_durations,
                 )
 
         # Exhausted MAX_TURNS -- return whatever we have.
@@ -230,6 +258,8 @@ class QueryHandler:
             turns=turns,
             tools_used=tools_used,
             search_result_count=search_result_count,
+            tool_call_log=tool_call_log,
+            turn_durations=turn_durations,
         )
 
     # ------------------------------------------------------------------

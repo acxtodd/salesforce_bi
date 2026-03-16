@@ -289,6 +289,91 @@ export class IngestionStack extends cdk.Stack {
     // Grant CDC processor access to CDC bucket
     this.cdcBucket.grantRead(cdcProcessorLambda);
 
+    // =========================================================================
+    // Phase 2: CDC Sync Lambda — direct Turbopuffer sync via denorm+embed+upsert
+    // =========================================================================
+
+    // Dedicated role for CDC Sync Lambda (needs Bedrock, SSM, S3, SQS, CloudWatch)
+    const cdcSyncRole = new iam.Role(this, "CDCSyncLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "service-role/AWSLambdaVPCAccessExecutionRole",
+        ),
+      ],
+    });
+
+    // Bedrock Titan Embed v2 for generating embeddings
+    cdcSyncRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["bedrock:InvokeModel"],
+        resources: [
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+        ],
+      }),
+    );
+
+    // SSM for Salesforce credentials
+    cdcSyncRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["ssm:GetParameter", "ssm:GetParameters"],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/salesforce/*`,
+        ],
+      }),
+    );
+
+    // CloudWatch for freshness metrics
+    cdcSyncRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["cloudwatch:PutMetricData"],
+        resources: ["*"],
+        conditions: {
+          StringEquals: {
+            "cloudwatch:namespace": "SalesforceAISearch/CDCSync",
+          },
+        },
+      }),
+    );
+
+    // SQS for DLQ
+    this.dlq.grantSendMessages(cdcSyncRole);
+
+    // KMS for encrypted resources
+    kmsKey.grantEncryptDecrypt(cdcSyncRole);
+
+    // Bundle cdc_sync Lambda with shared modules using a pre-built directory.
+    // scripts/bundle_cdc_sync.sh creates the deployment package at
+    // lambda/cdc_sync/.bundle/ with handler + lib/ + common/ + config.
+    const cdcSyncLambda = new lambda.Function(this, "CDCSyncLambda", {
+      functionName: "salesforce-ai-search-cdc-sync",
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: "index.lambda_handler",
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "../lambda/cdc_sync/.bundle"),
+        { exclude: LAMBDA_ASSET_EXCLUDES },
+      ),
+      timeout: cdk.Duration.minutes(2),
+      memorySize: 1024,
+      role: cdcSyncRole,
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [lambdaSecurityGroup],
+      environment: {
+        SALESFORCE_ORG_ID: "00Ddl000003yx57EAA",
+        DENORM_CONFIG_PATH: "denorm_config.yaml",
+        DLQ_URL: this.dlq.queueUrl,
+        TURBOPUFFER_API_KEY: process.env.TURBOPUFFER_API_KEY || "",
+        LOG_LEVEL: "INFO",
+      },
+    });
+
+    // Grant CDC sync Lambda read access to CDC bucket
+    this.cdcBucket.grantRead(cdcSyncLambda);
+
     // Ingest Lambda (for batch export fallback)
     this.ingestLambda = new lambda.Function(this, "IngestLambda", {
       functionName: "salesforce-ai-search-ingest",
@@ -903,6 +988,20 @@ export class IngestionStack extends cdk.Stack {
       }),
     );
 
+    // Phase 2: Add CDC Sync Lambda as second target on the same EventBridge rule.
+    // Same input transform as Step Functions target — delivers flat {bucket, key}.
+    cdcEventRule.addTarget(
+      new targets.LambdaFunction(cdcSyncLambda, {
+        event: events.RuleTargetInput.fromObject({
+          bucket: events.EventField.fromPath("$.detail.bucket.name"),
+          key: events.EventField.fromPath("$.detail.object.key"),
+          eventTime: events.EventField.fromPath("$.time"),
+          eventSource: "cdc",
+        }),
+        retryAttempts: 2,
+      }),
+    );
+
     // Enable EventBridge notifications on CDC bucket
     this.cdcBucket.enableEventBridgeNotification();
 
@@ -1109,6 +1208,12 @@ export class IngestionStack extends cdk.Stack {
       value: this.ingestLambda.functionArn,
       description: "Ingest Lambda Function ARN (for batch export)",
       exportName: `${this.stackName}-IngestLambdaArn`,
+    });
+
+    new cdk.CfnOutput(this, "CDCSyncLambdaArn", {
+      value: cdcSyncLambda.functionArn,
+      description: "CDC Sync Lambda Function ARN (Phase 2: Turbopuffer sync)",
+      exportName: `${this.stackName}-CDCSyncLambdaArn`,
     });
 
     // Zero-Config Schema Discovery Lambda output

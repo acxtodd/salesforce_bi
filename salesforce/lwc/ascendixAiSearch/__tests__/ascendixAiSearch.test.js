@@ -251,6 +251,55 @@ describe('c-ascendix-ai-search', () => {
             expect(citationsButton.label).toContain('(1)');
         });
 
+        it('should handle minimal citations from /query endpoint (id + title only)', async () => {
+            // Real /query returns citations with only {recordId, title, id}
+            // after Apex transforms {id, name} from the backend.
+            // No sobject, score, or snippet fields.
+            const mockResponse = {
+                answer: 'Test answer mentioning Tower One',
+                citations: [
+                    {
+                        id: 'a0x000001',
+                        recordId: 'a0x000001',
+                        title: 'Tower One'
+                        // No sobject, score, snippet, previewUrl
+                    }
+                ]
+            };
+            callAnswerEndpoint.mockResolvedValue(mockResponse);
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Find Tower One';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Find Tower One' }
+            }));
+
+            await flushPromises();
+
+            const submitButton = element.shadowRoot.querySelector('.submit-button');
+            submitButton.click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Verify citation renders with fallback values
+            expect(element.citations.length).toBe(1);
+            const citation = element.citations[0];
+            expect(citation.title).toBe('Tower One');
+            expect(citation.recordId).toBe('a0x000001');
+            expect(citation.sobject).toBe('Record'); // fallback
+            expect(citation.score).toBeNull(); // null, not 'N/A'
+            expect(citation.snippet).toBe('Record: Tower One'); // derived from title
+        });
+
         it('should toggle citations drawer when button is clicked', async () => {
             const mockResponse = {
                 answer: 'Test answer',
@@ -427,25 +476,26 @@ describe('c-ascendix-ai-search', () => {
         });
     });
 
-    describe('Facet Filter Application', () => {
-        it('should display filter options', () => {
+    describe('Filter UI Hidden (deferred — /query does not support filters)', () => {
+        it('should NOT display filter comboboxes when filter UI is disabled', () => {
             const element = createElement('c-ascendix-ai-search', {
                 is: AscendixAiSearch
             });
             document.body.appendChild(element);
 
+            // Filter comboboxes should not be rendered since isFilterUIEnabled is false
             const regionFilter = element.shadowRoot.querySelector('lightning-combobox[name="region"]');
             const buFilter = element.shadowRoot.querySelector('lightning-combobox[name="businessUnit"]');
             const quarterFilter = element.shadowRoot.querySelector('lightning-combobox[name="quarter"]');
 
-            expect(regionFilter).toBeTruthy();
-            expect(buFilter).toBeTruthy();
-            expect(quarterFilter).toBeTruthy();
+            expect(regionFilter).toBeFalsy();
+            expect(buFilter).toBeFalsy();
+            expect(quarterFilter).toBeFalsy();
         });
 
-        it('should apply selected filters to query', async () => {
+        it('should submit simplified request payload (query + sessionId only)', async () => {
             callAnswerEndpoint.mockResolvedValue({
-                answer: 'Filtered results',
+                answer: 'Test answer',
                 citations: []
             });
             getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
@@ -457,27 +507,11 @@ describe('c-ascendix-ai-search', () => {
 
             await flushPromises();
 
-            // Select region filter
-            const regionFilter = element.shadowRoot.querySelector('lightning-combobox[name="region"]');
-            regionFilter.dispatchEvent(new CustomEvent('change', {
-                detail: { value: 'EMEA' }
-            }));
-
-            await flushPromises();
-
-            // Select business unit filter
-            const buFilter = element.shadowRoot.querySelector('lightning-combobox[name="businessUnit"]');
-            buFilter.dispatchEvent(new CustomEvent('change', {
-                detail: { value: 'Enterprise' }
-            }));
-
-            await flushPromises();
-
             // Submit query
             const textarea = element.shadowRoot.querySelector('lightning-textarea');
-            textarea.value = 'Test query';
+            textarea.value = 'Find Class A properties';
             textarea.dispatchEvent(new CustomEvent('change', {
-                detail: { value: 'Test query' }
+                detail: { value: 'Find Class A properties' }
             }));
 
             await flushPromises();
@@ -487,108 +521,30 @@ describe('c-ascendix-ai-search', () => {
 
             await flushPromises();
 
-            // Verify filters were included in request
-            expect(callAnswerEndpoint).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    requestBodyJson: expect.stringContaining('"region":"EMEA"')
-                })
-            );
-            expect(callAnswerEndpoint).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    requestBodyJson: expect.stringContaining('"businessUnit":"Enterprise"')
-                })
-            );
+            // Verify simplified payload: only query and sessionId
+            expect(callAnswerEndpoint).toHaveBeenCalled();
+            const callArgs = callAnswerEndpoint.mock.calls[0][0];
+            const payload = JSON.parse(callArgs.requestBodyJson);
+            expect(payload.query).toBe('Find Class A properties');
+            expect(payload.sessionId).toBeTruthy();
+            // No legacy fields in payload
+            expect(payload.salesforceUserId).toBeUndefined();
+            expect(payload.topK).toBeUndefined();
+            expect(payload.policy).toBeUndefined();
+            expect(payload.filters).toBeUndefined();
+            expect(payload.recordContext).toBeUndefined();
         });
 
-        it('should display active filter chips', async () => {
+        it('should preserve filter JS helpers for future reactivation', () => {
             const element = createElement('c-ascendix-ai-search', {
                 is: AscendixAiSearch
             });
             document.body.appendChild(element);
 
-            // Select filters
-            const regionFilter = element.shadowRoot.querySelector('lightning-combobox[name="region"]');
-            regionFilter.dispatchEvent(new CustomEvent('change', {
-                detail: { value: 'APAC' }
-            }));
-
-            await flushPromises();
-
-            const quarterFilter = element.shadowRoot.querySelector('lightning-combobox[name="quarter"]');
-            quarterFilter.dispatchEvent(new CustomEvent('change', {
-                detail: { value: '2025-Q2' }
-            }));
-
-            await flushPromises();
-
-            // Verify filter chips are displayed
-            const filterChips = element.shadowRoot.querySelectorAll('.filter-chip');
-            expect(filterChips.length).toBe(2);
-            expect(filterChips[0].textContent).toContain('APAC');
-            expect(filterChips[1].textContent).toContain('2025-Q2');
-        });
-
-        it('should remove individual filter chips', async () => {
-            const element = createElement('c-ascendix-ai-search', {
-                is: AscendixAiSearch
-            });
-            document.body.appendChild(element);
-
-            // Select region filter
-            const regionFilter = element.shadowRoot.querySelector('lightning-combobox[name="region"]');
-            regionFilter.dispatchEvent(new CustomEvent('change', {
-                detail: { value: 'LATAM' }
-            }));
-
-            await flushPromises();
-
-            // Verify chip is displayed
-            let filterChips = element.shadowRoot.querySelectorAll('.filter-chip');
-            expect(filterChips.length).toBe(1);
-
-            // Click remove button
-            const removeButton = element.shadowRoot.querySelector('.filter-chip-remove');
-            removeButton.click();
-
-            await flushPromises();
-
-            // Verify chip is removed
-            filterChips = element.shadowRoot.querySelectorAll('.filter-chip');
-            expect(filterChips.length).toBe(0);
-        });
-
-        it('should clear all filters at once', async () => {
-            const element = createElement('c-ascendix-ai-search', {
-                is: AscendixAiSearch
-            });
-            document.body.appendChild(element);
-
-            // Select multiple filters
-            const regionFilter = element.shadowRoot.querySelector('lightning-combobox[name="region"]');
-            regionFilter.dispatchEvent(new CustomEvent('change', {
-                detail: { value: 'AMER' }
-            }));
-
-            const buFilter = element.shadowRoot.querySelector('lightning-combobox[name="businessUnit"]');
-            buFilter.dispatchEvent(new CustomEvent('change', {
-                detail: { value: 'SMB' }
-            }));
-
-            await flushPromises();
-
-            // Verify chips are displayed
-            let filterChips = element.shadowRoot.querySelectorAll('.filter-chip');
-            expect(filterChips.length).toBe(2);
-
-            // Click clear all button
-            const clearAllButton = element.shadowRoot.querySelector('lightning-button[label="Clear All"]');
-            clearAllButton.click();
-
-            await flushPromises();
-
-            // Verify all chips are removed
-            filterChips = element.shadowRoot.querySelectorAll('.filter-chip');
-            expect(filterChips.length).toBe(0);
+            // Filter helper methods should still exist in the component
+            expect(typeof element.getActiveFilters).toBe('undefined'); // private method
+            // Verify isFilterUIEnabled getter returns false
+            expect(element.isFilterUIEnabled).toBeFalsy();
         });
     });
 

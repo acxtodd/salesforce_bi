@@ -223,6 +223,12 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         return formatted;
     }
 
+    // Filter UI is hidden — /query endpoint does not accept filter params.
+    // Set to true when backend supports filters to re-enable the UI.
+    get isFilterUIEnabled() {
+        return false;
+    }
+
     get hasActiveFilters() {
         return Boolean(
             this.selectedFilters.region ||
@@ -462,24 +468,9 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             }
 
             const requestBody = {
-                sessionId: this.sessionId,
                 query: this.queryText,
-                salesforceUserId: this.getUserId(),
-                topK: 8,
-                policy: {
-                    require_citations: true,
-                    max_tokens: 1000
-                }
+                sessionId: this.sessionId
             };
-
-            if (this.recordId) {
-                requestBody.recordContext = { recordId: this.recordId };
-            }
-
-            const filters = this.getActiveFilters();
-            if (filters) {
-                requestBody.filters = filters;
-            }
 
             // Store for retry
             this.lastRequestBody = requestBody;
@@ -573,13 +564,20 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                 });
             }
 
+            // Build display-friendly snippet from available data.
+            // /query citations carry only {id, name} from the backend; enrich
+            // the snippet from the title so the drawer is not blank.
+            const displayTitle = citation.title || citation.name || citation.recordId || citation.id || 'Unknown';
+            const displaySnippet = citation.snippet || citation.text
+                || (displayTitle !== 'Unknown' ? `Record: ${displayTitle}` : 'No preview available');
+
             const processed = {
                 id: citation.id || 'citation-' + index,
-                title: citation.title || citation.recordId || 'Unknown',
+                title: displayTitle,
                 recordId: citation.recordId || citation.id,
                 sobject: citation.metadata?.sobject || citation.sobject || 'Record',
-                score: citation.score ? Number(citation.score).toFixed(2) : 'N/A',
-                snippet: citation.snippet || citation.text || 'No preview available',
+                score: citation.score ? Number(citation.score).toFixed(2) : null,
+                snippet: displaySnippet,
                 previewUrl: citation.previewUrl || null,
                 // Phase 3: Relationship path data (Task 12.1)
                 fromGraph: citation.fromGraph || citation.graphTraversal || hasRelationshipPath,

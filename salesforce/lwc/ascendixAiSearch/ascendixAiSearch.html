@@ -17,62 +17,12 @@
                 </div>
             </div>
 
-            <!-- Facet Filters -->
-            <div class="slds-m-top_medium" role="group" aria-labelledby="filters-heading">
-                <div id="filters-heading" class="slds-text-body_small slds-m-bottom_x-small">
-                    Filters (optional)
+            <!-- Facet Filters — hidden: /query endpoint does not support filter params.
+                 JS filter helpers preserved in ascendixAiSearch.js for future reactivation. -->
+            <template if:false={isFilterUIEnabled}>
+                <div class="slds-m-top_medium slds-hide" role="group" aria-labelledby="filters-heading">
                 </div>
-                <div class="filter-chips-container">
-                    <!-- Region Filter -->
-                    <lightning-combobox name="region" data-filter-name="region" label="Region"
-                        value={selectedFilters.region} placeholder="Select Region" options={regionOptions}
-                        onchange={handleFilterChange} class="filter-combobox"
-                        aria-label="Filter by region"></lightning-combobox>
-
-                    <!-- Business Unit Filter -->
-                    <lightning-combobox name="businessUnit" data-filter-name="businessUnit" label="Business Unit"
-                        value={selectedFilters.businessUnit} placeholder="Select Business Unit"
-                        options={businessUnitOptions} onchange={handleFilterChange} class="filter-combobox"
-                        aria-label="Filter by business unit"></lightning-combobox>
-
-                    <!-- Quarter Filter -->
-                    <lightning-combobox name="quarter" data-filter-name="quarter" label="Quarter"
-                        value={selectedFilters.quarter} placeholder="Select Quarter" options={quarterOptions}
-                        onchange={handleFilterChange} class="filter-combobox"
-                        aria-label="Filter by quarter"></lightning-combobox>
-                </div>
-
-                <!-- Active Filter Chips -->
-                <template if:true={hasActiveFilters}>
-                    <div class="slds-m-top_small active-filters" role="list" aria-label="Active filters">
-                        <template if:true={selectedFilters.region}>
-                            <span class="filter-chip" role="listitem">
-                                Region: {selectedFilters.region}
-                                <button class="filter-chip-remove" onclick={handleRemoveRegion}
-                                    title="Remove region filter" aria-label="Remove region filter">×</button>
-                            </span>
-                        </template>
-                        <template if:true={selectedFilters.businessUnit}>
-                            <span class="filter-chip" role="listitem">
-                                BU: {selectedFilters.businessUnit}
-                                <button class="filter-chip-remove" onclick={handleRemoveBusinessUnit}
-                                    title="Remove business unit filter"
-                                    aria-label="Remove business unit filter">×</button>
-                            </span>
-                        </template>
-                        <template if:true={selectedFilters.quarter}>
-                            <span class="filter-chip" role="listitem">
-                                Quarter: {selectedFilters.quarter}
-                                <button class="filter-chip-remove" onclick={handleRemoveQuarter}
-                                    title="Remove quarter filter" aria-label="Remove quarter filter">×</button>
-                            </span>
-                        </template>
-                        <lightning-button variant="base" label="Clear All" title="Clear all filters"
-                            onclick={handleClearAllFilters} class="slds-m-left_small"
-                            aria-label="Clear all active filters"></lightning-button>
-                    </div>
-                </template>
-            </div>
+            </template>
 
             <!-- Submit Button -->
             <div class="slds-m-top_small">
@@ -206,7 +156,10 @@
                                             onclick={handleCitationClick}>{citation.title}</button>
                                     </div>
                                     <div class="slds-text-body_small slds-text-color_weak slds-m-bottom_x-small">
-                                        {citation.sobject} • Score: {citation.score}
+                                        {citation.sobject}
+                                        <template if:true={citation.score}>
+                                            <span> • Score: {citation.score}</span>
+                                        </template>
                                         <template if:true={citation.fromGraph}>
                                             <span class="graph-indicator" title="Found via relationship traversal">
                                                 <lightning-icon icon-name="utility:connected_apps" size="xx-small"

@@ -4,12 +4,21 @@ private class AscendixAISearchControllerTest {
     @isTest
     static void testCallAnswerEndpoint() {
         Test.setMock(HttpCalloutMock.class, new AISearchMock(200));
-        
+
         Test.startTest();
-        Map<String, Object> result = AscendixAISearchController.callAnswerEndpoint('{"query": "test"}');
+        Map<String, Object> result = AscendixAISearchController.callAnswerEndpoint('{"query": "test", "sessionId": "sess_123"}');
         Test.stopTest();
-        
+
         System.assert(result != null);
+        // Verify SSE parsing: answer assembled from token events
+        System.assertEquals('Test answer', (String) result.get('answer'));
+        // Verify citations transformed from {id, name} to {recordId, title, id}
+        List<Object> citations = (List<Object>) result.get('citations');
+        System.assert(citations != null && citations.size() == 1);
+        Map<String, Object> citation = (Map<String, Object>) citations[0];
+        System.assertEquals('a0x001', citation.get('recordId'));
+        System.assertEquals('Test Record', citation.get('title'));
+        System.assertEquals('a0x001', citation.get('id'));
     }
     
     @isTest
@@ -77,7 +86,18 @@ private class AscendixAISearchControllerTest {
             HttpResponse res = new HttpResponse();
             res.setStatusCode(statusCode);
             if (statusCode == 200) {
-                res.setBody('{"result": "success"}');
+                String endpoint = req.getEndpoint();
+                if (endpoint != null && endpoint.contains('/query')) {
+                    // Return SSE format matching new /query Lambda contract
+                    res.setHeader('Content-Type', 'text/event-stream');
+                    res.setBody(
+                        'event: token\ndata: {"text": "Test answer"}\n\n' +
+                        'event: citations\ndata: {"citations": [{"id": "a0x001", "name": "Test Record"}]}\n\n' +
+                        'event: done\ndata: {"tool_calls": 1, "turns": 1}\n\n'
+                    );
+                } else {
+                    res.setBody('{"result": "success"}');
+                }
             } else if (statusCode == 400) {
                 res.setBody('{"error": "Validation error"}');
             } else {

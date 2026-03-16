@@ -4,5 +4,6 @@
     "us-west-2b",
     "us-west-2c",
     "us-west-2d"
-  ]
+  ],
+  "ssm:account=382211616288:parameterName=/salesforce/instance_url:region=us-west-2": "https://ascendix-agentforce-demo--beta.sandbox.my.salesforce.com"
 }

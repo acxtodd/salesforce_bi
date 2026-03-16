@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { NetworkStack } from '../lib/network-stack';
 import { DataStack } from '../lib/data-stack';
 import { SearchStack } from '../lib/search-stack';
@@ -64,6 +66,15 @@ const searchStack = new SearchStack(app, `${stackPrefix}-Search-${environment}`,
 
 searchStack.addDependency(dataStack);
 
+// Resolve Salesforce credentials from existing AWS config for AppFlow
+const salesforceInstanceUrl = ssm.StringParameter.valueFromLookup(
+  dataStack, '/salesforce/instance_url'
+);
+const salesforceSecret = secretsmanager.Secret.fromSecretNameV2(
+  dataStack, 'SalesforceConnectedAppSecret',
+  'salesforce-ai-search/salesforce-connected-app'
+);
+
 // Ingestion Stack - Lambda functions, Step Functions, DLQ
 const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${environment}`, {
   env,
@@ -74,6 +85,10 @@ const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${envir
   dataBucket: dataStack.dataBucket,
   knowledgeBaseId: searchStack.knowledgeBase.attrKnowledgeBaseId,
   dataSourceId: searchStack.dataSource.attrDataSourceId,
+  // AppFlow Salesforce CDC credentials
+  salesforceInstanceUrl,
+  salesforceConnectedAppClientId: 'appflow-gate',  // truthiness gate only
+  salesforceConnectedAppClientSecretArn: salesforceSecret.secretArn,
   // Phase 3: Graph Enhancement tables
   graphNodesTable: dataStack.graphNodesTable,
   graphEdgesTable: dataStack.graphEdgesTable,

@@ -28,7 +28,7 @@ export OPENSEARCH_ENDPOINT=$(aws cloudformation describe-stacks \
   --output text)
 
 # Run the setup script
-python scripts/setup-opensearch-index.py \
+python scripts/one-off/setup-opensearch-index.py \
   --endpoint $OPENSEARCH_ENDPOINT \
   --region us-east-1
 ```

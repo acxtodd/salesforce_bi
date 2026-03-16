@@ -526,7 +526,7 @@ Fixed graph filter short-circuit blocking aggregation queries (vacancy, etc.).
 
 **If Vacancy Queries Fail:**
 1. Check derived view has data: `aws dynamodb scan --table-name salesforce-ai-search-vacancy-view --select COUNT`
-2. Run backfill: `python3 scripts/backfill_vacancy_metrics.py --clear`
+2. Run backfill: `python3 scripts/one-off/backfill_vacancy_metrics.py --clear`
 
 ---
 
@@ -557,7 +557,7 @@ When vacancy data needs refreshing:
 # Run backfill script
 # Navigate to project root (adjust path for your environment)
 cd "${PROJECT_ROOT:-/path/to/salesforce-ai-search}"
-python3 scripts/backfill_vacancy_metrics.py --clear
+python3 scripts/one-off/backfill_vacancy_metrics.py --clear
 
 # Verify counts
 aws dynamodb scan --table-name salesforce-ai-search-vacancy-view --select COUNT --region us-west-2
@@ -702,7 +702,7 @@ aws dynamodb scan \
 | Planner timeout, traffic %, confidence | Lambda env vars (see Section 1) |
 | Schema memory cache TTL | `SCHEMA_MEMORY_CACHE_TTL` env var (default: 300s) |
 | Current acceptance results | `tasks.md` → Task 29 checkpoint |
-| Recent fixes/changes | Latest handoff in `docs/handoffs/` |
+| Recent fixes/changes | Latest handoff in `docs/archive/handoffs/` |
 
 ---
 
@@ -793,7 +793,7 @@ done
 
 # 2. Run backfill (clears and rebuilds)
 # Note: Script path and cadence documented in tasks.md
-python3 scripts/backfill_vacancy_metrics.py --clear
+python3 scripts/one-off/backfill_vacancy_metrics.py --clear
 
 # 3. Verify after backfill
 aws dynamodb scan \

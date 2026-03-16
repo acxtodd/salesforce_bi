@@ -11,7 +11,7 @@
 
 ## 2. Data Ingestion Pipeline
 - **CDC Configuration:** Change Data Capture enabled for Account, Opportunity, Case, Property, Lease.
-- **Seeding:** Initial data load triggered via `scripts/seed_data.apex`.
+- **Seeding:** Initial data load triggered via `scripts/salesforce/seed_data.apex`.
 - **Verification:** New data files (`chunk-0.txt`) confirmed in S3 bucket `salesforce-ai-search-data-382211616288-us-west-2` at 20:33 UTC.
 - **Indexing:** AWS Step Functions pipeline is processing these files for Bedrock Knowledge Base ingestion.
 

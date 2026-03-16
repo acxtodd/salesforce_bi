@@ -14,7 +14,7 @@ A Graph-Enhanced RAG system for Commercial Real Estate that:
 - Enforces Salesforce sharing rules and field-level security
 - Returns grounded answers via Bedrock KB + OpenSearch Serverless
 
-**For detailed architecture:** See `docs/guides/PROJECT_PRIMER.md` and `docs/guides/onboarding.md`
+**For detailed architecture:** See `docs/guides/onboarding.md`
 
 ---
 
@@ -41,10 +41,10 @@ curl -s -X POST "${ANSWER_LAMBDA_URL}/answer" \
 |----------|----------|
 | **Runbook** | `docs/runbooks/RUNBOOK-CANARY-OPERATIONS.md` |
 | **Onboarding** | `docs/guides/onboarding.md` |
-| **Architecture** | `docs/guides/PROJECT_PRIMER.md` |
+| **Architecture** | `docs/architecture/salesforce_ai_search_architecture.md` |
 | **Current Config** | Lambda env vars (see runbook Section 1) |
-| **Task Status** | `.kiro/specs/graph-aware-zero-config-retrieval/tasks.md` |
-| **Recent Changes** | `docs/handoffs/` (sorted by date) |
+| **Task Status** | `python3 scripts/task_manager.py phases` |
+| **Recent Changes** | `docs/archive/handoffs/` (sorted by date) |
 
 ---
 
@@ -122,7 +122,7 @@ Key variables:
 ## Getting Help
 
 1. **Check the runbook** - `docs/runbooks/RUNBOOK-CANARY-OPERATIONS.md`
-2. **Check recent handoffs** - `docs/handoffs/` (newest first)
+2. **Check recent handoffs** - `docs/archive/handoffs/` (newest first)
 3. **Check task status** - `.kiro/specs/graph-aware-zero-config-retrieval/tasks.md`
 4. **CloudWatch logs** - Use commands in runbook for specific issues
 

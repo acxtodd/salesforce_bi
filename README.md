@@ -75,17 +75,24 @@ Full spec: [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-con
 │   ├── search_backend.py           # Vendor-agnostic ABC (search, aggregate, upsert, delete, warm)
 │   └── turbopuffer_backend.py      # Turbopuffer implementation (only file that imports tpuf SDK)
 ├── scripts/
+│   ├── task_manager.py             # Task tracking CLI (manages tasks.json)
 │   ├── generate_denorm_config.py   # Metadata-driven field selection → YAML config
-│   └── task_manager.py             # Task tracking CLI (manages tasks.json)
+│   ├── bundle_cdc_sync.sh          # CDK build bundler for cdc_sync Lambda
+│   ├── bundle_query.sh             # CDK build bundler for query Lambda
+│   ├── run_acceptance_tests.py     # Acceptance test runner
+│   ├── salesforce/                 # Apex scripts for Salesforce CLI (sf apex run)
+│   ├── one-off/                    # Historical utility scripts (backfills, audits, etc.)
+│   └── data/                       # Seed data and test fixtures
 ├── lambda/                         # Lambda handlers (Python 3.11)
-│   ├── retrieve/                   # [legacy] Query processing — being replaced by Query Lambda
-│   ├── answer/                     # [legacy] Streaming answers — being replaced by Query Lambda
 │   ├── cdc_sync/                   # Current CDC processor for Turbopuffer sync
+│   ├── query/                      # Query Lambda (NL → tool-use → streaming SSE)
+│   ├── retrieve/                   # [legacy] Query processing
+│   ├── answer/                     # [legacy] Streaming answers
 │   ├── cdc_processor/              # [legacy] CDC event parsing for old ingestion workflow
 │   ├── transform/                  # Record transformation (adapting for denormalization)
 │   ├── embed/                      # Bedrock Titan v2 embeddings (reusing)
-│   ├── schema_discovery/           # [legacy] Nightly Describe API — replaced by denorm config generator
-│   └── ...                         # Other legacy Lambdas (graph, derived views, etc.)
+│   ├── derived_views/              # [deprecated] Removal at Phase 4 gate
+│   └── ...                         # Other legacy Lambdas (graph, schema_discovery, etc.)
 ├── salesforce/                     # Salesforce metadata & components
 │   ├── classes/                    # Apex (AscendixAISearchController — adapting)
 │   ├── lwc/                        # ascendixAiSearch LWC (adapting API contract)
@@ -96,11 +103,13 @@ Full spec: [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-con
 │   ├── test_search_backend.py      # 28 tests (ABC, filters, integration)
 │   └── test_denorm_generator.py    # 51 tests (scoring, parents, YAML output)
 ├── docs/
-│   ├── specs/
-│   │   └── salesforce-connector-spec.md  # Unified product & design spec
-│   ├── architecture/               # Legacy system design docs
-│   ├── guides/                     # Onboarding, deployment
-│   └── handoffs/                   # Session handoff documents
+│   ├── specs/                      # Canonical product & design spec
+│   ├── architecture/               # Active architecture docs (4 files)
+│   ├── guides/                     # Onboarding, operator guide, setup (5 files)
+│   ├── testing/                    # Acceptance testing, security tests (3 files)
+│   ├── runbooks/                   # Operational runbooks
+│   ├── AscendixIQ_for_SFDC/       # Product documentation
+│   └── archive/                    # Stale docs (handoffs, analysis, deployment, etc.)
 ├── tasks.json                      # Phase-based task tracking (use task_manager.py)
 ├── TASK_TRACKING.md                # Task tracking guide
 └── denorm_config.yaml              # Generated denormalization config (after running generator)
@@ -175,5 +184,5 @@ See [`TASK_TRACKING.md`](TASK_TRACKING.md) for task management commands and work
 
 - [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-connector-spec.md) — Unified product & design spec (start here)
 - [`TASK_TRACKING.md`](TASK_TRACKING.md) — Task tracking guide
-- `docs/guides/PROJECT_PRIMER.md` — Legacy system orientation
-- `docs/architecture/` — Legacy system design docs
+- `docs/guides/` — Onboarding, operator guide, AppFlow setup, quick start
+- `docs/architecture/` — CDC pipeline summary, CDK reference, infrastructure

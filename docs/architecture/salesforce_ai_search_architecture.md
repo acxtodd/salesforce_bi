@@ -150,7 +150,7 @@ The system has three main components:
 ## 6. Reliability & Monitoring (Current State)
 - CloudWatch logs for Lambdas; Step Functions execution history.  
 - Runtime guard logs `[FIELD_CONTRACT]` warnings when required fields missing (Task 36).  
-- CI gate for schema cache contract (Task 38.2/38.3) implemented via `test_automation/test_schema_cache_contract.py` on 2025-12-10.  
+- CI gate for schema cache contract (Task 38.2/38.3) implemented via `docs/archive/test_automation/test_schema_cache_contract.py` on 2025-12-10.  
 - Not yet complete: field coverage nightly report, schema drift dashboard (Tasks 34.6/34.7/34.9/39).  
 - Latency still high on cross-object availability queries; traversal/KB stages dominate.
 
@@ -214,9 +214,9 @@ The system has three main components:
 ## 13. Artifact Locations
 - **Code**: `lambda/retrieve`, `lambda/answer`, `lambda/schema_discovery`, `lambda/schema_api`, `lambda/chunking`, `lambda/graph_builder`, `lambda/enrich`, `lambda/embed`.  
 - **Infrastructure**: `lib/*.ts` (CDK stacks).  
-- **Salesforce**: `salesforce/classes/*.cls`, `salesforce/customMetadata/IndexConfiguration__mdt.*`, triggers `trigger_cre_export.apex`, `trigger_export.apex`.  
+- **Salesforce**: `salesforce/classes/*.cls`, `salesforce/customMetadata/IndexConfiguration__mdt.*`, triggers `scripts/salesforce/trigger_cre_export.apex`, `scripts/salesforce/trigger_export.apex`.  
 - **Specs (for reference only)**: `.kiro/specs/graph-aware-zero-config-retrieval/*`.  
-- **CI Validation**: `test_automation/test_schema_cache_contract.py` (schema cache contract test).  
+- **CI Validation**: `docs/archive/test_automation/test_schema_cache_contract.py` (schema cache contract test).  
 - **Deprecated Scripts (do not use)**: `scripts/DEPRECATED_seed_schema_cache.py`, `scripts/DEPRECATED_seed_derived_views.py`.
 
 ---

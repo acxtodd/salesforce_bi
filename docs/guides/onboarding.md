@@ -4,7 +4,7 @@ Welcome! This guide will help you understand the Salesforce AI Search project st
 
 ## Read This First (15–20 min)
 
-Start with `docs/guides/PROJECT_PRIMER.md` for a consolidated overview of the system, current state, key flows, and load‑bearing requirements.  
+Start with `docs/architecture/salesforce_ai_search_architecture.md` for a consolidated overview of the system, current state, key flows, and load‑bearing requirements.
 Then return here for detailed repo orientation and debugging playbooks.
 
 ## Project Overview
@@ -123,8 +123,8 @@ salesforce-ai-search/
 │   └── remoteSiteSettings/        # Callout allowlist
 ├── docs/
 │   ├── guides/                    # How-to guides
-│   └── handoffs/                  # Session handoff documents
-└── test_automation/               # Acceptance test scripts
+│   ├── archive/                   # Archived handoffs, analysis, deployment docs
+│   └── archive/test_automation/   # Archived acceptance test scripts
 ```
 
 ## Key Data Stores
@@ -259,7 +259,7 @@ aws bedrock-agent-runtime retrieve \
 1. `.kiro/specs/graph-aware-zero-config-retrieval/requirements.md`
 2. `.kiro/specs/graph-aware-zero-config-retrieval/design.md`
 3. `.kiro/specs/graph-aware-zero-config-retrieval/tasks.md`
-4. Latest handoff in `docs/handoffs/` (sorted by date)
+4. Latest handoff in `docs/archive/handoffs/` (sorted by date)
 
 ### Task Execution Steps
 
@@ -396,7 +396,7 @@ aws lambda update-function-code --function-name salesforce-ai-search-<function> 
 
 ## Getting Help
 
-1. **Check handoffs** in `docs/handoffs/` for recent context
+1. **Check handoffs** in `docs/archive/handoffs/` for recent context
 2. **Check the design doc** for architectural decisions
 3. **Check requirements** to understand the "why"
 4. **Search existing code** for similar patterns
@@ -405,7 +405,7 @@ aws lambda update-function-code --function-name salesforce-ai-search-<function> 
 ## Where to Find Current State (avoid stale configs)
 
 - **Sprint tasks, flags, timeouts:** `.kiro/specs/graph-aware-zero-config-retrieval/tasks.md`
-- **Latest fixes/hotspots:** `docs/handoffs/` (read the newest first)
+- **Latest fixes/hotspots:** `docs/archive/handoffs/` (read the newest first)
 - **Ops / rollback procedures:** `docs/runbooks/RUNBOOK-CANARY-OPERATIONS.md`
 - **Secrets (API keys/URLs):** retrieve from Secrets Manager or env vars; never hardcode in code or docs.
 

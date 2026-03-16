@@ -27,6 +27,7 @@ interface IngestionStackProps extends cdk.StackProps {
   salesforceInstanceUrl?: string;
   salesforceConnectedAppClientId?: string;
   salesforceConnectedAppClientSecretArn?: string;
+  salesforceJwtToken?: string;
   // Phase 3: Graph Enhancement tables
   graphNodesTable?: dynamodb.Table;
   graphEdgesTable?: dynamodb.Table;
@@ -67,6 +68,7 @@ export class IngestionStack extends cdk.Stack {
       salesforceInstanceUrl,
       salesforceConnectedAppClientId,
       salesforceConnectedAppClientSecretArn,
+      salesforceJwtToken,
       // Phase 3: Graph Enhancement tables
       graphNodesTable,
       graphEdgesTable,
@@ -132,7 +134,8 @@ export class IngestionStack extends cdk.Stack {
             connectorProfileCredentials: {
               salesforce: {
                 clientCredentialsArn: salesforceSecret.secretArn,
-                oAuth2GrantType: "CLIENT_CREDENTIALS",
+                jwtToken: salesforceJwtToken,
+                oAuth2GrantType: "JWT_BEARER",
               },
             },
           },

@@ -74,6 +74,12 @@ const salesforceSecret = secretsmanager.Secret.fromSecretNameV2(
   dataStack, 'SalesforceConnectedAppSecret',
   'salesforce-ai-search/salesforce-connected-app'
 );
+// JWT token for AppFlow JWT_BEARER auth (no interactive login required).
+// Store via: aws ssm put-parameter --name /salesforce/appflow_jwt_token \
+//   --type SecureString --value "<jwt>"
+const salesforceJwtToken = ssm.StringParameter.valueFromLookup(
+  dataStack, '/salesforce/appflow_jwt_token'
+);
 
 // Ingestion Stack - Lambda functions, Step Functions, DLQ
 const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${environment}`, {
@@ -85,10 +91,11 @@ const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${envir
   dataBucket: dataStack.dataBucket,
   knowledgeBaseId: searchStack.knowledgeBase.attrKnowledgeBaseId,
   dataSourceId: searchStack.dataSource.attrDataSourceId,
-  // AppFlow Salesforce CDC credentials
+  // AppFlow Salesforce CDC credentials (JWT_BEARER flow)
   salesforceInstanceUrl,
   salesforceConnectedAppClientId: 'appflow-gate',  // truthiness gate only
   salesforceConnectedAppClientSecretArn: salesforceSecret.secretArn,
+  salesforceJwtToken,
   // Phase 3: Graph Enhancement tables
   graphNodesTable: dataStack.graphNodesTable,
   graphEdgesTable: dataStack.graphEdgesTable,

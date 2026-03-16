@@ -18,6 +18,7 @@ from cdc_sync.index import (
     CDCEvent,
     _embed_single,
     _emit_freshness_metrics,
+    _extract_s3_coordinates,
     _process_cdc_event,
     _send_to_dlq,
     parse_event,
@@ -188,6 +189,56 @@ class TestParseEventbridgeS3CDC:
         assert len(events) == 1
         assert events[0].object_name == "ascendix__Property__c"
 
+    def test_raw_eventbridge_s3_shape(self):
+        """Raw EventBridge S3 notification (nested detail.bucket.name)."""
+        payload = _make_s3_cdc_payload(record_ids=["a0x6"])
+        s3_client = _mock_s3_get_object(payload)
+        raw_event = {
+            "source": "aws.s3",
+            "detail-type": "Object Created",
+            "detail": {
+                "bucket": {"name": "salesforce-cdc-bucket"},
+                "object": {"key": "cdc/ascendix__Property__ChangeEvent/2025/11/13/14/event-001.json"},
+            },
+            "time": "2025-11-13T14:30:00Z",
+        }
+
+        events = parse_eventbridge_s3_cdc(raw_event, s3_client)
+
+        assert len(events) == 1
+        assert events[0].record_ids == ["a0x6"]
+        s3_client.get_object.assert_called_once_with(
+            Bucket="salesforce-cdc-bucket",
+            Key="cdc/ascendix__Property__ChangeEvent/2025/11/13/14/event-001.json",
+        )
+
+
+# ===================================================================
+# _extract_s3_coordinates
+# ===================================================================
+
+
+class TestExtractS3Coordinates:
+    def test_flat_shape(self):
+        bucket, key = _extract_s3_coordinates({"bucket": "b", "key": "k"})
+        assert bucket == "b"
+        assert key == "k"
+
+    def test_nested_eventbridge_shape(self):
+        event = {
+            "detail": {
+                "bucket": {"name": "my-bucket"},
+                "object": {"key": "cdc/Property/event.json"},
+            }
+        }
+        bucket, key = _extract_s3_coordinates(event)
+        assert bucket == "my-bucket"
+        assert key == "cdc/Property/event.json"
+
+    def test_unknown_shape_raises(self):
+        with pytest.raises(ValueError, match="Cannot extract S3 coordinates"):
+            _extract_s3_coordinates({"foo": "bar"})
+
 
 # ===================================================================
 # parse_event routing
@@ -202,6 +253,21 @@ class TestParseEvent:
 
         events = parse_event(event, s3_client)
 
+        assert len(events) == 1
+        assert events[0].object_name == "ascendix__Property__c"
+
+    def test_raw_eventbridge_s3_routes_to_adapter(self):
+        """Raw EventBridge S3 shape (nested detail) routes correctly."""
+        payload = _make_s3_cdc_payload()
+        s3_client = _mock_s3_get_object(payload)
+        raw_event = {
+            "detail": {
+                "bucket": {"name": "b"},
+                "object": {"key": "cdc/ascendix__Property__ChangeEvent/event.json"},
+            }
+        }
+
+        events = parse_event(raw_event, s3_client)
         assert len(events) == 1
         assert events[0].object_name == "ascendix__Property__c"
 
@@ -377,8 +443,8 @@ class TestProcessCDCEvent:
         deps["backend"].delete.assert_not_called()
         deps["sqs_client"].send_message.assert_not_called()
 
-    def test_sf_fetch_failure_sends_to_dlq(self):
-        """Salesforce query failure sends event to DLQ and continues."""
+    def test_sf_fetch_failure_sends_to_dlq_and_raises(self):
+        """Salesforce query failure sends event to DLQ and re-raises."""
         deps = self._make_deps()
         deps["sf_client"].query.side_effect = RuntimeError("SF unavailable")
         cdc = CDCEvent(
@@ -388,7 +454,8 @@ class TestProcessCDCEvent:
             commit_timestamp=1700000000000,
         )
 
-        _process_cdc_event(cdc, **deps)
+        with pytest.raises(RuntimeError, match="SF unavailable"):
+            _process_cdc_event(cdc, **deps)
 
         # DLQ should be called
         deps["sqs_client"].send_message.assert_called_once()
@@ -398,8 +465,8 @@ class TestProcessCDCEvent:
         assert dlq_body["object_name"] == "ascendix__Property__c"
         assert "SF unavailable" in dlq_body["error"]
 
-    def test_embed_failure_sends_to_dlq(self):
-        """Bedrock embed failure sends event to DLQ and continues."""
+    def test_embed_failure_sends_to_dlq_and_raises(self):
+        """Bedrock embed failure sends event to DLQ and re-raises."""
         record = {
             "Id": "a0x1",
             "LastModifiedDate": "2025-03-01T00:00:00Z",
@@ -417,7 +484,8 @@ class TestProcessCDCEvent:
             commit_timestamp=1700000000000,
         )
 
-        _process_cdc_event(cdc, **deps)
+        with pytest.raises(RuntimeError, match="Bedrock unavailable"):
+            _process_cdc_event(cdc, **deps)
 
         # DLQ should be called
         deps["sqs_client"].send_message.assert_called_once()

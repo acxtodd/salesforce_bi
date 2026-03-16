@@ -251,6 +251,55 @@ describe('c-ascendix-ai-search', () => {
             expect(citationsButton.label).toContain('(1)');
         });
 
+        it('should handle minimal citations from /query endpoint (id + title only)', async () => {
+            // Real /query returns citations with only {recordId, title, id}
+            // after Apex transforms {id, name} from the backend.
+            // No sobject, score, or snippet fields.
+            const mockResponse = {
+                answer: 'Test answer mentioning Tower One',
+                citations: [
+                    {
+                        id: 'a0x000001',
+                        recordId: 'a0x000001',
+                        title: 'Tower One'
+                        // No sobject, score, snippet, previewUrl
+                    }
+                ]
+            };
+            callAnswerEndpoint.mockResolvedValue(mockResponse);
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Find Tower One';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Find Tower One' }
+            }));
+
+            await flushPromises();
+
+            const submitButton = element.shadowRoot.querySelector('.submit-button');
+            submitButton.click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Verify citation renders with fallback values
+            expect(element.citations.length).toBe(1);
+            const citation = element.citations[0];
+            expect(citation.title).toBe('Tower One');
+            expect(citation.recordId).toBe('a0x000001');
+            expect(citation.sobject).toBe('Record'); // fallback
+            expect(citation.score).toBeNull(); // null, not 'N/A'
+            expect(citation.snippet).toBe('Record: Tower One'); // derived from title
+        });
+
         it('should toggle citations drawer when button is clicked', async () => {
             const mockResponse = {
                 answer: 'Test answer',

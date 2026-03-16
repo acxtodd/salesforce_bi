@@ -156,7 +156,10 @@
                                             onclick={handleCitationClick}>{citation.title}</button>
                                     </div>
                                     <div class="slds-text-body_small slds-text-color_weak slds-m-bottom_x-small">
-                                        {citation.sobject} • Score: {citation.score}
+                                        {citation.sobject}
+                                        <template if:true={citation.score}>
+                                            <span> • Score: {citation.score}</span>
+                                        </template>
                                         <template if:true={citation.fromGraph}>
                                             <span class="graph-indicator" title="Found via relationship traversal">
                                                 <lightning-icon icon-name="utility:connected_apps" size="xx-small"

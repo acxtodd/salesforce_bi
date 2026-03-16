@@ -80,20 +80,42 @@ class CDCEvent:
 # ---------------------------------------------------------------------------
 
 
+def _extract_s3_coordinates(event: dict) -> tuple[str, str]:
+    """Extract bucket name and object key from an S3 event.
+
+    Supports two shapes:
+    1. Transformed (from CDK input transformer in ingestion-stack.ts:897):
+       {"bucket": "...", "key": "...", "eventTime": "..."}
+    2. Raw EventBridge S3 notification:
+       {"detail": {"bucket": {"name": "..."}, "object": {"key": "..."}}}
+    """
+    # Shape 1: flat/transformed (existing CDK pipeline)
+    if "bucket" in event and "key" in event:
+        return event["bucket"], event["key"]
+
+    # Shape 2: raw EventBridge S3 notification
+    detail = event.get("detail", {})
+    bucket_obj = detail.get("bucket", {})
+    object_obj = detail.get("object", {})
+    if isinstance(bucket_obj, dict) and "name" in bucket_obj and isinstance(object_obj, dict) and "key" in object_obj:
+        return bucket_obj["name"], object_obj["key"]
+
+    raise ValueError(
+        f"Cannot extract S3 coordinates from event. Expected flat "
+        f"'bucket'+'key' or nested 'detail.bucket.name'+'detail.object.key', "
+        f"got keys: {sorted(event.keys())}"
+    )
+
+
 def parse_eventbridge_s3_cdc(
     event: dict, s3_client: Any
 ) -> list[CDCEvent]:
     """Read CDC payload from S3 and parse ChangeEventHeader.
 
-    Expected event shape (from EventBridge):
-        {
-            "bucket": "...",
-            "key": "cdc/<EntityChangeEvent>/2025/11/13/14/event-001.json",
-            "eventTime": "2025-11-13T14:30:00Z"
-        }
+    Accepts both the CDK-transformed flat shape and the raw EventBridge
+    S3 notification shape (with nested detail.bucket.name / detail.object.key).
     """
-    bucket = event["bucket"]
-    key = event["key"]
+    bucket, key = _extract_s3_coordinates(event)
 
     response = s3_client.get_object(Bucket=bucket, Key=key)
     cdc_payload = json.loads(response["Body"].read().decode("utf-8"))
@@ -136,14 +158,29 @@ def parse_pubsub_cdc(event: dict) -> list[CDCEvent]:
 
 
 def parse_event(event: dict, s3_client: Any) -> list[CDCEvent]:
-    """Route incoming event to the correct input adapter."""
+    """Route incoming event to the correct input adapter.
+
+    Recognises:
+    - Flat S3 shape: {"bucket": ..., "key": ...}  (CDK input transformer)
+    - Raw EventBridge S3: {"detail": {"bucket": {"name": ...}, "object": {"key": ...}}}
+    - Pub/Sub shape: {"pubsub": ...}  (stub)
+    """
+    # Flat transformed shape
     if "bucket" in event and "key" in event:
         return parse_eventbridge_s3_cdc(event, s3_client)
+
+    # Raw EventBridge S3 notification shape
+    detail = event.get("detail", {})
+    if isinstance(detail, dict) and "bucket" in detail and "object" in detail:
+        return parse_eventbridge_s3_cdc(event, s3_client)
+
     if "pubsub" in event:
         return parse_pubsub_cdc(event)
+
     raise ValueError(
-        f"Unrecognized event shape — expected 'bucket'+'key' or 'pubsub', "
-        f"got keys: {sorted(event.keys())}"
+        f"Unrecognized event shape — expected flat 'bucket'+'key', "
+        f"nested 'detail.bucket.name'+'detail.object.key', or 'pubsub'. "
+        f"Got keys: {sorted(event.keys())}"
     )
 
 
@@ -431,6 +468,7 @@ def _process_cdc_event(
         )
         if dlq_url:
             _send_to_dlq(sqs_client, dlq_url, cdc_event, exc)
+        raise  # Re-raise so lambda_handler counts this as failed
 
 
 # ---------------------------------------------------------------------------
@@ -457,21 +495,26 @@ def lambda_handler(event: dict, context: Any) -> dict:
 
     cdc_events = parse_event(event, s3_client)
 
-    processed = 0
+    succeeded = 0
+    failed = 0
     for cdc_event in cdc_events:
-        _process_cdc_event(
-            cdc_event,
-            sf_client=sf_client,
-            bedrock_client=bedrock_client,
-            backend=backend,
-            cloudwatch_client=cloudwatch_client,
-            sqs_client=sqs_client,
-            namespace=namespace,
-            salesforce_org_id=salesforce_org_id,
-            denorm_config=denorm_config,
-            dlq_url=dlq_url,
-        )
-        processed += 1
+        try:
+            _process_cdc_event(
+                cdc_event,
+                sf_client=sf_client,
+                bedrock_client=bedrock_client,
+                backend=backend,
+                cloudwatch_client=cloudwatch_client,
+                sqs_client=sqs_client,
+                namespace=namespace,
+                salesforce_org_id=salesforce_org_id,
+                denorm_config=denorm_config,
+                dlq_url=dlq_url,
+            )
+            succeeded += 1
+        except Exception:
+            failed += 1
+            # _process_cdc_event already logged + sent to DLQ
 
-    LOG.info("Processed %d CDC events", processed)
-    return {"processed": processed}
+    LOG.info("CDC sync: %d succeeded, %d failed (of %d total)", succeeded, failed, len(cdc_events))
+    return {"succeeded": succeeded, "failed": failed}

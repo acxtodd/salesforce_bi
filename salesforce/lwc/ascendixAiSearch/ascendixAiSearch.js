@@ -564,13 +564,20 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                 });
             }
 
+            // Build display-friendly snippet from available data.
+            // /query citations carry only {id, name} from the backend; enrich
+            // the snippet from the title so the drawer is not blank.
+            const displayTitle = citation.title || citation.name || citation.recordId || citation.id || 'Unknown';
+            const displaySnippet = citation.snippet || citation.text
+                || (displayTitle !== 'Unknown' ? `Record: ${displayTitle}` : 'No preview available');
+
             const processed = {
                 id: citation.id || 'citation-' + index,
-                title: citation.title || citation.recordId || 'Unknown',
+                title: displayTitle,
                 recordId: citation.recordId || citation.id,
                 sobject: citation.metadata?.sobject || citation.sobject || 'Record',
-                score: citation.score ? Number(citation.score).toFixed(2) : 'N/A',
-                snippet: citation.snippet || citation.text || 'No preview available',
+                score: citation.score ? Number(citation.score).toFixed(2) : null,
+                snippet: displaySnippet,
                 previewUrl: citation.previewUrl || null,
                 // Phase 3: Relationship path data (Task 12.1)
                 fromGraph: citation.fromGraph || citation.graphTraversal || hasRelationshipPath,

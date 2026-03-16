@@ -102,16 +102,24 @@ def poll_for_record(
     backend: TurbopufferBackend,
     namespace: str,
     record_id: str,
+    record_name: str | None = None,
     timeout: int = POLL_TIMEOUT_SECONDS,
 ) -> dict | None:
-    """Poll Turbopuffer until record appears. Returns record or None on timeout."""
+    """Poll Turbopuffer until record appears. Returns record or None on timeout.
+
+    Uses the record name as a BM25 text query (since the indexed text contains
+    field values, not the Salesforce ID). Then confirms the match by checking
+    the document ``id`` field against the expected ``record_id``.
+    """
+    # BM25 query uses the test record name (which IS in the indexed text)
+    search_text = record_name or TEST_RECORD_PREFIX
     start = time.time()
     while time.time() - start < timeout:
         try:
             results = backend.search(
                 namespace,
-                text_query=record_id,
-                top_k=1,
+                text_query=search_text,
+                top_k=5,
                 include_attributes=["id", "name", "city", "object_type"],
             )
             for r in results:
@@ -130,23 +138,30 @@ def poll_for_record_absent(
     backend: TurbopufferBackend,
     namespace: str,
     record_id: str,
+    record_name: str | None = None,
     timeout: int = POLL_TIMEOUT_SECONDS,
 ) -> bool:
-    """Poll until record is no longer found. Returns True if absent."""
+    """Poll until record is no longer found. Returns True if absent.
+
+    Does NOT treat search exceptions as "absent" — only an explicit search
+    that returns no matching document ID counts.
+    """
+    search_text = record_name or TEST_RECORD_PREFIX
     start = time.time()
     while time.time() - start < timeout:
         try:
             results = backend.search(
                 namespace,
-                text_query=record_id,
-                top_k=1,
+                text_query=search_text,
+                top_k=5,
                 include_attributes=["id"],
             )
             found = any(r.get("id") == record_id for r in results)
             if not found:
                 return True
-        except Exception:
-            return True  # If search fails, record is likely gone
+        except Exception as e:
+            # Do NOT treat exceptions as "absent" — that gives false positives
+            LOG.warning("Poll error during deletion check: %s", e)
 
         LOG.info("  Polling for deletion... (%.0fs elapsed)", time.time() - start)
         time.sleep(POLL_INTERVAL_SECONDS)
@@ -161,6 +176,7 @@ def run_e2e_tests(
 ) -> dict:
     """Run all E2E test scenarios. Returns results dict."""
     test_id = str(int(time.time()))
+    record_name = f"{TEST_RECORD_PREFIX}{test_id}"
     results = {"passed": 0, "failed": 0, "tests": []}
     record_id = None
 
@@ -168,7 +184,7 @@ def run_e2e_tests(
         # Test 1: CREATE
         LOG.info("=== Test 1: CREATE ===")
         record_id = create_test_property(sf_client, test_id)
-        record = poll_for_record(backend, namespace, record_id)
+        record = poll_for_record(backend, namespace, record_id, record_name=record_name)
         if record:
             LOG.info("PASS: Record found in Turbopuffer after CREATE")
             results["passed"] += 1
@@ -187,7 +203,7 @@ def run_e2e_tests(
         start = time.time()
         updated = False
         while time.time() - start < POLL_TIMEOUT_SECONDS:
-            record = poll_for_record(backend, namespace, record_id, timeout=30)
+            record = poll_for_record(backend, namespace, record_id, record_name=record_name, timeout=30)
             if record and record.get("city") == new_city:
                 updated = True
                 break
@@ -206,7 +222,7 @@ def run_e2e_tests(
         # Test 3: DELETE
         LOG.info("=== Test 3: DELETE ===")
         delete_test_property(sf_client, record_id)
-        absent = poll_for_record_absent(backend, namespace, record_id)
+        absent = poll_for_record_absent(backend, namespace, record_id, record_name=record_name)
         if absent:
             LOG.info("PASS: Record removed from Turbopuffer after DELETE")
             results["passed"] += 1

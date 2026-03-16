@@ -106,8 +106,10 @@ export class IngestionStack extends cdk.Stack {
       salesforceConnectedAppClientId &&
       salesforceConnectedAppClientSecretArn
     ) {
-      // Reference the existing secret containing Salesforce credentials
-      const salesforceSecret = secretsmanager.Secret.fromSecretCompleteArn(
+      // Reference the existing secret containing Salesforce credentials.
+      // Use fromSecretPartialArn because the ARN from Secret.fromSecretNameV2
+      // in bin/app.ts does not include the 6-character random suffix.
+      const salesforceSecret = secretsmanager.Secret.fromSecretPartialArn(
         this,
         "SalesforceSecret",
         salesforceConnectedAppClientSecretArn,

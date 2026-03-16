@@ -523,8 +523,13 @@ export class ApiStack extends cdk.Stack {
           "us.anthropic.claude-sonnet-4-20250514-v1:0",
         TURBOPUFFER_API_KEY: process.env.TURBOPUFFER_API_KEY || "",
         LOG_LEVEL: "INFO",
+        // Reuse same API key secret as answer Lambda for auth parity
+        API_KEY_SECRET_ARN: streamingApiKeySecret.secretArn,
       },
     });
+
+    // Grant Query Lambda permission to read the API key secret
+    streamingApiKeySecret.grantRead(this.queryLambda);
 
     const queryFunctionUrl = this.queryLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,

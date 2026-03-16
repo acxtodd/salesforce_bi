@@ -40,6 +40,16 @@ FULL_TEXT_SEARCH_SCHEMA: dict[str, dict[str, Any]] = {
     "leasetermmin": {"type": "float"},
     "leasetermmax": {"type": "float"},
     "property_totalbuildingarea": {"type": "float"},
+    # Deal numeric fields
+    "dealamount": {"type": "float"},
+    "probability": {"type": "float"},
+    "commission": {"type": "float"},
+    "leaserate": {"type": "float"},
+    # Sale numeric fields
+    "saleprice": {"type": "float"},
+    "pricepersf": {"type": "float"},
+    "caprate": {"type": "float"},
+    "noi": {"type": "float"},
 }
 
 

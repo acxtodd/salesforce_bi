@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { NetworkStack } from '../lib/network-stack';
 import { DataStack } from '../lib/data-stack';
 import { SearchStack } from '../lib/search-stack';
@@ -64,6 +65,25 @@ const searchStack = new SearchStack(app, `${stackPrefix}-Search-${environment}`,
 
 searchStack.addDependency(dataStack);
 
+// Resolve Salesforce credentials at deploy time via CloudFormation dynamic references.
+// valueFromLookup is wrong here — it substitutes dummy placeholders at synth time.
+// Pre-deploy setup:
+//   aws ssm put-parameter --name /salesforce/instance_url --type String --value "https://…"
+//   aws ssm put-parameter --name /salesforce/appflow_jwt_token --type SecureString --value "<jwt>"
+//   aws secretsmanager create-secret --name salesforce-ai-search/salesforce-connected-app …
+const salesforceInstanceUrl = new cdk.CfnDynamicReference(
+  cdk.CfnDynamicReferenceService.SSM,
+  '/salesforce/instance_url',
+).toString();
+const salesforceSecret = secretsmanager.Secret.fromSecretNameV2(
+  dataStack, 'SalesforceConnectedAppSecret',
+  'salesforce-ai-search/salesforce-connected-app',
+);
+const salesforceJwtToken = new cdk.CfnDynamicReference(
+  cdk.CfnDynamicReferenceService.SSM_SECURE,
+  '/salesforce/appflow_jwt_token',
+).toString();
+
 // Ingestion Stack - Lambda functions, Step Functions, DLQ
 const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${environment}`, {
   env,
@@ -74,6 +94,11 @@ const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${envir
   dataBucket: dataStack.dataBucket,
   knowledgeBaseId: searchStack.knowledgeBase.attrKnowledgeBaseId,
   dataSourceId: searchStack.dataSource.attrDataSourceId,
+  // AppFlow Salesforce CDC credentials (JWT_BEARER flow)
+  salesforceInstanceUrl,
+  salesforceConnectedAppClientId: 'appflow-gate',  // truthiness gate only
+  salesforceConnectedAppClientSecretArn: salesforceSecret.secretArn,
+  salesforceJwtToken,
   // Phase 3: Graph Enhancement tables
   graphNodesTable: dataStack.graphNodesTable,
   graphEdgesTable: dataStack.graphEdgesTable,

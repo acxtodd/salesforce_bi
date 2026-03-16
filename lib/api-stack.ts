@@ -50,6 +50,7 @@ export class ApiStack extends cdk.Stack {
   public readonly api: apigateway.RestApi;
   public readonly retrieveLambda: lambda.Function;
   public readonly answerLambda: lambda.Function;
+  public readonly queryLambda: lambda.DockerImageFunction;
   public readonly authzLambda: lambda.Function;
   public readonly actionLambda: lambda.Function;
   public readonly vpcEndpoint: ec2.InterfaceVpcEndpoint;
@@ -497,6 +498,49 @@ export class ApiStack extends cdk.Stack {
     // Grant permissions
     this.retrieveLambda.grantInvoke(this.answerLambda); // Answer invokes Retrieve
 
+    // 3b. Query Lambda (Phase 2: Turbopuffer + tool-use via /query endpoint)
+    const queryRole = createLambdaRole(
+      "QueryLambdaRole",
+      "Role for Query Lambda",
+    );
+
+    this.queryLambda = new lambda.DockerImageFunction(this, "QueryLambda", {
+      functionName: "salesforce-ai-search-query",
+      code: lambda.DockerImageCode.fromImageAsset(
+        path.join(__dirname, "../lambda/query"),
+      ),
+      timeout: cdk.Duration.seconds(29),
+      memorySize: 1024,
+      architecture: lambda.Architecture.ARM_64,
+      role: queryRole,
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [lambdaSecurityGroup],
+      environment: {
+        AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
+        DENORM_CONFIG_PATH: "denorm_config.yaml",
+        BEDROCK_MODEL_ID:
+          "us.anthropic.claude-sonnet-4-20250514-v1:0",
+        TURBOPUFFER_API_KEY: process.env.TURBOPUFFER_API_KEY || "",
+        LOG_LEVEL: "INFO",
+        // Reuse same API key secret as answer Lambda for auth parity
+        API_KEY_SECRET_ARN: streamingApiKeySecret.secretArn,
+      },
+    });
+
+    // Grant Query Lambda permission to read the API key secret
+    streamingApiKeySecret.grantRead(this.queryLambda);
+
+    const queryFunctionUrl = this.queryLambda.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
+      cors: {
+        allowedOrigins: ["*"],
+        allowedMethods: [lambda.HttpMethod.POST],
+        allowedHeaders: ["*"],
+      },
+    });
+
     // 4. Action Lambda Role
     const actionRole = createLambdaRole(
       "ActionLambdaRole",
@@ -906,6 +950,12 @@ export class ApiStack extends cdk.Stack {
       value: answerFunctionUrl.url,
       description: "Answer Lambda Function URL (Streaming)",
       exportName: `${this.stackName}-AnswerFunctionUrl`,
+    });
+
+    new cdk.CfnOutput(this, "QueryFunctionUrl", {
+      value: queryFunctionUrl.url,
+      description: "Query Lambda Function URL (Streaming SSE)",
+      exportName: `${this.stackName}-QueryFunctionUrl`,
     });
 
     // Tag all resources

@@ -27,6 +27,7 @@ interface IngestionStackProps extends cdk.StackProps {
   salesforceInstanceUrl?: string;
   salesforceConnectedAppClientId?: string;
   salesforceConnectedAppClientSecretArn?: string;
+  salesforceJwtToken?: string;
   // Phase 3: Graph Enhancement tables
   graphNodesTable?: dynamodb.Table;
   graphEdgesTable?: dynamodb.Table;
@@ -67,6 +68,7 @@ export class IngestionStack extends cdk.Stack {
       salesforceInstanceUrl,
       salesforceConnectedAppClientId,
       salesforceConnectedAppClientSecretArn,
+      salesforceJwtToken,
       // Phase 3: Graph Enhancement tables
       graphNodesTable,
       graphEdgesTable,
@@ -106,8 +108,10 @@ export class IngestionStack extends cdk.Stack {
       salesforceConnectedAppClientId &&
       salesforceConnectedAppClientSecretArn
     ) {
-      // Reference the existing secret containing Salesforce credentials
-      const salesforceSecret = secretsmanager.Secret.fromSecretCompleteArn(
+      // Reference the existing secret containing Salesforce credentials.
+      // Use fromSecretPartialArn because the ARN from Secret.fromSecretNameV2
+      // in bin/app.ts does not include the 6-character random suffix.
+      const salesforceSecret = secretsmanager.Secret.fromSecretPartialArn(
         this,
         "SalesforceSecret",
         salesforceConnectedAppClientSecretArn,
@@ -130,29 +134,27 @@ export class IngestionStack extends cdk.Stack {
             connectorProfileCredentials: {
               salesforce: {
                 clientCredentialsArn: salesforceSecret.secretArn,
-                oAuth2GrantType: "CLIENT_CREDENTIALS",
+                jwtToken: salesforceJwtToken,
+                oAuth2GrantType: "JWT_BEARER",
               },
             },
           },
         },
       );
 
-      // Define CDC objects to sync
+      // Define CDC objects to sync (POC scope: 5 Ascendix CRE objects)
       const cdcObjects = [
-        "AccountChangeEvent",
-        "OpportunityChangeEvent",
-        "CaseChangeEvent",
-        "NoteChangeEvent",
-        "Property__ChangeEvent",
-        "Lease__ChangeEvent",
-        "Contract__ChangeEvent",
+        "ascendix__Property__ChangeEvent",
+        "ascendix__Lease__ChangeEvent",
+        "ascendix__Availability__ChangeEvent",
+        "ascendix__Deal__ChangeEvent",
+        "ascendix__Sale__ChangeEvent",
       ];
 
       // Create AppFlow flow for each CDC object
       cdcObjects.forEach((objectName) => {
-        const sobjectName = objectName
-          .replace("ChangeEvent", "")
-          .replace("__", "__c");
+        // ascendix__Property__ChangeEvent → ascendix__Property__c
+        const sobjectName = objectName.replace("ChangeEvent", "c");
 
         new appflow.CfnFlow(this, `CDCFlow${objectName}`, {
           flowName: `salesforce-ai-search-cdc-${sobjectName.toLowerCase()}`,

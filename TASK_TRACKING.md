@@ -98,16 +98,17 @@ Phase 4 (Production Cutover) and Phase 5 (Polish) from the spec will be added af
 
 ## Current Project Path
 
-Phase 2 closing path — code tasks 2.4.1, 2.4.2, 2.5.1 merged to main in
-`1f7dd3f` (PR #4, 2026-03-16). Remaining deploy/validate tasks:
+Phase 2 completed 2026-03-17 (`c489b03`). All subtasks closed:
 
-1. `2.4` (in_progress) — **2.4.3** deploy AppFlow flows, **2.4.4** validate
-   real CDC delivery. Pre-deploy: create SSM parameters
-   `/salesforce/instance_url` (String) and `/salesforce/appflow_jwt_token`
-   (SecureString).
-2. `2.5` (in_progress) — **2.5.2** deploy /query Lambda, **2.5.3** validate
-   LWC observability after CDC sync.
-3. `3.1` Begin the side-by-side validation gate (blocked on 2.4 + 2.5).
+- `2.4.3` AppFlow CDC flows deployed and activated
+- `2.4.4` Real Salesforce CDC delivery validated end-to-end
+- `2.5.2` Callout config repointed to live /query surface, hardcoded key removed
+- `2.5.3` CREATE/UPDATE/DELETE observed via /query Apex callout within 5-min SLA
+
+**Note**: 2.5.3 validated via Apex controller callout, not LWC UI rendering.
+LWC UI smoke test deferred to Phase 3 UAT.
+
+Phase 3 (Validation Gate) is now unblocked — starting with `3.1`.
 
 This project already has legacy ingestion infrastructure. For new connector
 work, treat `AppFlow -> S3 -> EventBridge -> cdc_sync` as the primary CDC path.

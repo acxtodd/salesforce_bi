@@ -920,7 +920,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T12:10:04.313617+00:00",
-          "updatedAt": "2026-03-17T18:56:25.915556+00:00",
+          "updatedAt": "2026-03-17T19:11:32.922465+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -936,6 +936,10 @@
             {
               "timestamp": "2026-03-17T18:56:25.915558+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-17T19:11:32.922258+00:00",
+              "note": "QA note: 2.5.3 validated via Apex controller callout path, not LWC UI rendering. The parent 2.5 description says 'observable from the Salesforce LWC' — this is partially met (backend proves data flow) but LWC UI rendering is not yet validated. Deferred to Phase 3 UAT as a manual smoke test."
             }
           ],
           "description": "After real AppFlow delivery is active, validate the user-visible path by confirming that CREATE, UPDATE, and DELETE propagate through the deployed /query endpoint and are observable from the Salesforce LWC, not just Turbopuffer direct searches.",

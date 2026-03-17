@@ -174,9 +174,9 @@ python3 scripts/task_manager.py phases
 | Phase | Name | Status |
 |-------|------|--------|
 | 0 | Foundations | Completed |
-| 1 | Intelligence Layer | In progress (`1.3` live validation still open) |
-| 2 | Salesforce Integration | In progress (code merged; `2.4.3`/`2.4.4` deploy + `2.5.2`/`2.5.3` validate remain) |
-| 3 | Validation Gate | Pending |
+| 1 | Intelligence Layer | Completed |
+| 2 | Salesforce Integration | Completed (CDC E2E validated 2026-03-17; LWC UI smoke test deferred to Phase 3 UAT) |
+| 3 | Validation Gate | In progress |
 
 See [`TASK_TRACKING.md`](TASK_TRACKING.md) for task management commands and workflow.
 

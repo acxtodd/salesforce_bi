@@ -1047,7 +1047,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T13:50:31.419003+00:00",
-          "updatedAt": "2026-03-17T18:56:25.863091+00:00",
+          "updatedAt": "2026-03-17T19:14:45.582123+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -1063,6 +1063,10 @@
             {
               "timestamp": "2026-03-17T18:56:25.863094+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-17T19:14:45.581923+00:00",
+              "note": "Closed at d72fa99. QA PASS with two accepted gaps: (1) LWC UI rendering not validated — deferred to Phase 3 UAT, documented on parent 2.5. (2) AppFlow flows required reactivation after prior CDK deploy — documented in task notes. All docs (README.md, TASK_TRACKING.md) aligned with Phase 2 complete state."
             }
           ],
           "description": "After real CDC is active and the /query path is deployed, prove that CREATE, UPDATE, and DELETE are observable through the Salesforce UI or Apex-controller path within the Phase 2 SLA.",

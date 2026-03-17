@@ -814,17 +814,29 @@
         {
           "id": "2.4.3",
           "title": "Deploy IngestionStack and verify AppFlow resources in AWS",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T13:48:30.633842+00:00",
-          "updatedAt": "2026-03-16T13:51:56.369312+00:00",
-          "files_modified": [],
+          "updatedAt": "2026-03-17T14:27:36.864389+00:00",
+          "files_modified": [
+            "bin/app.ts",
+            "lib/ingestion-stack.ts",
+            "scripts/mint_jwt.py"
+          ],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [
             {
               "timestamp": "2026-03-16T13:51:56.369127+00:00",
               "note": "Live AWS baseline on 2026-03-16 before fix: aws appflow list-flows --region us-west-2 returned [], and SalesforceAISearch-Ingestion-dev had no AWS::AppFlow resources. Use those commands as the before/after verification check."
+            },
+            {
+              "timestamp": "2026-03-17T14:12:56.407175+00:00",
+              "note": "Deployed 2026-03-17: 1 ConnectorProfile (salesforce-ai-search-cdc-profile, JWT_BEARER, sandbox) + 5 CDC flows (Property/Lease/Availability/Deal/Sale), all Active in us-west-2. Fixes applied during deploy: (1) External Client App needed JWT Bearer flow enabled + trackit-jwt.crt certificate uploaded, (2) dedicated appflow-creds secret with resource policy + CMK encryption for AppFlow access, (3) isSandboxEnvironment=true, (4) --method=direct to bypass Early Validation, (5) removed invalid prefixFormat/Filter task, (6) added GetBucketAcl to S3 policy, (7) explicit flow->profile dependency."
+            },
+            {
+              "timestamp": "2026-03-17T14:13:02.147256+00:00",
+              "note": "Task completed"
             }
           ],
           "description": "Deploy the updated ingestion stack and confirm that the Salesforce connector profile and CDC flows exist and are active in us-west-2 for the sandbox org.",
@@ -838,7 +850,8 @@
             "2.4.1",
             "2.4.2"
           ],
-          "gate_criteria": "Do not deploy until prop wiring and object-scope alignment are both complete."
+          "gate_criteria": "Do not deploy until prop wiring and object-scope alignment are both complete.",
+          "completedAt": "2026-03-17T14:13:02.147054+00:00"
         },
         {
           "id": "2.4.4",

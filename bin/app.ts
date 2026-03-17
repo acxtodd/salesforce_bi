@@ -65,24 +65,33 @@ const searchStack = new SearchStack(app, `${stackPrefix}-Search-${environment}`,
 
 searchStack.addDependency(dataStack);
 
-// Resolve Salesforce credentials at deploy time via CloudFormation dynamic references.
-// valueFromLookup is wrong here — it substitutes dummy placeholders at synth time.
-// Pre-deploy setup:
-//   aws ssm put-parameter --name /salesforce/instance_url --type String --value "https://…"
-//   aws ssm put-parameter --name /salesforce/appflow_jwt_token --type SecureString --value "<jwt>"
-//   aws secretsmanager create-secret --name salesforce-ai-search/salesforce-connected-app …
-const salesforceInstanceUrl = new cdk.CfnDynamicReference(
-  cdk.CfnDynamicReferenceService.SSM,
-  '/salesforce/instance_url',
-).toString();
-const salesforceSecret = secretsmanager.Secret.fromSecretNameV2(
-  dataStack, 'SalesforceConnectedAppSecret',
-  'salesforce-ai-search/salesforce-connected-app',
-);
-const salesforceJwtToken = new cdk.CfnDynamicReference(
-  cdk.CfnDynamicReferenceService.SSM_SECURE,
-  '/salesforce/appflow_jwt_token',
-).toString();
+// AppFlow ConnectorProfile Early Validation rejects SSM dynamic references and
+// partial secret ARNs. All three values must be passed as CDK context at deploy
+// time so they are literal in the synthesized template:
+//
+//   npx cdk deploy SalesforceAISearch-Ingestion-dev --method=direct \
+//     -c salesforceInstanceUrl="$(aws ssm get-parameter --name /salesforce/instance_url --region us-west-2 --query Parameter.Value --output text)" \
+//     -c salesforceSecretArn="$(aws secretsmanager describe-secret --secret-id salesforce-ai-search/appflow-creds --region us-west-2 --query ARN --output text)" \
+//     -c salesforceJwtToken="$(python3 scripts/mint_jwt.py)"
+const salesforceInstanceUrl = app.node.tryGetContext('salesforceInstanceUrl') || '';
+const salesforceSecretArn = app.node.tryGetContext('salesforceSecretArn') || '';
+const salesforceJwtToken = app.node.tryGetContext('salesforceJwtToken') || '';
+
+// Fail fast: if any AppFlow context value is provided, all three are required.
+const appflowContextValues = [salesforceInstanceUrl, salesforceSecretArn, salesforceJwtToken];
+const appflowContextProvided = appflowContextValues.filter(Boolean).length;
+if (appflowContextProvided > 0 && appflowContextProvided < 3) {
+  throw new Error(
+    'Partial AppFlow context: all three of salesforceInstanceUrl, salesforceSecretArn, ' +
+    'and salesforceJwtToken must be provided via -c flags. See deploy recipe above.',
+  );
+}
+
+const salesforceSecret = salesforceSecretArn
+  ? secretsmanager.Secret.fromSecretCompleteArn(
+      dataStack, 'SalesforceConnectedAppSecret', salesforceSecretArn,
+    )
+  : undefined;
 
 // Ingestion Stack - Lambda functions, Step Functions, DLQ
 const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${environment}`, {
@@ -96,8 +105,8 @@ const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${envir
   dataSourceId: searchStack.dataSource.attrDataSourceId,
   // AppFlow Salesforce CDC credentials (JWT_BEARER flow)
   salesforceInstanceUrl,
-  salesforceConnectedAppClientId: 'appflow-gate',  // truthiness gate only
-  salesforceConnectedAppClientSecretArn: salesforceSecret.secretArn,
+  salesforceConnectedAppClientId: salesforceSecretArn ? 'appflow-gate' : undefined,  // truthiness gate only
+  salesforceConnectedAppClientSecretArn: salesforceSecret?.secretArn,
   salesforceJwtToken,
   // Phase 3: Graph Enhancement tables
   graphNodesTable: dataStack.graphNodesTable,

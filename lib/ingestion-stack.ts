@@ -129,6 +129,7 @@ export class IngestionStack extends cdk.Stack {
             connectorProfileProperties: {
               salesforce: {
                 instanceUrl: salesforceInstanceUrl,
+                isSandboxEnvironment: true,
               },
             },
             connectorProfileCredentials: {
@@ -156,7 +157,7 @@ export class IngestionStack extends cdk.Stack {
         // ascendix__Property__ChangeEvent → ascendix__Property__c
         const sobjectName = objectName.replace("ChangeEvent", "c");
 
-        new appflow.CfnFlow(this, `CDCFlow${objectName}`, {
+        const flow = new appflow.CfnFlow(this, `CDCFlow${objectName}`, {
           flowName: `salesforce-ai-search-cdc-${sobjectName.toLowerCase()}`,
           triggerConfig: {
             triggerType: "Event",
@@ -183,23 +184,12 @@ export class IngestionStack extends cdk.Stack {
                     aggregationConfig: {
                       aggregationType: "None",
                     },
-                    prefixConfig: {
-                      prefixType: "PATH_AND_FILENAME",
-                      prefixFormat: "YEAR/MONTH/DAY/HOUR",
-                    },
                   },
                 },
               },
             },
           ],
           tasks: [
-            {
-              taskType: "Filter",
-              connectorOperator: {
-                salesforce: "PROJECTION",
-              },
-              sourceFields: [],
-            },
             {
               taskType: "Map_all",
               connectorOperator: {
@@ -215,15 +205,21 @@ export class IngestionStack extends cdk.Stack {
             },
           ],
         });
+        // Flows must wait for the connector profile to be created
+        flow.addDependency(connectorProfile);
       });
 
-      // Grant AppFlow permissions to write to CDC bucket
+      // Grant AppFlow permissions to write to CDC bucket.
+      // AppFlow requires PutObject + PutObjectAcl on objects AND GetBucketAcl on the bucket.
       this.cdcBucket.addToResourcePolicy(
         new iam.PolicyStatement({
           effect: iam.Effect.ALLOW,
           principals: [new iam.ServicePrincipal("appflow.amazonaws.com")],
-          actions: ["s3:PutObject", "s3:PutObjectAcl"],
-          resources: [`${this.cdcBucket.bucketArn}/*`],
+          actions: ["s3:PutObject", "s3:PutObjectAcl", "s3:GetBucketAcl"],
+          resources: [
+            this.cdcBucket.bucketArn,
+            `${this.cdcBucket.bucketArn}/*`,
+          ],
         }),
       );
     }

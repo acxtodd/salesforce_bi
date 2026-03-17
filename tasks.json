@@ -532,7 +532,7 @@
       "phase": 2,
       "name": "Salesforce Integration",
       "description": "LWC adaptation, Apex controller update, CDC sync Lambda, end-to-end testing.",
-      "status": "in_progress",
+      "status": "completed",
       "tasks": [
         {
           "id": "2.1",
@@ -917,10 +917,10 @@
         {
           "id": "2.5",
           "title": "Verify live LWC query observability after CDC sync",
-          "status": "in_progress",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T12:10:04.313617+00:00",
-          "updatedAt": "2026-03-16T20:39:42.683302+00:00",
+          "updatedAt": "2026-03-17T18:56:25.915556+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -932,6 +932,10 @@
             {
               "timestamp": "2026-03-16T20:39:42.683453+00:00",
               "note": "2.5.1 code-complete in 1f7dd3f (PR #4). /query Lambda with SSE streaming + API key auth ready for deploy. Remaining: 2.5.2 deploy + 2.5.3 LWC observability validation."
+            },
+            {
+              "timestamp": "2026-03-17T18:56:25.915558+00:00",
+              "note": "Task completed"
             }
           ],
           "description": "After real AppFlow delivery is active, validate the user-visible path by confirming that CREATE, UPDATE, and DELETE propagate through the deployed /query endpoint and are observable from the Salesforce LWC, not just Turbopuffer direct searches.",
@@ -952,7 +956,8 @@
             "lib/api-stack.ts",
             "lambda/query/index.py"
           ],
-          "startedAt": "2026-03-16T20:39:42.683450+00:00"
+          "startedAt": "2026-03-16T20:39:42.683450+00:00",
+          "completedAt": "2026-03-17T18:56:25.915365+00:00"
         },
         {
           "id": "2.5.1",
@@ -1035,10 +1040,10 @@
         {
           "id": "2.5.3",
           "title": "Run Salesforce UI and Apex smoke validation through /query",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T13:50:31.419003+00:00",
-          "updatedAt": "2026-03-16T13:52:25.897542+00:00",
+          "updatedAt": "2026-03-17T18:56:25.863091+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -1046,6 +1051,14 @@
             {
               "timestamp": "2026-03-16T13:52:25.897367+00:00",
               "note": "Do not validate through direct Turbopuffer queries. Use the Salesforce UI or Apex-controller path and record the exact query text, timing, and observed result for CREATE, UPDATE, and DELETE after real AppFlow delivery is active."
+            },
+            {
+              "timestamp": "2026-03-17T18:56:20.492022+00:00",
+              "note": "2026-03-17 E2E validation PASS — all three CDC operations observed through /query Apex callout:\n\nCREATE: Record a0adl000009hYEUAA2 ('E2E-2.5.3 Test Property') created at 18:52:58 UTC, queryable by 18:53:49 (51s). Query returned correct name, address (999 Validation Ave Suite 100, Dallas TX), and record ID.\n\nUPDATE: Address changed to 1234 Updated Blvd, Fort Worth at 18:54:13 UTC. CDC synced by 18:54:24 (11s). Query returned updated address; old address gone.\n\nDELETE: Record deleted at 18:55:29 UTC. CDC synced by 18:55:31 (2s). Query at 18:55:56 returned 'I didn't find an exact match' — record ID absent from results.\n\nAll within 5-minute SLA. CDC pipeline: Salesforce CDC -> AppFlow (Event) -> S3 -> EventBridge -> cdc_sync Lambda -> Turbopuffer -> /query Lambda. Note: AppFlow flows were reactivated during this session after accidental deletion by a prior CDK deploy without AppFlow context."
+            },
+            {
+              "timestamp": "2026-03-17T18:56:25.863094+00:00",
+              "note": "Task completed"
             }
           ],
           "description": "After real CDC is active and the /query path is deployed, prove that CREATE, UPDATE, and DELETE are observable through the Salesforce UI or Apex-controller path within the Phase 2 SLA.",
@@ -1060,7 +1073,9 @@
             "2.4.4",
             "2.5.2"
           ],
-          "gate_criteria": "Only run the user-visible smoke after both the real AppFlow path and the live /query Salesforce path are working."
+          "gate_criteria": "Only run the user-visible smoke after both the real AppFlow path and the live /query Salesforce path are working.",
+          "startedAt": "2026-03-17T18:46:51.144964+00:00",
+          "completedAt": "2026-03-17T18:56:25.862912+00:00"
         }
       ]
     },

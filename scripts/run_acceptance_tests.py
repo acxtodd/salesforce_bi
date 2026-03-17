@@ -380,6 +380,26 @@ def run_acceptance_tests(
                 "answer_snippet": r.answer_snippet,
             })
 
+    # --- Per-category latency breakdown ---
+    category_latency: dict[str, dict[str, float]] = {}
+    cats: dict[str, list[float]] = {}
+    for r in results:
+        if r.latency_s > 0:
+            cats.setdefault(r.category, []).append(r.latency_s)
+    for cat, lats in sorted(cats.items()):
+        entry: dict[str, float] = {
+            "count": len(lats),
+            "min": round(min(lats), 2),
+            "max": round(max(lats), 2),
+            "mean": round(statistics.mean(lats), 2),
+            "median": round(statistics.median(lats), 2),
+        }
+        if len(lats) >= 2:
+            s = sorted(lats)
+            idx = min(int(len(s) * 0.95), len(s) - 1)
+            entry["p95"] = round(s[idx], 2)
+        category_latency[cat] = entry
+
     summary = {
         "pass_rate": round(pass_rate, 4),
         "total": total,
@@ -388,6 +408,7 @@ def run_acceptance_tests(
         "skipped": skipped,
         "results": [asdict(r) for r in results],
         "latency_stats": latency_stats,
+        "category_latency": category_latency,
         "failures": failures,
     }
 
@@ -435,7 +456,15 @@ def format_report(summary: dict) -> str:
     lat = summary.get("latency_stats", {})
     if lat:
         parts = [f"{k}={v}s" for k, v in lat.items()]
-        lines.append(f"  Latency: {', '.join(parts)}")
+        lines.append(f"  Latency (overall): {', '.join(parts)}")
+
+    cat_lat = summary.get("category_latency", {})
+    if cat_lat:
+        lines.append("")
+        lines.append("  Latency by category:")
+        for cat, stats in cat_lat.items():
+            parts = [f"{k}={v}" for k, v in stats.items()]
+            lines.append(f"    {cat:<16} {', '.join(parts)}")
 
     lines.append("")
 

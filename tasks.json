@@ -1095,28 +1095,42 @@
       "tasks": [
         {
           "id": "3.1",
-          "title": "Run full acceptance test suite side-by-side",
-          "description": "Execute all existing acceptance test queries against both the current system and the new system. Record pass/fail, latency, and answer quality for each.",
-          "status": "pending",
-          "owner": "",
+          "title": "Run acceptance test suite and validate against baseline",
+          "description": "Run the full acceptance test suite against the current Turbopuffer-backed system (in-process via QueryHandler + TurbopufferBackend). Compare pass rate and per-category latency against the March 15 baseline (results/acceptance_test_results.json, 13/15 = 86.67%). This is a one-system validation gate — the repo has no side-by-side runner for the legacy /retrieve path, and building one is not justified given the legacy path is being sunset. Also run validate_data.py for namespace integrity. Note: this tests backend quality in-process, not the deployed /query Lambda surface (which was validated in 2.5.2/2.5.3).",
+          "status": "in_progress",
+          "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T22:28:30.772738+00:00",
-          "startedAt": null,
+          "updatedAt": "2026-03-17T20:18:29.344564+00:00",
+          "startedAt": "2026-03-17T19:35:17.210656+00:00",
           "completedAt": null,
           "depends_on": [
-            "2.3"
+            "2.4.4",
+            "2.5.3"
           ],
           "acceptance_criteria": [
-            "Run scripts/validate_data.py against both old and new systems",
-            "Run full acceptance test query set (from scripts/acceptance_tests/) against both systems",
-            "Pass rate comparison documented (new system target: ≥83%)",
-            "Latency comparison documented per query type (simple, cross-object, aggregation)",
-            "Results captured in results/ directory for audit"
+            "Run scripts/validate_data.py against the Turbopuffer namespace — all checks PASS (namespace exists, object counts, system fields, metadata filter, BM25 search, hybrid search, warm latency)",
+            "Run scripts/run_acceptance_tests.py (in-process via QueryHandler + TurbopufferBackend) — all 15 tests execute, results written to results/",
+            "Pass rate >= 83% (>= 13/15). Document any regressions vs the March 15 historical baseline (13/15 = 86.67%, same in-process runner, same test definitions)",
+            "Per-category latency breakdown documented: simple_search, cross_object, aggregation, comparison, semantic — with min/max/median/p95 per category",
+            "Results captured in results/ directory with timestamped filenames for audit trail"
           ],
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": []
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-17T19:35:17.210981+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-17T20:10:09.204001+00:00",
+              "note": "2026-03-17 validation-gate run (one-system, in-process) executed against active namespace org_00Ddl000003yx57EAA.\n\nCommands run:\n1. python3 scripts/validate_data.py --namespace org_00Ddl000003yx57EAA --config denorm_config.yaml > results/validate_data_20260317T200533Z.txt 2>&1\n2. python3 scripts/run_acceptance_tests.py --output results/acceptance_test_results_20260317T200546Z.json > results/acceptance_test_report_20260317T200546Z.txt 2>&1\n\nArtifacts:\n- results/validate_data_20260317T200533Z.txt\n- results/acceptance_test_results_20260317T200546Z.json\n- results/acceptance_test_report_20260317T200546Z.txt\n- results/task_3_1_comparison_20260317T200546Z.md\n\nvalidate_data result: FAIL (1 passed / 7 failed). Failures: namespace exists, object type counts (missing deal,sale), system fields, metadata filter (closedate attr missing), parent fields (market_name attr missing), hybrid search (422 rank input error), warm latency (p50=154ms p95=237ms vs <50ms target).\n\nAcceptance result: 12/15 passed = 80.00% vs March 15 baseline 13/15 = 86.67% (delta -6.67 pts). Fresh failed tests: search-03, search-05, nlp-01. Baseline failed tests: search-03, search-05.\n\nOverall latency:\n- fresh: min=5.95s max=18.44s mean=12.19s median=12.34s p95=18.44s\n- baseline: min=5.65s max=16.51s mean=10.63s median=9.56s p95=16.51s\n\nPer-category latency (fresh vs baseline):\n- simple_search: mean 14.33s vs 13.16s, median 14.58s vs 13.36s, p95 16.69s vs 16.51s\n- cross_object: mean 13.91s vs 10.22s, median 12.34s vs 9.52s, p95 18.44s vs 12.50s\n- aggregation: mean 8.07s vs 7.04s, median 8.24s vs 6.80s, p95 8.42s vs 8.68s\n- comparison: mean 7.32s vs 6.97s, median 7.32s vs 6.97s, p95 8.70s vs 7.49s\n- semantic: mean 15.29s vs 13.93s, median 15.29s vs 13.93s, p95 16.73s vs 14.15s\n\nConclusion: Task 3.1 evidence is now captured, but the task is NOT complete. Acceptance criterion 1 failed (`validate_data.py`), criterion 3 failed (80% < 83%), and the new run introduces one extra failing test (nlp-01) relative to the March 15 baseline. Do not mark complete until namespace/schema validation issues and latency regressions are addressed and the suite is rerun."
+            },
+            {
+              "timestamp": "2026-03-17T20:18:29.344392+00:00",
+              "note": "End-of-day handoff for 2026-03-17:\n\nStatus: keep 3.1 IN_PROGRESS. Do not complete.\n\nWhat was done today:\n- Confirmed Task 3.1 scope is the rewritten one-system validation gate, not a side-by-side old/new comparison.\n- Ran validate_data.py against org_00Ddl000003yx57EAA and captured artifact results/validate_data_20260317T200533Z.txt.\n- Ran the in-process acceptance harness and captured artifacts results/acceptance_test_results_20260317T200546Z.json and results/acceptance_test_report_20260317T200546Z.txt.\n- Created comparison summary results/task_3_1_comparison_20260317T200546Z.md.\n\nCurrent outcome:\n- Acceptance run = 12/15 passed (80.00%), below the 83% gate and below the March 15 baseline of 13/15 (86.67%).\n- Fresh failing tests: search-03, search-05, nlp-01.\n- All three fresh failures are latency-only (latency_under), not answer-quality/content failures.\n- validate_data.py reported 7 failures, but its output is internally inconsistent: it reported \"Namespace empty or does not exist\" while also returning a passing BM25 search with 10 results in the same run. Treat this as requiring validator triage, not as conclusive proof of namespace corruption.\n\nImportant reproducibility note:\n- The per-category latency reporting used in today's note/comparison depends on an uncommitted local change in scripts/run_acceptance_tests.py. Before the next gate rerun, either commit that minimal reporting change or discard it and stop relying on category-latency output from this run.\n\nRecommended next steps for the next agent:\n1. Resolve reproducibility: commit or discard the local scripts/run_acceptance_tests.py category-latency patch.\n2. Triage scripts/validate_data.py failures into validator/schema drift vs real namespace/data issues.\n3. Investigate latency regressions for search-03, search-05, and nlp-01.\n4. Rerun Task 3.1 only after the validator/reproducibility issues are settled.\n\nThis session is complete for today; leave Task 3.1 open for continuation tomorrow."
+            }
+          ]
         },
         {
           "id": "3.2",

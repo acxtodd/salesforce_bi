@@ -1,8 +1,8 @@
 public with sharing class AscendixAISearchController {
     
     private static final String NAMED_CREDENTIAL = 'callout:Ascendix_RAG_API';
+    private static final String QUERY_CREDENTIAL = 'callout:Ascendix_RAG_Query_API';
     private static final Integer TIMEOUT_MS = 120000; // 120 seconds
-    private static final String API_KEY = 'M3L9GKMhRs2j5e9KvD3Et6upEWtHUQHy7SgrvCSQ'; // POC Workaround
     
     /**
      * Call the /answer endpoint with streaming support
@@ -19,10 +19,10 @@ public with sharing class AscendixAISearchController {
             newPayload.put('session_id', (String) requestBody.get('sessionId'));
 
             HttpRequest req = new HttpRequest();
-            req.setEndpoint(NAMED_CREDENTIAL + '/query');
+            req.setEndpoint(QUERY_CREDENTIAL + '/query');
             req.setMethod('POST');
             req.setHeader('Content-Type', 'application/json');
-            req.setHeader('x-api-key', API_KEY); // Manual header for POC
+            req.setHeader('x-api-key', '{!$Credential.Ascendix_RAG_Query_API.ApiKey}');
             req.setTimeout(TIMEOUT_MS);
             req.setBody(JSON.serialize(newPayload));
             
@@ -152,13 +152,13 @@ public with sharing class AscendixAISearchController {
             req.setEndpoint(NAMED_CREDENTIAL + '/retrieve');
             req.setMethod('POST');
             req.setHeader('Content-Type', 'application/json');
-            req.setHeader('x-api-key', API_KEY); // Manual header for POC
+            req.setHeader('x-api-key', '{!$Credential.Ascendix_RAG_Query_API.ApiKey}');
             req.setTimeout(TIMEOUT_MS);
             req.setBody(JSON.serialize(requestBody));
-            
+
             Http http = new Http();
             HttpResponse res = http.send(req);
-            
+
             if (res.getStatusCode() == 200) {
                 Map<String, Object> responseData = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
                 return responseData;
@@ -166,7 +166,7 @@ public with sharing class AscendixAISearchController {
                 handleErrorResponse(res);
                 return null;
             }
-            
+
         } catch (Exception e) {
             System.debug('Error in callRetrieveEndpoint: ' + e.getMessage());
             if (e instanceof AuraHandledException) {
@@ -194,13 +194,13 @@ public with sharing class AscendixAISearchController {
             req.setEndpoint(NAMED_CREDENTIAL + '/action');
             req.setMethod('POST');
             req.setHeader('Content-Type', 'application/json');
-            req.setHeader('x-api-key', API_KEY); // Manual header for POC
+            req.setHeader('x-api-key', '{!$Credential.Ascendix_RAG_Query_API.ApiKey}');
             req.setTimeout(TIMEOUT_MS);
             req.setBody(JSON.serialize(requestBody));
-            
+
             Http http = new Http();
             HttpResponse res = http.send(req);
-            
+
             if (res.getStatusCode() == 200) {
                 Map<String, Object> responseData = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
                 return responseData;
@@ -208,7 +208,7 @@ public with sharing class AscendixAISearchController {
                 handleErrorResponse(res);
                 return null;
             }
-            
+
         } catch (Exception e) {
             System.debug('Error in callActionEndpoint: ' + e.getMessage());
             if (e instanceof AuraHandledException) {

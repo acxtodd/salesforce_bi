@@ -77,16 +77,34 @@ private class AscendixAISearchControllerTest {
     
     private class AISearchMock implements HttpCalloutMock {
         private Integer statusCode;
-        
+
         public AISearchMock(Integer statusCode) {
             this.statusCode = statusCode;
         }
-        
+
         public HttpResponse respond(HttpRequest req) {
             HttpResponse res = new HttpResponse();
             res.setStatusCode(statusCode);
+
+            String endpoint = req.getEndpoint();
+            String apiKeyHeader = req.getHeader('x-api-key');
+
+            // Assert no hardcoded API key in any callout
+            System.assertNotEquals('M3L9GKMhRs2j5e9KvD3Et6upEWtHUQHy7SgrvCSQ', apiKeyHeader,
+                'API key must not be hardcoded — use External Credential merge field');
+
+            // Assert /query uses the Query Named Credential
+            if (endpoint != null && endpoint.contains('/query')) {
+                System.assert(endpoint.startsWith('callout:Ascendix_RAG_Query_API'),
+                    'callAnswerEndpoint must use QUERY_CREDENTIAL, got: ' + endpoint);
+            }
+            // Assert /retrieve and /action use the original Named Credential
+            if (endpoint != null && (endpoint.contains('/retrieve') || endpoint.contains('/action'))) {
+                System.assert(endpoint.startsWith('callout:Ascendix_RAG_API'),
+                    'retrieve/action must use NAMED_CREDENTIAL, got: ' + endpoint);
+            }
+
             if (statusCode == 200) {
-                String endpoint = req.getEndpoint();
                 if (endpoint != null && endpoint.contains('/query')) {
                     // Return SSE format matching new /query Lambda contract
                     res.setHeader('Content-Type', 'text/event-stream');

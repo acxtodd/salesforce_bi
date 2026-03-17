@@ -222,9 +222,9 @@ export class ApiStack extends cdk.Stack {
             `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
             // Claude models (inference profiles)
             `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
-            // Foundation models (for direct invocation)
-            `arn:aws:bedrock:${this.region}::foundation-model/anthropic.claude-*`,
-            `arn:aws:bedrock:${this.region}::foundation-model/us.anthropic.claude-*`,
+            // Foundation models (for direct invocation — use * region for cross-region inference profiles)
+            `arn:aws:bedrock:*::foundation-model/anthropic.claude-*`,
+            `arn:aws:bedrock:*::foundation-model/us.anthropic.claude-*`,
           ],
         }),
       );

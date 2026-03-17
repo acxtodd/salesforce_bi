@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Grants access to the Ascendix RAG Query API External Credential. Required for all AI Search callouts (/query, /retrieve, /action) — all three endpoints authenticate via this credential.</description>
+    <externalCredentialPrincipalAccesses>
+        <enabled>true</enabled>
+        <externalCredentialPrincipal>Ascendix_RAG_Query_API-DefaultPrincipal</externalCredentialPrincipal>
+    </externalCredentialPrincipalAccesses>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>AI Search Query API</label>
+</PermissionSet>

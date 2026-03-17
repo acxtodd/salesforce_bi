@@ -699,10 +699,10 @@
         {
           "id": "2.4",
           "title": "Activate real Salesforce CDC to AppFlow to S3 delivery",
-          "status": "in_progress",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T12:09:39.111074+00:00",
-          "updatedAt": "2026-03-16T20:39:38.402288+00:00",
+          "updatedAt": "2026-03-17T16:31:23.454952+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -726,6 +726,10 @@
             {
               "timestamp": "2026-03-16T20:39:38.402456+00:00",
               "note": "2.4.1 and 2.4.2 code-complete in 1f7dd3f (PR #4). Remaining: 2.4.3 deploy AppFlow flows + 2.4.4 validate real CDC delivery."
+            },
+            {
+              "timestamp": "2026-03-17T16:31:23.454956+00:00",
+              "note": "Task completed"
             }
           ],
           "description": "Finish the upstream source leg for the new connector by wiring the existing Salesforce Connected App credentials and instance URL into the ingestion CDK/app config, creating active AppFlow CDC flows in us-west-2, and proving that a normal Salesforce record change lands in the CDC S3 bucket without synthetic test writes.",
@@ -742,7 +746,8 @@
             "lambda/cdc_sync/index.py",
             "denorm_config.yaml"
           ],
-          "startedAt": "2026-03-16T20:39:38.402453+00:00"
+          "startedAt": "2026-03-16T20:39:38.402453+00:00",
+          "completedAt": "2026-03-17T16:31:23.454799+00:00"
         },
         {
           "id": "2.4.1",
@@ -859,7 +864,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T13:48:58.922513+00:00",
-          "updatedAt": "2026-03-17T16:18:55.984256+00:00",
+          "updatedAt": "2026-03-17T16:29:51.580758+00:00",
           "files_modified": [
             "scripts/integration_test_e2e.py",
             "lambda/cdc_sync/index.py",
@@ -886,6 +891,14 @@
             {
               "timestamp": "2026-03-17T16:18:30.289997+00:00",
               "note": "files_modified: scripts/integration_test_e2e.py, lambda/cdc_sync/index.py, tests/test_e2e_appflow_mode.py, results/e2e_test_results.json, lib/ingestion-stack.ts, lib/api-stack.ts"
+            },
+            {
+              "timestamp": "2026-03-17T16:25:36.269346+00:00",
+              "note": "Committed 8f230d8 and pushed. CDK stacks now resolve TURBOPUFFER_API_KEY from Secrets Manager. Lambda code deployed manually during validation; CDK redeploy needed to make infra match source."
+            },
+            {
+              "timestamp": "2026-03-17T16:29:51.580588+00:00",
+              "note": "CDK deploy completed. All 6 stacks deployed. CDC sync + Query Lambdas now receive TURBOPUFFER_API_KEY from Secrets Manager (salesforce-ai-search/turbopuffer-api-key), no longer from process.env. Infra matches source."
             }
           ],
           "description": "Prove that a normal Salesforce record change lands in the CDC bucket through AppFlow and rerun the Phase 2 end-to-end validation on the real upstream path.",
@@ -973,10 +986,10 @@
         {
           "id": "2.5.2",
           "title": "Repoint Salesforce callout config to the live /query surface",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T13:49:56.901328+00:00",
-          "updatedAt": "2026-03-16T13:52:22.331321+00:00",
+          "updatedAt": "2026-03-17T18:45:24.430470+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -984,6 +997,26 @@
             {
               "timestamp": "2026-03-16T13:52:22.331138+00:00",
               "note": "Current mismatch from QA probe on 2026-03-16: AscendixAISearchController calls NAMED_CREDENTIAL + '/query', but the repo Named Credential points to the old answer Lambda Function URL. Function URL /query returned 404 Not Found, while API Gateway /prod/query returned 403 MissingAuthenticationToken because no /query route is deployed."
+            },
+            {
+              "timestamp": "2026-03-17T17:48:48.288693+00:00",
+              "note": "2026-03-17 Validation PASS: callout:Ascendix_RAG_Query_API/query → 200 OK, SSE response (text/event-stream), 1621-char answer about Dallas properties, 15 citations in {recordId,title,id} shape. First citation: recordId=a0afk000000PvCXAA0, title=Hal Property. Merge field auth via External Credential (no hardcoded key in callAnswerEndpoint). Also fixed Bedrock IAM cross-region policy (us-east-1 foundation model access for cross-region inference profiles)."
+            },
+            {
+              "timestamp": "2026-03-17T17:48:55.219494+00:00",
+              "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-17T17:59:08.938376+00:00",
+              "note": "QA follow-up: (1) Removed hardcoded API_KEY constant entirely — all 3 methods now use merge field auth. Zero key literals remain in controller. (2) Updated test mock with assertions: no hardcoded key, correct Named Credential per endpoint. All 6 tests pass. (3) Live validation of /retrieve and /action with merge field: both pass auth (not 401)."
+            },
+            {
+              "timestamp": "2026-03-17T18:43:03.596750+00:00",
+              "note": "Residual risk (accepted): /retrieve and /action now share the Ascendix_RAG_Query_API External Credential with /query for auth. This is intentional — all three endpoints use the same API key, one credential is correct. Consequence: the AI_Search_Query_API permission set must be assigned to all AI Search users (not just /query users). Perm set description updated to reflect this. Credential permission checks are platform-level and cannot be tested in Apex unit tests with mocks — validated live as admin. Non-admin validation deferred until UAT."
+            },
+            {
+              "timestamp": "2026-03-17T18:45:24.430263+00:00",
+              "note": "Closed. Commit 696920a. QA PASS: hardcoded secret removed, credential wiring tested, live E2E validated (200 OK, SSE, 15 citations). Residual risk on /retrieve+/action perm-set coupling accepted and documented."
             }
           ],
           "description": "Update the Salesforce Named Credential and any controller/config assumptions so the Apex/LWC path reaches the deployed /query endpoint with the correct contract.",
@@ -996,7 +1029,8 @@
           "depends_on": [
             "2.5.1"
           ],
-          "gate_criteria": "Do not repoint Salesforce until the live /query surface exists and is probe-validated."
+          "gate_criteria": "Do not repoint Salesforce until the live /query surface exists and is probe-validated.",
+          "completedAt": "2026-03-17T17:48:55.219311+00:00"
         },
         {
           "id": "2.5.3",

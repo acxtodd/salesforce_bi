@@ -343,6 +343,13 @@ export class IngestionStack extends cdk.Stack {
     // KMS for encrypted resources
     kmsKey.grantEncryptDecrypt(cdcSyncRole);
 
+    // Turbopuffer API key from Secrets Manager (plain-text secret)
+    const turbopufferApiKeySecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      "TurbopufferApiKeySecret",
+      "salesforce-ai-search/turbopuffer-api-key",
+    );
+
     // Bundle cdc_sync Lambda with shared modules using a pre-built directory.
     // scripts/bundle_cdc_sync.sh creates the deployment package at
     // lambda/cdc_sync/.bundle/ with handler + lib/ + common/ + config.
@@ -364,10 +371,13 @@ export class IngestionStack extends cdk.Stack {
         SALESFORCE_ORG_ID: "00Ddl000003yx57EAA",
         DENORM_CONFIG_PATH: "denorm_config.yaml",
         DLQ_URL: this.dlq.queueUrl,
-        TURBOPUFFER_API_KEY: process.env.TURBOPUFFER_API_KEY || "",
+        TURBOPUFFER_API_KEY: turbopufferApiKeySecret.secretValue.unsafeUnwrap(),
         LOG_LEVEL: "INFO",
       },
     });
+
+    // Grant CDC sync Lambda read access to Turbopuffer API key secret
+    turbopufferApiKeySecret.grantRead(cdcSyncRole);
 
     // Grant CDC sync Lambda read access to CDC bucket
     this.cdcBucket.grantRead(cdcSyncLambda);

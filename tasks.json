@@ -856,17 +856,36 @@
         {
           "id": "2.4.4",
           "title": "Validate real Salesforce CDC delivery and rerun E2E without synthetic writes",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-16T13:48:58.922513+00:00",
-          "updatedAt": "2026-03-16T13:52:05.667111+00:00",
-          "files_modified": [],
+          "updatedAt": "2026-03-17T16:18:55.984256+00:00",
+          "files_modified": [
+            "scripts/integration_test_e2e.py",
+            "lambda/cdc_sync/index.py",
+            "tests/test_e2e_appflow_mode.py",
+            "results/e2e_test_results.json",
+            "lib/ingestion-stack.ts",
+            "lib/api-stack.ts"
+          ],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [
             {
               "timestamp": "2026-03-16T13:52:05.666928+00:00",
               "note": "scripts/integration_test_e2e.py currently simulates AppFlow by writing CDC payloads directly to S3. Do not close this task with synthetic writes; use a normal Salesforce CREATE/UPDATE/DELETE and verify the resulting AppFlow-written files land in the CDC bucket."
+            },
+            {
+              "timestamp": "2026-03-17T16:08:41.143471+00:00",
+              "note": "Real AppFlow E2E validated 2026-03-17. CREATE=24.1s, UPDATE=13.2s, DELETE=23.6s — all within 5min SLA. Fixed: (1) CDC_ENTITY_MAP missing SObject-name keys (AppFlow uses ascendix__Property__c not ChangeEvent suffix), (2) TURBOPUFFER_API_KEY Lambda env was empty, (3) SSM access_token expired. Results in results/e2e_test_results.json."
+            },
+            {
+              "timestamp": "2026-03-17T16:08:44.453974+00:00",
+              "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-17T16:18:30.289997+00:00",
+              "note": "files_modified: scripts/integration_test_e2e.py, lambda/cdc_sync/index.py, tests/test_e2e_appflow_mode.py, results/e2e_test_results.json, lib/ingestion-stack.ts, lib/api-stack.ts"
             }
           ],
           "description": "Prove that a normal Salesforce record change lands in the CDC bucket through AppFlow and rerun the Phase 2 end-to-end validation on the real upstream path.",
@@ -879,7 +898,8 @@
           "depends_on": [
             "2.4.3"
           ],
-          "gate_criteria": "Only run live CDC validation after AppFlow resources exist and are active in AWS."
+          "gate_criteria": "Only run live CDC validation after AppFlow resources exist and are active in AWS.",
+          "completedAt": "2026-03-17T16:08:44.453783+00:00"
         },
         {
           "id": "2.5",

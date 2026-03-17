@@ -504,6 +504,13 @@ export class ApiStack extends cdk.Stack {
       "Role for Query Lambda",
     );
 
+    // Turbopuffer API key from Secrets Manager (plain-text secret)
+    const turbopufferApiKeySecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      "TurbopufferApiKeySecret",
+      "salesforce-ai-search/turbopuffer-api-key",
+    );
+
     this.queryLambda = new lambda.DockerImageFunction(this, "QueryLambda", {
       functionName: "salesforce-ai-search-query",
       code: lambda.DockerImageCode.fromImageAsset(
@@ -521,14 +528,15 @@ export class ApiStack extends cdk.Stack {
         DENORM_CONFIG_PATH: "denorm_config.yaml",
         BEDROCK_MODEL_ID:
           "us.anthropic.claude-sonnet-4-20250514-v1:0",
-        TURBOPUFFER_API_KEY: process.env.TURBOPUFFER_API_KEY || "",
+        TURBOPUFFER_API_KEY: turbopufferApiKeySecret.secretValue.unsafeUnwrap(),
         LOG_LEVEL: "INFO",
         // Reuse same API key secret as answer Lambda for auth parity
         API_KEY_SECRET_ARN: streamingApiKeySecret.secretArn,
       },
     });
 
-    // Grant Query Lambda permission to read the API key secret
+    // Grant Query Lambda permission to read the Turbopuffer + streaming API key secrets
+    turbopufferApiKeySecret.grantRead(queryRole);
     streamingApiKeySecret.grantRead(this.queryLambda);
 
     const queryFunctionUrl = this.queryLambda.addFunctionUrl({

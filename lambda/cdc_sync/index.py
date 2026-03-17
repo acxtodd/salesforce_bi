@@ -66,6 +66,12 @@ CDC_ENTITY_MAP: dict[str, str] = {
     "Availability__ChangeEvent": "ascendix__Availability__c",
     "Deal__ChangeEvent": "ascendix__Deal__c",
     "Sale__ChangeEvent": "ascendix__Sale__c",
+    # AppFlow CDC uses SObject names (not ChangeEvent channel names) as entityName
+    "ascendix__Property__c": "ascendix__Property__c",
+    "ascendix__Lease__c": "ascendix__Lease__c",
+    "ascendix__Availability__c": "ascendix__Availability__c",
+    "ascendix__Deal__c": "ascendix__Deal__c",
+    "ascendix__Sale__c": "ascendix__Sale__c",
 }
 
 # ---------------------------------------------------------------------------

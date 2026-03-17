@@ -1,48 +1,34 @@
 {
-  "run_date": "2026-03-16T10:12:36Z",
-  "namespace": "org_00Ddl000003yx57EAA",
-  "target_org": "ascendix-beta-sandbox",
-  "timeout_seconds": 90,
+  "mode": "real_appflow",
   "passed": 3,
   "failed": 0,
   "tests": [
     {
       "name": "CREATE",
       "status": "PASS",
-      "record_id": "a0adl000009fR3tAAE",
-      "record_name": "E2E_TEST_1773655956",
-      "latency_seconds": 11,
-      "detail": "Record found in Turbopuffer via BM25 search 11s after CDC event written to S3"
+      "mutation_ts": "2026-03-17T16:07:25Z",
+      "cdc_s3_key": "cdc/ascendix__Property__c/salesforce-ai-search-cdc-ascendix__property__c/0-89c512a5e322be1690186ceed4419988-0069B97C444F39AE43",
+      "cdc_arrival_ts": "2026-03-17T16:07:37+00:00",
+      "turbopuffer_visible_ts": "2026-03-17T16:07:49Z",
+      "latency_seconds": 24.1
     },
     {
       "name": "UPDATE",
       "status": "PASS",
-      "latency_seconds": 12,
-      "detail": "City field updated to UpdatedCity_1773655956, reflected in Turbopuffer within 12s"
+      "mutation_ts": "2026-03-17T16:07:49Z",
+      "cdc_s3_key": "cdc/ascendix__Property__c/salesforce-ai-search-cdc-ascendix__property__c/0-0c8917df8967d3cded03bbbf1d88731e-0069B97C587058A3D7",
+      "cdc_arrival_ts": "2026-03-17T16:07:57+00:00",
+      "turbopuffer_visible_ts": "2026-03-17T16:08:03Z",
+      "latency_seconds": 13.2
     },
     {
       "name": "DELETE",
       "status": "PASS",
-      "latency_seconds": 11,
-      "detail": "Record removed from Turbopuffer search results within 11s of CDC DELETE event"
+      "mutation_ts": "2026-03-17T16:08:03Z",
+      "cdc_s3_key": "cdc/ascendix__Property__c/salesforce-ai-search-cdc-ascendix__property__c/0-5ca1b848a01f779dc8e6d21c40e64e45-0069B97C6C9A54C029",
+      "cdc_arrival_ts": "2026-03-17T16:08:18+00:00",
+      "turbopuffer_visible_ts": "2026-03-17T16:08:26Z",
+      "latency_seconds": 23.6
     }
-  ],
-  "coverage": {
-    "validated": [
-      "S3 → EventBridge → CDC sync Lambda → Turbopuffer upsert/delete (downstream sync path)",
-      "Denormalize → embed → upsert pipeline correctness",
-      "DELETE propagation (record removed from search index)",
-      "Latency: all CRUD ops complete in <15s (well within 5-min SLA)"
-    ],
-    "not_validated": [
-      "Salesforce CDC → AppFlow → S3 delivery (script writes synthetic CDC payloads directly to S3; AppFlow CDC flows require Connected App with Client Credentials grant)",
-      "LWC/query UI observability (script queries Turbopuffer directly via backend.search(), not through /query Lambda or LWC frontend)"
-    ]
-  },
-  "infrastructure": {
-    "cdc_sync_lambda": "salesforce-ai-search-cdc-sync",
-    "eventbridge_rule": "salesforce-ai-search-cdc-trigger",
-    "cdc_bucket": "salesforce-ai-search-cdc-382211616288-us-west-2",
-    "dlq": "salesforce-ai-search-ingestion-dlq"
-  }
+  ]
 }

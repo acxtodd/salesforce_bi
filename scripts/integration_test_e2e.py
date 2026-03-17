@@ -6,6 +6,10 @@ Run with:
     python3 scripts/integration_test_e2e.py --config denorm_config.yaml \
         --target-org ascendix-beta-sandbox
 
+    # Real AppFlow mode (validates full Salesforce CDC -> AppFlow -> S3 path):
+    python3 scripts/integration_test_e2e.py \
+        --target-org ascendix-beta-sandbox --real-appflow --timeout 300
+
 Tests:
 1. CREATE: Create test Property in SF -> poll Turbopuffer -> verify searchable
 2. UPDATE: Update field (City) -> poll -> verify updated value
@@ -18,6 +22,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -130,6 +135,73 @@ def write_cdc_event_to_s3(
     LOG.info("Wrote CDC %s event to s3://%s/%s", change_type, CDC_BUCKET, key)
 
 
+# AppFlow writes CDC files under cdc/{sobjectName}/ where sobjectName is
+# e.g. ascendix__Property__c (the ChangeEvent suffix replaced with __c).
+# This is distinct from the synthetic prefix cdc/Property__c/ used above.
+APPFLOW_CDC_PREFIX = "cdc/ascendix__Property__c/"
+
+
+def poll_for_appflow_cdc_file(
+    record_id: str,
+    change_type: str,
+    after_timestamp: float,
+    timeout: int = POLL_TIMEOUT_SECONDS,
+) -> dict | None:
+    """Poll S3 for an AppFlow-written CDC file matching the record and change type.
+
+    Returns dict with 's3_key', 'arrival_ts', and 'payload' on success, or None on timeout.
+    Only considers objects written after ``after_timestamp`` (epoch seconds) to
+    exclude stale files from previous runs.
+    """
+    s3 = boto3.client("s3")
+    after_dt = datetime.fromtimestamp(after_timestamp, tz=timezone.utc)
+    start = time.time()
+
+    while time.time() - start < timeout:
+        try:
+            paginator = s3.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=CDC_BUCKET, Prefix=APPFLOW_CDC_PREFIX):
+                for obj in page.get("Contents", []):
+                    # Skip files written before the mutation
+                    if obj["LastModified"].replace(tzinfo=timezone.utc) <= after_dt:
+                        continue
+
+                    key = obj["Key"]
+                    try:
+                        resp = s3.get_object(Bucket=CDC_BUCKET, Key=key)
+                        body = json.loads(resp["Body"].read().decode("utf-8"))
+                    except Exception:
+                        LOG.debug("Failed to read candidate %s, skipping", key)
+                        continue
+
+                    header = body.get("ChangeEventHeader", {})
+                    if (
+                        record_id in header.get("recordIds", [])
+                        and header.get("changeType") == change_type
+                    ):
+                        arrival_ts = obj["LastModified"].isoformat()
+                        LOG.info(
+                            "Found AppFlow CDC file: s3://%s/%s (changeType=%s, arrival=%s)",
+                            CDC_BUCKET, key, change_type, arrival_ts,
+                        )
+                        return {
+                            "s3_key": key,
+                            "arrival_ts": arrival_ts,
+                            "payload": body,
+                        }
+        except Exception as e:
+            LOG.debug("S3 poll error: %s", e)
+
+        LOG.info(
+            "  Polling S3 for AppFlow CDC file (%s %s)... (%.0fs elapsed)",
+            change_type, record_id, time.time() - start,
+        )
+        time.sleep(POLL_INTERVAL_SECONDS)
+
+    LOG.warning("No AppFlow CDC file found for %s %s within %ds", change_type, record_id, timeout)
+    return None
+
+
 def poll_for_record(
     backend: TurbopufferBackend,
     namespace: str,
@@ -201,90 +273,241 @@ def poll_for_record_absent(
     return False
 
 
+def _iso_now() -> str:
+    """Return current UTC time as ISO 8601 string."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _build_test_entry(
+    name: str,
+    status: str,
+    *,
+    reason: str = "",
+    mutation_ts: str = "",
+    cdc_s3_key: str = "",
+    cdc_arrival_ts: str = "",
+    turbopuffer_visible_ts: str = "",
+    latency_seconds: float | None = None,
+) -> dict:
+    """Build a test result entry with optional timing fields."""
+    entry: dict[str, Any] = {"name": name, "status": status}
+    if reason:
+        entry["reason"] = reason
+    if mutation_ts:
+        entry["mutation_ts"] = mutation_ts
+    if cdc_s3_key:
+        entry["cdc_s3_key"] = cdc_s3_key
+    if cdc_arrival_ts:
+        entry["cdc_arrival_ts"] = cdc_arrival_ts
+    if turbopuffer_visible_ts:
+        entry["turbopuffer_visible_ts"] = turbopuffer_visible_ts
+    if latency_seconds is not None:
+        entry["latency_seconds"] = round(latency_seconds, 1)
+    return entry
+
+
 def run_e2e_tests(
     sf_client: SalesforceClient,
     backend: TurbopufferBackend,
     namespace: str,
+    *,
+    real_appflow: bool = False,
 ) -> dict:
     """Run all E2E test scenarios. Returns results dict."""
     test_id = str(int(time.time()))
     record_name = f"{TEST_RECORD_PREFIX}{test_id}"
-    results = {"passed": 0, "failed": 0, "tests": []}
+    mode = "real_appflow" if real_appflow else "synthetic"
+    results: dict[str, Any] = {"mode": mode, "passed": 0, "failed": 0, "tests": []}
     record_id = None
 
     create_succeeded = False
 
     try:
         # Test 1: CREATE
-        LOG.info("=== Test 1: CREATE ===")
+        LOG.info("=== Test 1: CREATE (mode=%s) ===", mode)
+        mutation_ts = _iso_now()
+        mutation_epoch = time.time()
         record_id = create_test_property(sf_client, test_id)
-        write_cdc_event_to_s3(record_id, "CREATE")
+
+        cdc_s3_key = ""
+        cdc_arrival_ts = ""
+
+        if real_appflow:
+            cdc_file = poll_for_appflow_cdc_file(record_id, "CREATE", mutation_epoch)
+            if cdc_file:
+                cdc_s3_key = cdc_file["s3_key"]
+                cdc_arrival_ts = cdc_file["arrival_ts"]
+            else:
+                LOG.error("FAIL: No AppFlow CDC file for CREATE within timeout")
+                results["failed"] += 1
+                results["tests"].append(_build_test_entry(
+                    "CREATE", "FAIL",
+                    reason="AppFlow CDC file not found in S3 within timeout",
+                    mutation_ts=mutation_ts,
+                ))
+                return results  # Cannot continue without CDC delivery
+        else:
+            write_cdc_event_to_s3(record_id, "CREATE")
+
         record = poll_for_record(backend, namespace, record_id, record_name=record_name)
         if record:
-            LOG.info("PASS: Record found in Turbopuffer after CREATE")
+            turbopuffer_visible_ts = _iso_now()
+            latency = time.time() - mutation_epoch
+            LOG.info("PASS: Record found in Turbopuffer after CREATE (%.1fs)", latency)
             results["passed"] += 1
-            results["tests"].append({"name": "CREATE", "status": "PASS"})
+            results["tests"].append(_build_test_entry(
+                "CREATE", "PASS",
+                mutation_ts=mutation_ts,
+                cdc_s3_key=cdc_s3_key,
+                cdc_arrival_ts=cdc_arrival_ts,
+                turbopuffer_visible_ts=turbopuffer_visible_ts,
+                latency_seconds=latency,
+            ))
             create_succeeded = True
         else:
             LOG.error("FAIL: Record not found within %ds", POLL_TIMEOUT_SECONDS)
             results["failed"] += 1
-            results["tests"].append({"name": "CREATE", "status": "FAIL",
-                                     "reason": "Record not found within timeout"})
+            results["tests"].append(_build_test_entry(
+                "CREATE", "FAIL",
+                reason="Record not found within timeout",
+                mutation_ts=mutation_ts,
+                cdc_s3_key=cdc_s3_key,
+                cdc_arrival_ts=cdc_arrival_ts,
+            ))
 
         # Test 2: UPDATE (depends on CREATE succeeding)
         if create_succeeded:
-            LOG.info("=== Test 2: UPDATE ===")
+            LOG.info("=== Test 2: UPDATE (mode=%s) ===", mode)
+            mutation_ts = _iso_now()
+            mutation_epoch = time.time()
             new_city = f"UpdatedCity_{test_id}"
             update_test_property(sf_client, record_id, new_city)
-            write_cdc_event_to_s3(record_id, "UPDATE")
-            start = time.time()
-            updated = False
-            while time.time() - start < POLL_TIMEOUT_SECONDS:
-                record = poll_for_record(backend, namespace, record_id, record_name=record_name, timeout=30)
-                if record and record.get("city") == new_city:
-                    updated = True
-                    break
-                time.sleep(POLL_INTERVAL_SECONDS)
 
-            if updated:
-                LOG.info("PASS: Record updated in Turbopuffer after UPDATE")
-                results["passed"] += 1
-                results["tests"].append({"name": "UPDATE", "status": "PASS"})
+            cdc_s3_key = ""
+            cdc_arrival_ts = ""
+
+            if real_appflow:
+                cdc_file = poll_for_appflow_cdc_file(record_id, "UPDATE", mutation_epoch)
+                if cdc_file:
+                    cdc_s3_key = cdc_file["s3_key"]
+                    cdc_arrival_ts = cdc_file["arrival_ts"]
+                else:
+                    LOG.error("FAIL: No AppFlow CDC file for UPDATE within timeout")
+                    results["failed"] += 1
+                    results["tests"].append(_build_test_entry(
+                        "UPDATE", "FAIL",
+                        reason="AppFlow CDC file not found in S3 within timeout",
+                        mutation_ts=mutation_ts,
+                    ))
+                    # Continue to DELETE test — don't abort entirely
+                    create_succeeded = True  # still try delete
+                    # Jump past the Turbopuffer poll for UPDATE
+                    cdc_file = None
             else:
-                LOG.error("FAIL: Updated value not reflected within %ds", POLL_TIMEOUT_SECONDS)
-                results["failed"] += 1
-                results["tests"].append({"name": "UPDATE", "status": "FAIL",
-                                         "reason": "Updated value not reflected within timeout"})
+                write_cdc_event_to_s3(record_id, "UPDATE")
+                cdc_file = True  # sentinel to enter poll block
+
+            if cdc_file:
+                start = time.time()
+                updated = False
+                while time.time() - start < POLL_TIMEOUT_SECONDS:
+                    record = poll_for_record(backend, namespace, record_id, record_name=record_name, timeout=30)
+                    if record and record.get("city") == new_city:
+                        updated = True
+                        break
+                    time.sleep(POLL_INTERVAL_SECONDS)
+
+                if updated:
+                    turbopuffer_visible_ts = _iso_now()
+                    latency = time.time() - mutation_epoch
+                    LOG.info("PASS: Record updated in Turbopuffer after UPDATE (%.1fs)", latency)
+                    results["passed"] += 1
+                    results["tests"].append(_build_test_entry(
+                        "UPDATE", "PASS",
+                        mutation_ts=mutation_ts,
+                        cdc_s3_key=cdc_s3_key,
+                        cdc_arrival_ts=cdc_arrival_ts,
+                        turbopuffer_visible_ts=turbopuffer_visible_ts,
+                        latency_seconds=latency,
+                    ))
+                else:
+                    LOG.error("FAIL: Updated value not reflected within %ds", POLL_TIMEOUT_SECONDS)
+                    results["failed"] += 1
+                    results["tests"].append(_build_test_entry(
+                        "UPDATE", "FAIL",
+                        reason="Updated value not reflected within timeout",
+                        mutation_ts=mutation_ts,
+                        cdc_s3_key=cdc_s3_key,
+                        cdc_arrival_ts=cdc_arrival_ts,
+                    ))
         else:
             LOG.warning("SKIP: UPDATE skipped because CREATE failed")
-            results["tests"].append({"name": "UPDATE", "status": "SKIP",
-                                     "reason": "CREATE failed — cannot validate UPDATE"})
+            results["tests"].append(_build_test_entry(
+                "UPDATE", "SKIP", reason="CREATE failed — cannot validate UPDATE"))
 
         # Test 3: DELETE (depends on CREATE succeeding)
         if create_succeeded:
-            LOG.info("=== Test 3: DELETE ===")
+            LOG.info("=== Test 3: DELETE (mode=%s) ===", mode)
+            mutation_ts = _iso_now()
+            mutation_epoch = time.time()
             delete_test_property(sf_client, record_id)
-            write_cdc_event_to_s3(record_id, "DELETE")
-            absent = poll_for_record_absent(backend, namespace, record_id, record_name=record_name)
-            if absent:
-                LOG.info("PASS: Record removed from Turbopuffer after DELETE")
-                results["passed"] += 1
-                results["tests"].append({"name": "DELETE", "status": "PASS"})
-                record_id = None  # Already cleaned up
+
+            cdc_s3_key = ""
+            cdc_arrival_ts = ""
+
+            if real_appflow:
+                cdc_file = poll_for_appflow_cdc_file(record_id, "DELETE", mutation_epoch)
+                if cdc_file:
+                    cdc_s3_key = cdc_file["s3_key"]
+                    cdc_arrival_ts = cdc_file["arrival_ts"]
+                else:
+                    LOG.error("FAIL: No AppFlow CDC file for DELETE within timeout")
+                    results["failed"] += 1
+                    results["tests"].append(_build_test_entry(
+                        "DELETE", "FAIL",
+                        reason="AppFlow CDC file not found in S3 within timeout",
+                        mutation_ts=mutation_ts,
+                    ))
+                    cdc_file = None
             else:
-                LOG.error("FAIL: Record still present after %ds", POLL_TIMEOUT_SECONDS)
-                results["failed"] += 1
-                results["tests"].append({"name": "DELETE", "status": "FAIL",
-                                         "reason": "Record still present after timeout"})
+                write_cdc_event_to_s3(record_id, "DELETE")
+                cdc_file = True
+
+            if cdc_file:
+                absent = poll_for_record_absent(backend, namespace, record_id, record_name=record_name)
+                if absent:
+                    turbopuffer_visible_ts = _iso_now()
+                    latency = time.time() - mutation_epoch
+                    LOG.info("PASS: Record removed from Turbopuffer after DELETE (%.1fs)", latency)
+                    results["passed"] += 1
+                    results["tests"].append(_build_test_entry(
+                        "DELETE", "PASS",
+                        mutation_ts=mutation_ts,
+                        cdc_s3_key=cdc_s3_key,
+                        cdc_arrival_ts=cdc_arrival_ts,
+                        turbopuffer_visible_ts=turbopuffer_visible_ts,
+                        latency_seconds=latency,
+                    ))
+                    record_id = None  # Already cleaned up
+                else:
+                    LOG.error("FAIL: Record still present after %ds", POLL_TIMEOUT_SECONDS)
+                    results["failed"] += 1
+                    results["tests"].append(_build_test_entry(
+                        "DELETE", "FAIL",
+                        reason="Record still present after timeout",
+                        mutation_ts=mutation_ts,
+                        cdc_s3_key=cdc_s3_key,
+                        cdc_arrival_ts=cdc_arrival_ts,
+                    ))
         else:
             LOG.warning("SKIP: DELETE skipped because CREATE failed (would be vacuously true)")
-            results["tests"].append({"name": "DELETE", "status": "SKIP",
-                                     "reason": "CREATE failed — DELETE would be vacuously true"})
+            results["tests"].append(_build_test_entry(
+                "DELETE", "SKIP", reason="CREATE failed — DELETE would be vacuously true"))
 
     except Exception as e:
         LOG.error("E2E test error: %s", e)
         results["failed"] += 1
-        results["tests"].append({"name": "UNEXPECTED", "status": "FAIL", "reason": str(e)})
+        results["tests"].append(_build_test_entry("UNEXPECTED", "FAIL", reason=str(e)))
 
     finally:
         # Cleanup: delete test record if still exists
@@ -310,6 +533,11 @@ def main() -> None:
     parser.add_argument("--instance-url", default="")
     parser.add_argument("--access-token", default="")
     parser.add_argument("--timeout", type=int, default=300, help="Poll timeout in seconds")
+    parser.add_argument(
+        "--real-appflow", action="store_true",
+        help="Use real AppFlow CDC delivery instead of synthetic S3 writes. "
+             "Polls S3 for AppFlow-written CDC files after each Salesforce mutation.",
+    )
     args = parser.parse_args()
 
     global POLL_TIMEOUT_SECONDS
@@ -329,8 +557,9 @@ def main() -> None:
 
     backend = TurbopufferBackend()
 
-    LOG.info("Running E2E tests against namespace: %s", namespace)
-    results = run_e2e_tests(sf, backend, namespace)
+    mode_label = "real_appflow" if args.real_appflow else "synthetic"
+    LOG.info("Running E2E tests against namespace: %s (mode=%s)", namespace, mode_label)
+    results = run_e2e_tests(sf, backend, namespace, real_appflow=args.real_appflow)
 
     # Report
     LOG.info("=== E2E Results ===")

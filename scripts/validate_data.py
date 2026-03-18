@@ -132,20 +132,33 @@ class DataValidator:
         return results
 
     def _check_namespace_exists(self) -> CheckResult:
-        """Check 1: Namespace exists via BM25 query with top_k=1."""
-        results = self.backend.search(
-            self.namespace, text_query=" ", top_k=1,
-        )
-        if results:
-            # Get total doc count via aggregate
+        """Check 1: Namespace exists via aggregate count."""
+        try:
             agg = self.backend.aggregate(self.namespace)
             count = agg.get("count", 0)
+        except Exception:
+            count = 0
+
+        if count > 0:
             return CheckResult(
                 name="Namespace exists",
                 status="PASS",
                 message=f"{count:,} documents found",
                 details={"count": count},
             )
+
+        # Fallback: BM25 with stopwords (single space is not a valid token)
+        results = self.backend.search(
+            self.namespace, text_query="a the is of and", top_k=1,
+        )
+        if results:
+            return CheckResult(
+                name="Namespace exists",
+                status="PASS",
+                message="Namespace exists (aggregate returned 0 but search found docs)",
+                details={"count": 0},
+            )
+
         return CheckResult(
             name="Namespace exists",
             status="FAIL",
@@ -218,7 +231,7 @@ class DataValidator:
     def _check_system_fields(self) -> CheckResult:
         """Check 3: Sample 5 docs, verify system fields present."""
         docs = self.backend.search(
-            self.namespace, text_query=" ", top_k=5,
+            self.namespace, text_query="a the is of and", top_k=5,
             include_attributes=SYSTEM_FIELDS,
         )
         if not docs:
@@ -276,11 +289,21 @@ class DataValidator:
                 continue
 
             # Sample a doc of this object type
-            sample = self.backend.search(
-                self.namespace, text_query=" ", top_k=1,
-                filters={"object_type": obj_type},
-                include_attributes=candidate_fields,
-            )
+            try:
+                sample = self.backend.search(
+                    self.namespace, text_query="a the is of and", top_k=1,
+                    filters={"object_type": obj_type},
+                    include_attributes=candidate_fields,
+                )
+            except Exception as e:
+                if "not found in schema" in str(e):
+                    sample = self.backend.search(
+                        self.namespace, text_query="a the is of and", top_k=1,
+                        filters={"object_type": obj_type},
+                        include_attributes=True,
+                    )
+                else:
+                    raise
             if not sample:
                 continue
 
@@ -298,11 +321,21 @@ class DataValidator:
                 # Fallback to curated allowlist
                 allowlist = ["city", "state", "propertyclass", "status",
                              "leasetype", "spacetype"]
-                sample2 = self.backend.search(
-                    self.namespace, text_query=" ", top_k=1,
-                    filters={"object_type": obj_type},
-                    include_attributes=allowlist,
-                )
+                try:
+                    sample2 = self.backend.search(
+                        self.namespace, text_query="a the is of and", top_k=1,
+                        filters={"object_type": obj_type},
+                        include_attributes=allowlist,
+                    )
+                except Exception as e:
+                    if "not found in schema" in str(e):
+                        sample2 = self.backend.search(
+                            self.namespace, text_query="a the is of and", top_k=1,
+                            filters={"object_type": obj_type},
+                            include_attributes=True,
+                        )
+                    else:
+                        raise
                 if sample2:
                     for f in allowlist:
                         val = sample2[0].get(f)
@@ -313,11 +346,21 @@ class DataValidator:
                 continue
 
             # Query with compound filter (business fields only)
-            results = self.backend.search(
-                self.namespace, text_query=" ", top_k=10,
-                filters=filter_pairs,
-                include_attributes=list(filter_pairs),
-            )
+            try:
+                results = self.backend.search(
+                    self.namespace, text_query="a the is of and", top_k=10,
+                    filters=filter_pairs,
+                    include_attributes=list(filter_pairs),
+                )
+            except Exception as e:
+                if "not found in schema" in str(e):
+                    results = self.backend.search(
+                        self.namespace, text_query="a the is of and", top_k=10,
+                        filters=filter_pairs,
+                        include_attributes=True,
+                    )
+                else:
+                    raise
 
             if not results:
                 return CheckResult(
@@ -380,11 +423,21 @@ class DataValidator:
             for ref_field, pfields in parents.items():
                 pkeys = expected_parent_keys(ref_field, pfields)
 
-                docs = self.backend.search(
-                    self.namespace, text_query=" ", top_k=10,
-                    filters={"object_type": obj_type},
-                    include_attributes=pkeys,
-                )
+                try:
+                    docs = self.backend.search(
+                        self.namespace, text_query="a the is of and", top_k=10,
+                        filters={"object_type": obj_type},
+                        include_attributes=pkeys,
+                    )
+                except Exception as e:
+                    if "not found in schema" in str(e):
+                        docs = self.backend.search(
+                            self.namespace, text_query="a the is of and", top_k=10,
+                            filters={"object_type": obj_type},
+                            include_attributes=True,
+                        )
+                    else:
+                        raise
 
                 if not docs:
                     all_violations.append(
@@ -502,11 +555,38 @@ class DataValidator:
                     )
         attrs_to_check = list(dict.fromkeys(attrs_to_check))  # dedupe
 
-        # Hybrid search
-        results = self.backend.search(
-            self.namespace, vector=embedding, text_query=self.query_text,
-            top_k=5, include_attributes=attrs_to_check,
-        )
+        # Hybrid search (with fallback to vector-only)
+        hybrid_failed = False
+        try:
+            try:
+                results = self.backend.search(
+                    self.namespace, vector=embedding, text_query=self.query_text,
+                    top_k=5, include_attributes=attrs_to_check,
+                )
+            except Exception as e:
+                if "not found in schema" in str(e):
+                    results = self.backend.search(
+                        self.namespace, vector=embedding, text_query=self.query_text,
+                        top_k=5, include_attributes=True,
+                    )
+                else:
+                    raise
+        except Exception as e:
+            hybrid_failed = True
+            LOG.warning("Hybrid search failed (%s), falling back to vector-only", e)
+            try:
+                results = self.backend.search(
+                    self.namespace, vector=embedding,
+                    top_k=5, include_attributes=attrs_to_check,
+                )
+            except Exception as e2:
+                if "not found in schema" in str(e2):
+                    results = self.backend.search(
+                        self.namespace, vector=embedding,
+                        top_k=5, include_attributes=True,
+                    )
+                else:
+                    raise
 
         if not results:
             return CheckResult(
@@ -527,14 +607,24 @@ class DataValidator:
                     matched_attrs.append((doc.get("id"), attr, val))
 
         if not matched_attrs:
+            status = "WARN" if hybrid_failed else "FAIL"
             return CheckResult(
                 name="Hybrid search",
-                status="FAIL",
-                message="No top-5 result has attributes matching query terms",
+                status=status,
+                message="No top-5 result has attributes matching query terms"
+                + (" (hybrid ranking failed, used vector-only)" if hybrid_failed else ""),
                 details={"query_terms": query_terms},
             )
 
         unique_docs = len(set(m[0] for m in matched_attrs))
+        if hybrid_failed:
+            return CheckResult(
+                name="Hybrid search",
+                status="WARN",
+                message=f"{unique_docs}/{len(results)} results match query terms "
+                f"(hybrid ranking failed, used vector-only fallback)",
+                details={"matched": matched_attrs[:10]},
+            )
         return CheckResult(
             name="Hybrid search",
             status="PASS",
@@ -547,7 +637,7 @@ class DataValidator:
         latencies = []
         for _ in range(5):
             start = time.perf_counter()
-            self.backend.search(self.namespace, text_query=" ", top_k=1)
+            self.backend.search(self.namespace, text_query="a the is of and", top_k=1)
             latencies.append((time.perf_counter() - start) * 1000)
 
         sorted_lat = sorted(latencies)

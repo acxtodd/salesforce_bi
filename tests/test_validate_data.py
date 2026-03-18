@@ -267,7 +267,7 @@ class TestSFCountComparison:
 
 
 class TestParentFieldViolation:
-    def _make_validator(self, docs):
+    def _make_validator(self, docs, sf_client=None):
         backend = MagicMock()
         backend.search.return_value = docs
         config = {
@@ -279,7 +279,10 @@ class TestParentFieldViolation:
                 },
             }
         }
-        return DataValidator(namespace="ns", backend=backend, config=config)
+        return DataValidator(
+            namespace="ns", backend=backend, config=config,
+            sf_client=sf_client,
+        )
 
     def test_all_keys_present_pass(self):
         docs = [
@@ -290,14 +293,28 @@ class TestParentFieldViolation:
         result = validator._check_parent_fields()
         assert result.status == "PASS"
 
-    def test_partial_keys_fail(self):
+    def test_partial_keys_consistent_null_warns(self):
+        # Same field consistently null — likely null on source parent
         docs = [
             {"id": "d1", "property_name": "Plaza", "property_city": None},
+            {"id": "d2", "property_name": "Tower", "property_city": None},
+        ]
+        validator = self._make_validator(docs)
+        result = validator._check_parent_fields()
+        assert result.status == "WARN"
+        assert "partial" in result.message.lower()
+        assert "null source" in result.message.lower()
+
+    def test_partial_keys_inconsistent_fails(self):
+        # Different fields missing on different docs — possible defect
+        docs = [
+            {"id": "d1", "property_name": "Plaza", "property_city": None},
+            {"id": "d2", "property_name": None, "property_city": "Dallas"},
         ]
         validator = self._make_validator(docs)
         result = validator._check_parent_fields()
         assert result.status == "FAIL"
-        assert "partial" in result.message.lower()
+        assert "inconsistent" in result.message.lower()
 
     def test_all_keys_null_orphan_no_violation(self):
         # Orphan record: all parent keys null — consistent, not a violation
@@ -309,16 +326,57 @@ class TestParentFieldViolation:
         result = validator._check_parent_fields()
         assert result.status == "PASS"
 
-    def test_zero_docs_with_parent_keys_fail(self):
-        # All docs are orphans — denorm produced nothing
+    def test_zero_docs_with_parent_keys_warns_sparse(self):
+        # All docs have null parent keys — sparse source, not denorm defect
         docs = [
             {"id": "d1", "property_name": None, "property_city": None},
             {"id": "d2", "property_name": None, "property_city": None},
         ]
         validator = self._make_validator(docs)
         result = validator._check_parent_fields()
-        assert result.status == "FAIL"
+        assert result.status == "WARN"
         assert "0/" in result.message
+        assert "sparse" in result.message.lower()
+
+    def test_no_docs_warns_not_loaded(self):
+        # No docs for this object type at all
+        validator = self._make_validator([])
+        result = validator._check_parent_fields()
+        assert result.status == "WARN"
+        assert "not loaded" in result.message.lower()
+
+    def test_sparse_with_sf_client_stale_index(self):
+        # SF shows FKs populated but index is empty — stale index
+        sf = MagicMock()
+        sf.query.side_effect = [
+            {"totalSize": 100},  # COUNT() WHERE FK != null
+            {"totalSize": 500},  # COUNT() total
+        ]
+        docs = [
+            {"id": "d1", "property_name": None, "property_city": None},
+            {"id": "d2", "property_name": None, "property_city": None},
+        ]
+        validator = self._make_validator(docs, sf_client=sf)
+        result = validator._check_parent_fields()
+        assert result.status == "WARN"
+        assert "stale" in result.message.lower()
+        assert "reindex" in result.message.lower()
+
+    def test_sparse_with_sf_client_truly_sparse(self):
+        # SF also shows 0 FKs populated — truly sparse source
+        sf = MagicMock()
+        sf.query.side_effect = [
+            {"totalSize": 0},  # COUNT() WHERE FK != null
+            {"totalSize": 500},  # COUNT() total
+        ]
+        docs = [
+            {"id": "d1", "property_name": None, "property_city": None},
+        ]
+        validator = self._make_validator(docs, sf_client=sf)
+        result = validator._check_parent_fields()
+        assert result.status == "WARN"
+        assert "sparse" in result.message.lower()
+        assert "SF has 0/" in result.message
 
 
 # ===================================================================

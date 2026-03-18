@@ -1334,14 +1334,27 @@
         {
           "id": "3.3.2.3",
           "title": "Make parent-field validation sparse- and orphan-aware",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T06:56:42.411486+00:00",
-          "updatedAt": "2026-03-18T06:56:50.992793+00:00",
+          "updatedAt": "2026-03-18T07:48:01.066377+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-18T07:45:38.518538+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-18T07:47:57.283220+00:00",
+              "note": "Implementation complete (2026-03-18).\n\nCheck 5 now classifies parent-field gaps into:\n- PASS: parent fields present as expected (property ownerlandlord, lease tenant/ownerlandlord)\n- WARN sparse: 0/N docs have parent keys, SF confirms 0 FKs populated\n- WARN stale: 0/N docs have parent keys, SF confirms FKs ARE populated → needs reindex\n- WARN partial (null source): consistent absent fields across docs → null on source parent\n- WARN no docs: object type not loaded in index\n- FAIL inconsistent partial: different fields missing on different docs → possible defect\n\nWith SF client (--target-org): queries Salesforce to distinguish sparse vs stale.\nWithout SF client: reports as 'sparse or stale — source verification unavailable'.\n\nLive result: check 5 changed from FAIL to WARN. Geography gaps correctly identified as stale index (SF has 29/2470 market FKs, 5/2470 submarket FKs). Partial keys on lease/availability correctly attributed to null source fields (property_totalbuildingarea, property_propertysubtype).\n\nTests: 8 parent-field test cases cover all classification paths including SF-enriched stale/sparse detection. 451 total tests pass."
+            },
+            {
+              "timestamp": "2026-03-18T07:48:01.066380+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Update validate_data.py parent-field checks so sparse relationships, null source values, and orphaned lookup rows are reported truthfully. Distinguish denorm/pipeline defects from missing source data or deleted parent rows, and downgrade the latter from hard FAIL when appropriate.",
           "technical_context": "BA audits showed Property market/submarket parent keys are absent largely because referenced Geography rows are deleted or sparse in the sandbox, while Lease/Availability partial parent keys often come from null source fields. The current check 5 treats all of these as hard denorm failures, which overstates the product issue and erodes trust in validator output.",
           "parent": "3.3.2",
@@ -1352,7 +1365,9 @@
           "depends_on": [
             "3.3.2.1"
           ],
-          "gate_criteria": "Parent-field validation severity should follow the agreed geography scope and source-data expectations."
+          "gate_criteria": "Parent-field validation severity should follow the agreed geography scope and source-data expectations.",
+          "startedAt": "2026-03-18T07:45:38.518359+00:00",
+          "completedAt": "2026-03-18T07:48:01.066200+00:00"
         },
         {
           "id": "3.3.2.4",

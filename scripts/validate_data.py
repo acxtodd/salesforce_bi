@@ -401,7 +401,15 @@ class DataValidator:
         )
 
     def _check_parent_fields(self) -> CheckResult:
-        """Check 5: Parent field denormalization consistency."""
+        """Check 5: Parent field denormalization consistency.
+
+        Classifies each parent relationship gap as one of:
+        - PASS: parent fields present as expected
+        - WARN (no docs): object type not loaded / empty in index
+        - WARN (sparse): 0/N docs have parent keys — likely null FK in source
+        - WARN (partial): some parent fields present, others null on source parent
+        - FAIL (denorm defect): source has data but index is missing derived fields
+        """
         if not self.config:
             return CheckResult(
                 name="Parent fields",
@@ -410,8 +418,9 @@ class DataValidator:
             )
 
         has_parents = False
-        all_summaries = []
-        all_violations = []
+        passes: list[str] = []
+        warns: list[str] = []
+        fails: list[str] = []
 
         for obj_name, obj_config in self.config.items():
             parents = obj_config.get("parents", {})
@@ -422,6 +431,7 @@ class DataValidator:
 
             for ref_field, pfields in parents.items():
                 pkeys = expected_parent_keys(ref_field, pfields)
+                parent_label = clean_label(ref_field).lower()
 
                 try:
                     docs = self.backend.search(
@@ -440,37 +450,46 @@ class DataValidator:
                         raise
 
                 if not docs:
-                    all_violations.append(
-                        f"{obj_type}: no docs found for parent check"
+                    warns.append(
+                        f"{obj_type}: no indexed docs (not loaded)"
                     )
                     continue
 
+                # Classify each doc's parent-key state
                 docs_with_parent = 0
-                violations = []
+                partial_docs: list[tuple] = []
+                consistently_absent: set[str] | None = None
                 for doc in docs:
                     present = [k for k in pkeys if doc.get(k) is not None]
                     absent = [k for k in pkeys if doc.get(k) is None]
-                    if present:  # parent relationship existed
+                    if present:
                         docs_with_parent += 1
                         if absent:
-                            violations.append(
+                            partial_docs.append(
                                 (doc.get("id"), present, absent)
                             )
+                            if consistently_absent is None:
+                                consistently_absent = set(absent)
+                            else:
+                                consistently_absent &= set(absent)
 
                 if docs_with_parent == 0:
-                    all_violations.append(
-                        f"{obj_type}: 0/{len(docs)} docs have any "
-                        f"{clean_label(ref_field).lower()} parent keys"
+                    # No docs have ANY parent keys — sparse source or stale
+                    self._classify_sparse(
+                        obj_name, ref_field, obj_type, parent_label,
+                        len(docs), warns, fails,
                     )
-                elif violations:
-                    all_violations.append(
-                        f"{obj_type}: {len(violations)} docs have partial "
-                        f"{clean_label(ref_field).lower()} keys"
+                elif partial_docs:
+                    # Some keys present, some missing — classify the gap
+                    self._classify_partial(
+                        obj_name, ref_field, obj_type, parent_label,
+                        partial_docs, consistently_absent or set(),
+                        len(docs), warns, fails,
                     )
                 else:
-                    all_summaries.append(
-                        f"{obj_type}: {docs_with_parent}/{len(docs)} docs OK "
-                        f"(0 violations)"
+                    passes.append(
+                        f"{obj_type}: {docs_with_parent}/{len(docs)} "
+                        f"{parent_label} OK"
                     )
 
         if not has_parents:
@@ -480,19 +499,96 @@ class DataValidator:
                 message="No parent relationships in config",
             )
 
-        if all_violations:
+        all_parts = passes + warns + fails
+        if fails:
             return CheckResult(
                 name="Parent fields",
                 status="FAIL",
-                message=" | ".join(all_violations),
-                details={"violations": all_violations},
+                message=" | ".join(all_parts),
+                details={"passes": passes, "warns": warns, "fails": fails},
             )
-
+        if warns:
+            return CheckResult(
+                name="Parent fields",
+                status="WARN",
+                message=" | ".join(all_parts),
+                details={"passes": passes, "warns": warns},
+            )
         return CheckResult(
             name="Parent fields",
             status="PASS",
-            message=" | ".join(all_summaries) if all_summaries else "OK",
+            message=" | ".join(passes) if passes else "OK",
         )
+
+    def _classify_sparse(
+        self,
+        obj_name: str,
+        ref_field: str,
+        obj_type: str,
+        parent_label: str,
+        sample_size: int,
+        warns: list[str],
+        fails: list[str],
+    ) -> None:
+        """Classify a 0/N sparse parent relationship using SF data if available."""
+        if self.sf_client:
+            try:
+                count_result = self.sf_client.query(
+                    f"SELECT COUNT() FROM {obj_name} "
+                    f"WHERE {ref_field} != null"
+                )
+                fk_count = count_result.get("totalSize", 0)
+                total_result = self.sf_client.query(
+                    f"SELECT COUNT() FROM {obj_name}"
+                )
+                total = total_result.get("totalSize", 0)
+                if fk_count == 0:
+                    warns.append(
+                        f"{obj_type}: 0/{sample_size} {parent_label} keys "
+                        f"(sparse — SF has 0/{total} FKs populated)"
+                    )
+                else:
+                    warns.append(
+                        f"{obj_type}: 0/{sample_size} {parent_label} keys "
+                        f"(stale index — SF has {fk_count}/{total} FKs "
+                        f"populated, needs reindex)"
+                    )
+                return
+            except Exception as e:
+                LOG.debug("SF verify failed for %s.%s: %s", obj_type, ref_field, e)
+
+        # Without SF — report as sparse/stale (cannot distinguish)
+        warns.append(
+            f"{obj_type}: 0/{sample_size} {parent_label} keys "
+            f"(sparse or stale — source verification unavailable)"
+        )
+
+    def _classify_partial(
+        self,
+        obj_name: str,
+        ref_field: str,
+        obj_type: str,
+        parent_label: str,
+        partial_docs: list[tuple],
+        consistently_absent: set[str],
+        sample_size: int,
+        warns: list[str],
+        fails: list[str],
+    ) -> None:
+        """Classify partial parent keys (some present, some null)."""
+        if consistently_absent:
+            # Same fields absent across all partial docs — likely null on source
+            absent_short = ", ".join(sorted(consistently_absent))
+            warns.append(
+                f"{obj_type}: {len(partial_docs)} docs have partial "
+                f"{parent_label} keys (null source fields: {absent_short})"
+            )
+        else:
+            # Inconsistent pattern — harder to attribute to source nulls
+            fails.append(
+                f"{obj_type}: {len(partial_docs)}/{sample_size} docs have "
+                f"inconsistent partial {parent_label} keys"
+            )
 
     def _check_bm25_search(self) -> CheckResult:
         """Check 6: BM25 text search."""

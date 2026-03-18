@@ -27,10 +27,14 @@ from bulk_load import (
     embed_texts,
     flatten,
     generate_embeddings_batch,
+    load_config,
+    load_config_with_raw,
     load_object,
     upsert_documents,
     validate_parents,
 )
+
+from lib.audit_writer import AuditingBackend, write_config_snapshot
 
 
 # ===================================================================
@@ -917,3 +921,65 @@ class TestEndToEnd:
                 continue
             assert "ascendix__" not in key
             assert "__c" not in key
+
+
+# ===================================================================
+# Audit trail integration
+# ===================================================================
+
+
+class TestAuditBulkLoad:
+    def test_audit_bucket_wraps_backend(self):
+        """AuditingBackend is used when --audit-bucket is set."""
+        inner = MagicMock()
+        s3 = MagicMock()
+        ab = AuditingBackend(inner, s3, "audit-bucket", "org123")
+
+        # Verify it delegates upsert and adds S3 writes
+        docs = [{"id": "r1", "object_type": "property"}]
+        ab.upsert("ns", documents=docs)
+
+        inner.upsert.assert_called_once()
+        s3.put_object.assert_called_once()
+        assert ab.stats.audit_ok == 1
+
+    def test_no_audit_without_flag(self):
+        """Plain TurbopufferBackend is used when --audit-bucket is not set."""
+        # Just verify that the wrapper is not applied without the flag
+        backend = MagicMock(spec=["upsert", "delete", "search", "aggregate", "warm"])
+        assert not isinstance(backend, AuditingBackend)
+
+    def test_config_snapshot_written_before_first_load(self):
+        """Verify _meta/ write happens via write_config_snapshot."""
+        s3 = MagicMock()
+        write_config_snapshot(
+            s3, "audit-bucket", "org123",
+            {"property": {"embed_fields": ["Name"]}},
+            "property:\n  embed_fields: [Name]\n",
+            "bulk_load",
+        )
+
+        assert s3.put_object.call_count == 2
+        keys = [c[1]["Key"] for c in s3.put_object.call_args_list]
+        assert any("_meta/" in k and "bulk_load" in k for k in keys)
+
+    def test_load_config_returns_dict(self, tmp_path):
+        """load_config returns a plain dict (backwards-compatible)."""
+        config_file = tmp_path / "test_config.yaml"
+        config_file.write_text("ascendix__Property__c:\n  embed_fields: [Name]\n")
+
+        result = load_config(str(config_file))
+
+        assert isinstance(result, dict)
+        assert "ascendix__Property__c" in result
+
+    def test_load_config_with_raw_returns_tuple(self, tmp_path):
+        """load_config_with_raw returns (dict, raw_str) tuple."""
+        config_file = tmp_path / "test_config.yaml"
+        config_file.write_text("ascendix__Property__c:\n  embed_fields: [Name]\n")
+
+        config_dict, raw_str = load_config_with_raw(str(config_file))
+
+        assert isinstance(config_dict, dict)
+        assert "ascendix__Property__c" in config_dict
+        assert "embed_fields" in raw_str

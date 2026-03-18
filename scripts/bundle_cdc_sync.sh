@@ -22,6 +22,7 @@ cp "$PROJECT_ROOT/lambda/cdc_sync/index.py" "$BUNDLE_DIR/"
 cp "$PROJECT_ROOT/lib/denormalize.py" "$BUNDLE_DIR/lib/"
 cp "$PROJECT_ROOT/lib/turbopuffer_backend.py" "$BUNDLE_DIR/lib/"
 cp "$PROJECT_ROOT/lib/search_backend.py" "$BUNDLE_DIR/lib/"
+cp "$PROJECT_ROOT/lib/audit_writer.py" "$BUNDLE_DIR/lib/"
 touch "$BUNDLE_DIR/lib/__init__.py"
 
 # Copy shared lambda/common modules

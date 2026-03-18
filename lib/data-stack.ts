@@ -13,6 +13,7 @@ interface DataStackProps extends cdk.StackProps {
 export class DataStack extends cdk.Stack {
   public readonly dataBucket: s3.Bucket;
   public readonly embeddingsBucket: s3.Bucket;
+  public readonly auditBucket: s3.Bucket;
   public readonly logsBucket: s3.Bucket;
   public readonly telemetryTable: dynamodb.Table;
   public readonly sessionsTable: dynamodb.Table;
@@ -119,6 +120,33 @@ export class DataStack extends cdk.Stack {
               transitionAfter: cdk.Duration.days(30),
             },
           ],
+        },
+      ],
+    });
+
+    // S3 Bucket for audit trail (document snapshots + config provenance)
+    this.auditBucket = new s3.Bucket(this, 'AuditBucket', {
+      bucketName: `salesforce-ai-search-audit-${this.account}-${this.region}`,
+      encryption: s3.BucketEncryption.KMS,
+      encryptionKey: kmsKey,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      versioned: true,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      serverAccessLogsBucket: this.logsBucket,
+      serverAccessLogsPrefix: 'audit-bucket-access-logs/',
+      lifecycleRules: [
+        {
+          id: 'TransitionNoncurrentToGlacier',
+          noncurrentVersionTransitions: [
+            {
+              storageClass: s3.StorageClass.GLACIER,
+              transitionAfter: cdk.Duration.days(90),
+            },
+          ],
+        },
+        {
+          id: 'ExpireNoncurrentVersions',
+          noncurrentVersionExpiration: cdk.Duration.days(365),
         },
       ],
     });
@@ -605,6 +633,12 @@ export class DataStack extends cdk.Stack {
       value: this.embeddingsBucket.bucketName,
       description: 'S3 bucket for embeddings',
       exportName: `${this.stackName}-EmbeddingsBucketName`,
+    });
+
+    new cdk.CfnOutput(this, 'AuditBucketName', {
+      value: this.auditBucket.bucketName,
+      description: 'S3 bucket for document audit trail',
+      exportName: `${this.stackName}-AuditBucketName`,
     });
 
     new cdk.CfnOutput(this, 'LogsBucketName', {

@@ -33,6 +33,8 @@ interface IngestionStackProps extends cdk.StackProps {
   graphEdgesTable?: dynamodb.Table;
   // Zero-Config Schema Discovery table
   schemaCacheTable?: dynamodb.Table;
+  // Audit trail bucket
+  auditBucket?: s3.Bucket;
 }
 
 // Shared exclude patterns for Lambda asset bundling
@@ -373,6 +375,7 @@ export class IngestionStack extends cdk.Stack {
         DLQ_URL: this.dlq.queueUrl,
         TURBOPUFFER_API_KEY: turbopufferApiKeySecret.secretValue.unsafeUnwrap(),
         LOG_LEVEL: "INFO",
+        ...(props.auditBucket ? { AUDIT_BUCKET: props.auditBucket.bucketName } : {}),
       },
     });
 
@@ -381,6 +384,11 @@ export class IngestionStack extends cdk.Stack {
 
     // Grant CDC sync Lambda read access to CDC bucket
     this.cdcBucket.grantRead(cdcSyncLambda);
+
+    // Grant CDC sync Lambda write access to audit bucket
+    if (props.auditBucket) {
+      props.auditBucket.grantWrite(cdcSyncLambda);
+    }
 
     // Ingest Lambda (for batch export fallback)
     this.ingestLambda = new lambda.Function(this, "IngestLambda", {

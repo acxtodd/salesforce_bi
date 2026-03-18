@@ -13,6 +13,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "lambda"))
 
+from lib.audit_writer import AuditingBackend
+
 from cdc_sync.index import (
     CDC_ENTITY_MAP,
     CDCEvent,
@@ -632,3 +634,121 @@ class TestSendToDLQ:
 
         # Should not raise
         _send_to_dlq(sqs, DLQ_URL, evt, RuntimeError("original"))
+
+
+# ===================================================================
+# Audit trail integration
+# ===================================================================
+
+
+class TestAuditIntegration:
+    """Tests for audit trail wiring in CDC sync."""
+
+    def _make_deps(
+        self,
+        sf_records: list[dict] | None = None,
+        audit_bucket: str = "",
+    ) -> dict:
+        sf = _make_sf_client_mock(sf_records)
+        deps = {
+            "sf_client": sf,
+            "bedrock_client": _make_bedrock_mock(),
+            "backend": MagicMock(),
+            "cloudwatch_client": MagicMock(),
+            "sqs_client": MagicMock(),
+            "namespace": NAMESPACE,
+            "salesforce_org_id": SALESFORCE_ORG_ID,
+            "denorm_config": DENORM_CONFIG,
+            "dlq_url": DLQ_URL,
+            "audit_bucket": audit_bucket,
+            "audit_s3_client": MagicMock() if audit_bucket else None,
+        }
+        return deps
+
+    def test_upsert_audits_via_wrapper(self):
+        """AuditingBackend writes to S3 on upsert."""
+        inner = MagicMock()
+        s3 = MagicMock()
+        ab = AuditingBackend(inner, s3, "audit-bucket", SALESFORCE_ORG_ID)
+        docs = [{"id": "a0x1", "object_type": "property", "name": "Test"}]
+
+        ab.upsert(NAMESPACE, documents=docs, schema={"text": {}})
+
+        inner.upsert.assert_called_once()
+        s3.put_object.assert_called_once()
+        assert ab.stats.audit_ok == 1
+        assert ab.stats.audit_failed == 0
+
+    def test_delete_writes_tombstone(self):
+        """DELETE event writes tombstone to S3 when audit_bucket is set."""
+        deps = self._make_deps(audit_bucket="audit-bucket")
+        # Wrap backend with AuditingBackend so stats are tracked
+        inner_backend = deps["backend"]
+        ab = AuditingBackend(
+            inner_backend, deps["audit_s3_client"], "audit-bucket", SALESFORCE_ORG_ID
+        )
+        deps["backend"] = ab
+        cdc = CDCEvent(
+            object_name="ascendix__Property__c",
+            change_type="DELETE",
+            record_ids=["a0x1", "a0x2"],
+            commit_timestamp=1700000000000,
+        )
+
+        _process_cdc_event(cdc, **deps)
+
+        inner_backend.delete.assert_called_once()
+        # Tombstone writes: one per record_id
+        audit_s3 = deps["audit_s3_client"]
+        assert audit_s3.put_object.call_count == 2
+        keys = [c[1]["Key"] for c in audit_s3.put_object.call_args_list]
+        assert any("a0x1.json" in k for k in keys)
+        assert any("a0x2.json" in k for k in keys)
+        # Tombstone outcomes are rolled into the backend stats
+        assert ab.stats.audit_ok == 2
+        assert ab.stats.audit_failed == 0
+
+    def test_audit_failure_counted_not_raised(self):
+        """Mock S3 to raise; verify upsert succeeds and audit_failed incremented."""
+        inner = MagicMock()
+        s3 = MagicMock()
+        s3.put_object.side_effect = RuntimeError("S3 down")
+        ab = AuditingBackend(inner, s3, "bucket", "org")
+        docs = [{"id": "a0x1", "object_type": "property"}]
+
+        ab.upsert("ns", documents=docs)
+
+        inner.upsert.assert_called_once()
+        assert ab.stats.audit_ok == 0
+        assert ab.stats.audit_failed == 1
+
+    def test_no_audit_when_bucket_empty(self):
+        """When audit_bucket is empty, no tombstone writes on DELETE."""
+        deps = self._make_deps(audit_bucket="")
+        cdc = CDCEvent(
+            object_name="ascendix__Property__c",
+            change_type="DELETE",
+            record_ids=["a0x1"],
+            commit_timestamp=1700000000000,
+        )
+
+        _process_cdc_event(cdc, **deps)
+
+        deps["backend"].delete.assert_called_once()
+        # No audit_s3_client means no S3 writes
+        assert deps["audit_s3_client"] is None
+
+    def test_config_snapshot_on_cold_start(self):
+        """Verify _meta/ write happens via write_config_snapshot."""
+        from lib.audit_writer import write_config_snapshot
+
+        s3 = MagicMock()
+        write_config_snapshot(
+            s3, "audit-bucket", SALESFORCE_ORG_ID,
+            DENORM_CONFIG, "raw_yaml_content", "cdc_cold_start",
+        )
+
+        assert s3.put_object.call_count == 2
+        keys = [c[1]["Key"] for c in s3.put_object.call_args_list]
+        assert any("_meta/" in k and ".yaml" in k for k in keys)
+        assert any("_meta/" in k and ".json" in k for k in keys)

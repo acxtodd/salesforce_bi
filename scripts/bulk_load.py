@@ -44,6 +44,7 @@ from lib.denormalize import (
     clean_label,
     flatten,
 )
+from lib.audit_writer import AuditingBackend, write_config_snapshot
 from lib.turbopuffer_backend import TurbopufferBackend
 
 LOG = logging.getLogger("bulk_load")
@@ -76,6 +77,18 @@ def load_config(config_path: str) -> dict[str, Any]:
 
     with open(config_path) as f:
         return yaml.safe_load(f)
+
+
+def load_config_with_raw(config_path: str) -> tuple[dict[str, Any], str]:
+    """Load denorm_config.yaml and return ``(parsed_dict, raw_yaml_str)``.
+
+    Use this when the caller needs byte-for-byte provenance (e.g. audit trail).
+    """
+    import yaml
+
+    with open(config_path) as f:
+        raw = f.read()
+    return yaml.safe_load(raw), raw
 
 
 # ===================================================================
@@ -552,11 +565,16 @@ def main() -> None:
     )
     parser.add_argument("--instance-url", default="")
     parser.add_argument("--access-token", default="")
+    parser.add_argument(
+        "--audit-bucket",
+        default="",
+        help="S3 bucket for audit trail (optional). Wraps backend with AuditingBackend.",
+    )
 
     args = parser.parse_args()
 
     # Load config
-    config = load_config(args.config)
+    config, raw_yaml_str = load_config_with_raw(args.config)
 
     # Determine which objects to load
     object_names = args.objects or list(config.keys())
@@ -586,6 +604,15 @@ def main() -> None:
         bedrock_client = boto3.client("bedrock-runtime")
         backend = TurbopufferBackend()
 
+        # Wrap with audit writer if --audit-bucket provided
+        if args.audit_bucket:
+            audit_s3_client = boto3.client("s3")
+            backend = AuditingBackend(backend, audit_s3_client, args.audit_bucket, org_id)
+            write_config_snapshot(
+                audit_s3_client, args.audit_bucket, org_id,
+                config, raw_yaml_str, "bulk_load",
+            )
+
     # Process each object
     total_fetched = 0
     total_indexed = 0
@@ -604,6 +631,13 @@ def main() -> None:
         total_fetched += summary.fetched_count
         total_indexed += summary.indexed_count
         total_skipped += summary.skipped_count
+
+    if isinstance(backend, AuditingBackend):
+        LOG.info(
+            "Audit stats: audit_ok=%d audit_failed=%d",
+            backend.stats.audit_ok,
+            backend.stats.audit_failed,
+        )
 
     LOG.info(
         "=== Complete: fetched=%d indexed=%d skipped=%d across %d objects ===",

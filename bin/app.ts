@@ -113,6 +113,8 @@ const ingestionStack = new IngestionStack(app, `${stackPrefix}-Ingestion-${envir
   graphEdgesTable: dataStack.graphEdgesTable,
   // Zero-Config Schema Discovery table
   schemaCacheTable: dataStack.schemaCacheTable,
+  // Audit trail bucket
+  auditBucket: dataStack.auditBucket,
   tags: {
     Project: 'SalesforceAISearch',
     Environment: environment,

@@ -45,6 +45,11 @@ from lib.denormalize import (  # noqa: E402
     build_text,
     flatten,
 )
+from lib.audit_writer import (  # noqa: E402
+    AuditingBackend,
+    write_audit_tombstone,
+    write_config_snapshot,
+)
 from lib.turbopuffer_backend import TurbopufferBackend  # noqa: E402
 
 LOG = logging.getLogger("cdc_sync")
@@ -204,6 +209,7 @@ def parse_event(event: dict, s3_client: Any) -> list[CDCEvent]:
 # ---------------------------------------------------------------------------
 
 _denorm_config: dict | None = None
+_denorm_config_raw_yaml: str = ""
 _sf_client: SalesforceClient | None = None
 _bedrock_client: Any = None
 _backend: TurbopufferBackend | None = None
@@ -211,16 +217,22 @@ _cloudwatch_client: Any = None
 _sqs_client: Any = None
 _s3_client: Any = None
 _relationship_maps: dict[str, dict[str, str]] = {}
+_config_snapshot_written: bool = False
 
 
-def _load_denorm_config() -> dict:
-    """Load denorm config (cached at module level after first call)."""
-    global _denorm_config
+def _load_denorm_config() -> tuple[dict, str]:
+    """Load denorm config (cached at module level after first call).
+
+    Returns ``(parsed_dict, raw_yaml_str)`` so callers that need byte-
+    for-byte provenance (audit trail) can use the raw string.
+    """
+    global _denorm_config, _denorm_config_raw_yaml
     if _denorm_config is None:
         config_path = os.environ.get("DENORM_CONFIG_PATH", "denorm_config.yaml")
         with open(config_path) as f:
-            _denorm_config = yaml.safe_load(f)
-    return _denorm_config
+            _denorm_config_raw_yaml = f.read()
+        _denorm_config = yaml.safe_load(_denorm_config_raw_yaml)
+    return _denorm_config, _denorm_config_raw_yaml
 
 
 def _get_sf_client() -> SalesforceClient:
@@ -395,6 +407,8 @@ def _process_cdc_event(
     salesforce_org_id: str,
     denorm_config: dict,
     dlq_url: str,
+    audit_bucket: str = "",
+    audit_s3_client: Any = None,
 ) -> None:
     """Process a single CDCEvent through the sync pipeline."""
     object_name = cdc_event.object_name
@@ -414,6 +428,22 @@ def _process_cdc_event(
                 namespace,
                 cdc_event.record_ids,
             )
+            if audit_bucket and audit_s3_client:
+                from lib.denormalize import clean_label
+
+                cleaned_type = clean_label(object_name).lower()
+                ok, failed = write_audit_tombstone(
+                    audit_s3_client,
+                    audit_bucket,
+                    salesforce_org_id,
+                    cleaned_type,
+                    cdc_event.record_ids,
+                )
+                # Roll tombstone outcomes into the backend stats so
+                # emit_audit_metrics covers deletes as well as upserts.
+                if isinstance(backend, AuditingBackend):
+                    backend.stats.audit_ok += ok
+                    backend.stats.audit_failed += failed
         else:
             # CREATE / UPDATE / UNDELETE — full re-index
             embed_fields = obj_config.get("embed_fields", [])
@@ -496,9 +526,12 @@ def lambda_handler(event: dict, context: Any) -> dict:
 
     Accepts events from EventBridge (S3-backed CDC payloads).
     """
+    global _config_snapshot_written
+
     salesforce_org_id = os.environ.get("SALESFORCE_ORG_ID", "")
     namespace = f"org_{salesforce_org_id}"
     dlq_url = os.environ.get("DLQ_URL", "")
+    audit_bucket = os.environ.get("AUDIT_BUCKET", "")
 
     s3_client = _get_s3_client()
     sf_client = _get_sf_client()
@@ -506,7 +539,23 @@ def lambda_handler(event: dict, context: Any) -> dict:
     backend = _get_backend()
     cloudwatch_client = _get_cloudwatch_client()
     sqs_client = _get_sqs_client()
-    denorm_config = _load_denorm_config()
+    denorm_config, raw_yaml_str = _load_denorm_config()
+
+    # Wrap backend with audit writer if AUDIT_BUCKET is configured
+    audit_s3_client = None
+    if audit_bucket:
+        audit_s3_client = s3_client
+        backend = AuditingBackend(backend, audit_s3_client, audit_bucket, salesforce_org_id)
+        if not _config_snapshot_written:
+            write_config_snapshot(
+                audit_s3_client,
+                audit_bucket,
+                salesforce_org_id,
+                denorm_config,
+                raw_yaml_str,
+                "cdc_cold_start",
+            )
+            _config_snapshot_written = True
 
     cdc_events = parse_event(event, s3_client)
 
@@ -525,11 +574,18 @@ def lambda_handler(event: dict, context: Any) -> dict:
                 salesforce_org_id=salesforce_org_id,
                 denorm_config=denorm_config,
                 dlq_url=dlq_url,
+                audit_bucket=audit_bucket,
+                audit_s3_client=audit_s3_client,
             )
             succeeded += 1
         except Exception:
             failed += 1
             # _process_cdc_event already logged + sent to DLQ
+
+    # Emit audit metrics once per invocation
+    if isinstance(backend, AuditingBackend):
+        LOG.info("Audit stats: ok=%d failed=%d", backend.stats.audit_ok, backend.stats.audit_failed)
+        backend.emit_audit_metrics(cloudwatch_client)
 
     LOG.info("CDC sync: %d succeeded, %d failed (of %d total)", succeeded, failed, len(cdc_events))
     return {"succeeded": succeeded, "failed": failed}

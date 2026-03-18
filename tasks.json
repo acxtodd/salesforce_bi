@@ -1261,14 +1261,27 @@
         {
           "id": "3.3.2.1",
           "title": "Resolve geography scope mismatch across prompt, tools, config, and tests",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T06:56:13.648401+00:00",
-          "updatedAt": "2026-03-18T06:56:19.121141+00:00",
+          "updatedAt": "2026-03-18T07:28:57.318804+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-18T07:27:38.551568+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-18T07:28:54.751179+00:00",
+              "note": "Scope decision (2026-03-18):\n\nGEOGRAPHY RETRIEVAL SCOPE — OBJECT-SPECIFIC, NOT GLOBAL:\n\n1. Property: market/submarket IN current POC scope.\n   - denorm_config.yaml has Market/SubMarket as parents (→ market_name, submarket_name)\n   - Semantic aliases exist: market → market_name, submarket → submarket_name\n   - Prompt and TOOL_DEFINITIONS correctly list them for Property only\n   - Data currently sparse/stale in index (Geography just fixed in SF, index not yet re-loaded)\n   - No changes needed to prompt/tool surfaces for Property\n\n2. Lease: property_submarket NOT currently supported.\n   - Spec shows property_submarket on Lease docs (line 382) and in query examples (line 771)\n   - Current denorm_config only denorms Name, City, State, PropertyClass, PropertySubType, TotalBuildingArea from parent Property — no SubMarket\n   - Prompt and TOOL_DEFINITIONS correctly DO NOT claim it\n   - Follow-up: add SubMarket to Lease Property parent denorm (3.3.2.7 or later)\n\n3. Availability: property_submarket NOT currently supported.\n   - Spec shows property_submarket on Availability docs (line 415) and in query examples (line 790)\n   - Same denorm gap as Lease — no SubMarket from parent Property\n   - Additionally, Availability has its own ascendix__Market/SubMarket/Region__c fields (denorm audit RC-5) that are not in config\n   - Prompt and TOOL_DEFINITIONS correctly DO NOT claim it\n   - Follow-up: add geography fields to Availability denorm (3.3.2.7 or later)\n\nCHANGES MADE:\n- system_prompt.py guideline #11 added: explicitly states geography fields are only on Property\n- system_prompt.py guideline #4: changed 'two submarkets' to 'two cities' to avoid implying submarket comparison works across all objects\n- No changes to field references, tool aliases, or acceptance tests — they were already honest\n\nFOLLOW-UP BOUNDARIES:\n- Re-indexing after Geography fix: 3.3.2.6\n- Adding SubMarket to Lease/Availability denorm: 3.3.2.7\n- nlp-01 passes vacuously (0 results, answer matches on 'available' in negative response) — test coverage gap noted but not changed per constraint against modifying acceptance thresholds"
+            },
+            {
+              "timestamp": "2026-03-18T07:28:57.318810+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Establish whether market/submarket retrieval is in current POC scope and align current gate surfaces accordingly. Use the spec as source of truth, then reconcile prompt claims, tool aliases, denorm expectations, validator assumptions, and acceptance coverage so the system does not over-promise unsupported geography behavior.",
           "technical_context": "BA audits found a real scope mismatch: tool_dispatch and system_prompt expose market/submarket, Property config includes geography parents, Availability does not denormalize geography, and acceptance coverage includes downtown/submarket scenarios. Sandbox data repair is being handled separately; this task is about product/code/test scope alignment, not seeding data.",
           "parent": "3.3.2",
@@ -1276,19 +1289,34 @@
             "An explicit yes/no decision is recorded for market/submarket retrieval in the current POC scope",
             "Prompt claims, tool aliases, validator expectations, and acceptance tests are aligned to that decision",
             "Any unsupported geography behavior is removed from current gate surfaces or scheduled as follow-up implementation work"
-          ]
+          ],
+          "startedAt": "2026-03-18T07:27:38.551333+00:00",
+          "completedAt": "2026-03-18T07:28:57.318645+00:00"
         },
         {
           "id": "3.3.2.2",
           "title": "Tighten geography acceptance coverage to fail on zero-result false positives",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T06:56:26.136768+00:00",
-          "updatedAt": "2026-03-18T06:56:35.841871+00:00",
+          "updatedAt": "2026-03-18T07:38:53.203686+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-18T07:37:43.443523+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-18T07:38:49.229669+00:00",
+              "note": "Fix complete (2026-03-18).\n\nROOT CAUSE: nlp-01 had answer_contains_any but no min_results check. The model's zero-result response ('I didn't find any availability records...') matched on 'downtown' and 'propert', passing the test vacuously. The harness's min_results check works correctly — it was simply not declared on this test.\n\nCHANGES:\n1. nlp-01 REPLACED: 'What's available downtown?' → 'What do we have in Texas?'\n   - Old: tested unsupported path (Availability + geography). Passed on 0 results.\n   - New: tests supported path (Property + state-level geography). Requires min_results: 1.\n   - Preserves semantic test spirit: vague geographic language → structured search.\n\n2. nlp-02: added min_results: 1 (was missing, same structural weakness).\n\n3. search-05: added min_results: 1 (was missing, same structural weakness).\n\nAUDIT: All 10 search_records tests now require min_results: 1. All 5 aggregate_records tests appropriately do not (aggregation doesn't produce search_result_count). Zero-result false-pass is structurally prevented across the suite.\n\nVERIFICATION: Simulated the old false-pass scenario against the new test definition — correctly FAILs on min_results check even when answer_contains_any passes."
+            },
+            {
+              "timestamp": "2026-03-18T07:38:53.203689+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Fix the acceptance harness and the downtown/submarket semantic coverage so a geography-oriented test cannot pass when search_records returns zero results and the answer merely echoes the query term. Require positive retrieval evidence or remove the test from the current gate if geography is out of scope.",
           "technical_context": "BA audit found nlp-01 passing despite result_count=0 and an answer that explicitly said no downtown availability was found. This is a harness defect, not a retrieval success. The task should use the scope decision from 3.3.2.1 to decide whether to strengthen or remove current geography gate expectations.",
           "parent": "3.3.2",
@@ -1299,7 +1327,9 @@
           "depends_on": [
             "3.3.2.1"
           ],
-          "gate_criteria": "Use the geography scope decision before tightening or removing gate tests."
+          "gate_criteria": "Use the geography scope decision before tightening or removing gate tests.",
+          "startedAt": "2026-03-18T07:37:43.443103+00:00",
+          "completedAt": "2026-03-18T07:38:53.203516+00:00"
         },
         {
           "id": "3.3.2.3",

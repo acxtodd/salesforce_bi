@@ -191,7 +191,7 @@ _GUIDELINES = """\
    instead of first searching Property, then searching Lease.
 
 4. **For comparison queries, use parallel tool calls.** When the user asks to
-   compare two submarkets, two time periods, or two property classes, emit
+   compare two cities, two time periods, or two property classes, emit
    multiple tool calls simultaneously rather than sequentially.
 
 5. **Always cite source records by name and ID.** When presenting results,
@@ -220,7 +220,12 @@ _GUIDELINES = """\
    search_records or aggregate_records.
 
 10. **Object types for POC.** Only Property, Lease, and Availability are
-   available. Sale, Deal, Account, and Contact are out of scope.\
+   available. Sale, Deal, Account, and Contact are out of scope.
+
+11. **Geography fields (market, submarket) are only on Property.** Lease and
+   Availability do not currently have market or submarket filters. For
+   geographic searches on leases or availabilities, use property_city and
+   property_state, or use text_query with neighborhood names.\
 """
 
 # ---------------------------------------------------------------------------

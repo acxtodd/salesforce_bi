@@ -57,6 +57,7 @@ tests:
     expected:
       tool_used: "search_records"
       answer_contains_any: ["propert", "owner", "landlord"]
+      min_results: 1
       no_error: true
       latency_under: 15
 
@@ -158,11 +159,12 @@ tests:
   # =========================================================================
 
   - id: "nlp-01"
-    question: "What's available downtown?"
+    question: "What do we have in Texas?"
     category: "semantic"
     expected:
       tool_used: "search_records"
-      answer_contains_any: ["available", "downtown", "space", "propert"]
+      answer_contains_any: ["Texas", "TX", "Dallas", "Houston", "propert"]
+      min_results: 1
       no_error: true
       latency_under: 15
 
@@ -173,5 +175,6 @@ tests:
       tool_used: "search_records"
       answer_contains_any: ["large", "biggest", "propert", "square feet", "SF"]
       answer_contains_number: true
+      min_results: 1
       no_error: true
       latency_under: 15

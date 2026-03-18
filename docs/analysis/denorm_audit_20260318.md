@@ -312,6 +312,122 @@ Pro: Best of both worlds. Con: Requires defining "active" per object type.
 4. **RC-4**: Add `is_active` computed field → design decision needed first
 5. **RC-2c**: Parent denylist → quality-of-life, prevents noise from system references
 
+---
+
+## Appendix A: Lease Entity Deep Dive
+
+**Sample records:**
+- `a0Vfk000000A0gsEAC` — "Office" at PPFC, tenant=Mid Atlantic Commercial, broker=Transwestern, contact=John Worley
+- `a0Vfk000000A1HNEA0` — "Office" at Berkshire Preston Center, tenant=Beal Bank, broker=Holt Lunsford, contact=Andy Beal
+
+### A.1 Side-by-Side: Salesforce vs Turbopuffer (record a0Vfk000000A0gsEAC)
+
+| Field | Salesforce Value | In Turbopuffer? | TP Key |
+|-------|-----------------|----------------|--------|
+| **Direct fields** | | | |
+| Name | Office | Yes | `name` |
+| LeaseType | NNN | Yes | `leasetype` |
+| Description | *(null)* | — | — |
+| UnitType | Office | Yes | `unittype` |
+| Size | 5000 | Yes | `size` |
+| LeaseRatePerUOM | 24 | Yes | `leaserateperuom` |
+| AverageRent | 319.09 | Yes | `averagerent` |
+| TermCommencementDate | 2019-01-24 | Yes | `termcommencementdate` |
+| TermExpirationDate | 2030-01-31 | Yes | `termexpirationdate` |
+| TermMonths | 132.26 | Yes | `termmonths` |
+| OccupancyDate | *(null)* | — | — |
+| LeaseSigned | *(null)* | — | — |
+| **Property parent (configured)** | | | |
+| Property.Name | Preston Park Financial Center | Yes | `property_name` |
+| Property.City | Plano | Yes | `property_city` |
+| Property.State | TX | Yes | `property_state` |
+| Property.PropertyClass | A | Yes | `property_propertyclass` |
+| Property.PropertySubType | General | Yes | `property_propertysubtype` |
+| Property.TotalBuildingArea | 189398 | Yes | `property_totalbuildingarea` |
+| **Tenant parent (configured)** | | | |
+| Tenant.Name | Mid Atlantic Commercial | Yes | `tenant_name` |
+| **OwnerLandlord parent (configured)** | | | |
+| OwnerLandlord.Name | Griffin Partners | Yes | `ownerlandlord_name` |
+| **TenantRepBroker (NOT configured)** | | | |
+| TenantRepBroker.Name | *(null on this record)* | **NO — not in config** | — |
+| **ListingBrokerCompany (NOT configured)** | | | |
+| ListingBrokerCompany.Name | **Transwestern Commercial Services LLC** | **NO — MISSING** | — |
+| **ListingBrokerContact (NOT configured)** | | | |
+| ListingBrokerContact.Name | *(null on this record)* | **NO — not in config** | — |
+| **TenantContact (NOT configured)** | | | |
+| TenantContact.Name | **John Worley** | **NO — MISSING** | — |
+| **OwnerLandlordContact (NOT configured)** | | | |
+| OwnerLandlordContact.Name | *(null on this record)* | **NO — not in config** | — |
+| **OriginatingDeal (NOT configured)** | | | |
+| OriginatingDeal | a0Pfk000000Ckp1EAC → "MAC Lease Deal" | **NO — MISSING** | — |
+
+**What's lost:** This lease was brokered by Transwestern, with John Worley as tenant contact, and originated from a Deal record. None of this context reaches the index.
+
+### A.2 Text Embedding — Label Ambiguity Demonstrated
+
+**Beal Bank lease text (actual from Turbopuffer):**
+```
+Lease: | Name: Office | LeaseType: Full Service Gross | UnitType: Office |
+Name: The Berkshire - Preston Center | City: Dallas | State: TX |
+PropertyClass: A | Name: Beal Bank | Name: Edwards RE Partners
+```
+
+Four `Name:` values in one string:
+1. `Name: Office` — the lease's own Name field
+2. `Name: The Berkshire - Preston Center` — Property parent
+3. `Name: Beal Bank` — Tenant parent
+4. `Name: Edwards RE Partners` — OwnerLandlord parent
+
+A search for "Edwards RE Partners" would match via BM25, but the embedding model has no way to know this is an owner vs a tenant vs a property. **With the RC-3 fix**, this would become:
+```
+Lease: | Name: Office | LeaseType: Full Service Gross | UnitType: Office |
+Property Name: The Berkshire - Preston Center | Property City: Dallas |
+Property State: TX | Property PropertyClass: A |
+Tenant Name: Beal Bank | OwnerLandlord Name: Edwards RE Partners
+```
+
+### A.3 Lease Relationship Fill Rates — Full Salesforce Ground Truth (483 leases)
+
+| Relationship | Target | SF Fill | Fill % | In Config? | Query Impact |
+|-------------|--------|---------|--------|-----------|-------------|
+| Property | Property | 483 | 100% | Yes | — |
+| **Tenant** | Account | **329** | **68.1%** | Yes | Working (52% in TP due to partial load) |
+| **TenantContact** | Contact | **215** | **44.5%** | **NO** | "Who is the contact for [Tenant]?" impossible |
+| OwnerLandlord | Account | 88 | 18.2% | Yes | Working (20% in TP) |
+| Floor | Floor | 74 | 15.3% | NO | Low value for search |
+| OriginatingDeal | Deal | 50 | 10.4% | NO | "Which deal created this lease?" impossible |
+| **ListingBrokerCompany** | Account | **39** | **8.1%** | **NO** | "Leases brokered by Transwestern" impossible |
+| OwnerLandlordContact | Contact | 32 | 6.6% | NO | Low fill, low priority |
+| ListingBrokerContact | Contact | 30 | 6.2% | NO | Low fill |
+| TenantRepBroker | Account | 12 | 2.5% | NO | Low fill |
+| MasterLease | Lease | 0 | 0% | NO | No data |
+
+**Top listing broker companies on leases:**
+
+| Broker Company | Lease Count |
+|---------------|-------------|
+| Henry S. Miller - Houston | 6 |
+| Wave NNN | 4 |
+| Sleiman Enterprises | 4 |
+| Transwestern Commercial Services LLC | 3 |
+| Bayer Properties Incorporated | 3 |
+| Brand Partners | 2 |
+| MG Retail Partners | 2 |
+| Lee & Associates - NYC | 2 |
+
+### A.4 Lease Audit Findings
+
+**Confirms RC-2 (missing relationships):** The three highest-value missing relationships are:
+1. **TenantContact** (215 / 44.5%) — highest fill rate of any missing relationship. "Who do I call about this lease?" is a core CRE workflow.
+2. **ListingBrokerCompany** (39 / 8.1%) — lower fill but high business value. Broker attribution is fundamental to CRE.
+3. **OriginatingDeal** (50 / 10.4%) — cross-object link to Deal. Could enable "show me the deal that created this lease" once Deals are loaded.
+
+**Confirms RC-3 (label ambiguity):** The Beal Bank record text has 4 undifferentiated `Name:` values. This is the clearest example of why `build_text()` needs relationship prefixes.
+
+**Confirms RC-4 (no active filtering):** The sample record (exp 2030-01-31) is active, but 46% of loaded leases are expired. No mechanism to distinguish them at search time.
+
+**New finding — OriginatingDeal as cross-object link:** 50 leases (10.4%) link back to their originating Deal. If Deals are loaded (RC-2a), this becomes a navigable relationship: "show me the deal history for this lease." Not critical for POC, but worth noting for the dev as a future denorm candidate.
+
 ### Sandbox data status (not systemic — patched 2026-03-18)
 
 - Geography: **Resolved.** 30 records seeded (4 regions, 14 markets, 12 submarkets). 29 properties now resolve to markets (e.g., PPFC → Dallas-Fort Worth).

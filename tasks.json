@@ -1670,10 +1670,10 @@
         {
           "id": "3.4",
           "title": "Add document audit trail and sandbox replay capability",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T13:45:13.359718+00:00",
-          "updatedAt": "2026-03-18T14:56:26.665408+00:00",
+          "updatedAt": "2026-03-18T15:19:54.209373+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -1681,6 +1681,10 @@
             {
               "timestamp": "2026-03-18T14:47:32+00:00",
               "note": "Implementation plan for engineering and QA review: /Users/toddadmin/.claude/plans/replicated-mixing-snail.md. QA should read this plan alongside testing because it captures the intended audit bucket key pattern, replay behavior, config snapshot sidecars, and observability expectations."
+            },
+            {
+              "timestamp": "2026-03-18T15:19:54.209525+00:00",
+              "note": "Implemented and pushed in commit 98152d7. AuditingBackend wraps upsert/delete transparently for both CDC and bulk_load paths. Key pattern: documents/{org_id}/{object_type}/{record_id}.json. Replay script supports --dry-run, --as-of (point-in-time via S3 versioning), --require-empty (fail-closed), --validate-config (drift detection). Config snapshots written to _meta/ on bulk_load and CDC cold start. Delete tombstone audit failures are counted in CloudWatch metrics. load_config() kept backwards-compatible (dict return); new load_config_with_raw() for audit callers. 122 tests across 4 test files, 470 total suite passing."
             }
           ],
           "references": [
@@ -1694,7 +1698,8 @@
             "DELETE events write tombstone JSON to the same S3 key pattern with deleted:true and deleted_at timestamp.",
             "Config snapshot written to _meta/ on every bulk_load and CDC cold start. Contains denorm config hash, source, timestamp, and raw YAML.",
             "replay_from_audit.py can replay documents from S3 into any Turbopuffer namespace without Salesforce or Bedrock credentials. Supports --dry-run, --as-of for point-in-time, --require-empty for authoritative mode, and --validate-config for drift detection."
-          ]
+          ],
+          "completedAt": "2026-03-18T15:19:54.209522+00:00"
         }
       ]
     }

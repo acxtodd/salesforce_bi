@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AscendixIQ — CDC Pipeline Trace</title>
+<style>
+  :root {
+    --sf-blue: #00A1E0;
+    --aws-orange: #FF9900;
+    --aws-dark: #232F3E;
+    --s3-green: #3F8624;
+    --eb-pink: #E7157B;
+    --lambda-orange: #F58536;
+    --bedrock-purple: #8C4FFF;
+    --tp-cyan: #06B6D4;
+    --search-emerald: #10B981;
+    --dlq-red: #EF4444;
+    --bg: #0F172A;
+    --card: #1E293B;
+    --text: #E2E8F0;
+    --muted: #94A3B8;
+    --border: #334155;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    text-align: center;
+    padding: 48px 24px 32px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .header p {
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .pipeline {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+    position: relative;
+  }
+
+  /* Vertical connector line */
+  .pipeline::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 80px;
+    width: 2px;
+    background: linear-gradient(to bottom,
+      var(--sf-blue) 0%,
+      var(--aws-orange) 20%,
+      var(--s3-green) 30%,
+      var(--eb-pink) 40%,
+      var(--lambda-orange) 50%,
+      var(--bedrock-purple) 70%,
+      var(--tp-cyan) 85%,
+      var(--search-emerald) 100%
+    );
+    opacity: 0.3;
+    transform: translateX(-50%);
+  }
+
+  .step {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeUp 0.5s ease forwards;
+  }
+  .step:nth-child(1)  { animation-delay: 0.1s; }
+  .step:nth-child(2)  { animation-delay: 0.25s; }
+  .step:nth-child(3)  { animation-delay: 0.4s; }
+  .step:nth-child(4)  { animation-delay: 0.55s; }
+  .step:nth-child(5)  { animation-delay: 0.7s; }
+  .step:nth-child(6)  { animation-delay: 0.85s; }
+  .step:nth-child(7)  { animation-delay: 1.0s; }
+  .step:nth-child(8)  { animation-delay: 1.15s; }
+  .step:nth-child(9)  { animation-delay: 1.3s; }
+  .step:nth-child(10) { animation-delay: 1.45s; }
+  .step:nth-child(11) { animation-delay: 1.6s; }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Alternating left/right layout */
+  .step:nth-child(odd) { flex-direction: row; }
+  .step:nth-child(even) { flex-direction: row-reverse; }
+
+  .step-number {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    color: #fff;
+    position: relative;
+    z-index: 2;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(0,0,0,0.3);
+  }
+
+  .step-content {
+    flex: 1;
+    max-width: 460px;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 20px 24px;
+    border: 1px solid var(--border);
+    position: relative;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .step-content:hover {
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  .step:nth-child(odd) .step-content { margin-right: auto; margin-left: 0; }
+  .step:nth-child(even) .step-content { margin-left: auto; margin-right: 0; }
+
+  .step-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+
+  .step-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  .step-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .step-detail {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11.5px;
+    color: #CBD5E1;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .step-latency {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    background: rgba(255,255,255,0.05);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  /* Grid layout for the pipeline */
+  .pipeline-grid {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    gap: 0;
+    align-items: start;
+  }
+
+  .g-left  { grid-column: 1; text-align: right; }
+  .g-center { grid-column: 2; display: flex; justify-content: center; }
+  .g-right { grid-column: 3; text-align: left; }
+
+  .row {
+    display: contents;
+  }
+
+  .row .g-left .step-content,
+  .row .g-right .step-content {
+    display: inline-block;
+    text-align: left;
+    max-width: 460px;
+    width: 100%;
+  }
+
+  .connector-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-top: 18px;
+    position: relative;
+    z-index: 2;
+  }
+  .connector-dot::after {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 60px;
+    opacity: 0.2;
+  }
+
+  .arrow-down {
+    text-align: center;
+    padding: 4px 0;
+    color: var(--muted);
+    font-size: 20px;
+    opacity: 0.5;
+    grid-column: 2;
+  }
+
+  /* Color schemes per service */
+  .sf .step-number, .sf .connector-dot { background: var(--sf-blue); }
+  .sf .step-content { border-color: rgba(0,161,224,0.25); }
+  .sf .step-badge { background: rgba(0,161,224,0.15); color: var(--sf-blue); }
+  .sf .step-content:hover { border-color: rgba(0,161,224,0.5); }
+
+  .appflow .step-number, .appflow .connector-dot { background: var(--aws-orange); }
+  .appflow .step-content { border-color: rgba(255,153,0,0.25); }
+  .appflow .step-badge { background: rgba(255,153,0,0.15); color: var(--aws-orange); }
+  .appflow .step-content:hover { border-color: rgba(255,153,0,0.5); }
+
+  .s3 .step-number, .s3 .connector-dot { background: var(--s3-green); }
+  .s3 .step-content { border-color: rgba(63,134,36,0.25); }
+  .s3 .step-badge { background: rgba(63,134,36,0.15); color: var(--s3-green); }
+  .s3 .step-content:hover { border-color: rgba(63,134,36,0.5); }
+
+  .eb .step-number, .eb .connector-dot { background: var(--eb-pink); }
+  .eb .step-content { border-color: rgba(231,21,123,0.25); }
+  .eb .step-badge { background: rgba(231,21,123,0.15); color: var(--eb-pink); }
+  .eb .step-content:hover { border-color: rgba(231,21,123,0.5); }
+
+  .lam .step-number, .lam .connector-dot { background: var(--lambda-orange); }
+  .lam .step-content { border-color: rgba(245,133,54,0.25); }
+  .lam .step-badge { background: rgba(245,133,54,0.15); color: var(--lambda-orange); }
+  .lam .step-content:hover { border-color: rgba(245,133,54,0.5); }
+
+  .bedrock .step-number, .bedrock .connector-dot { background: var(--bedrock-purple); }
+  .bedrock .step-content { border-color: rgba(140,79,255,0.25); }
+  .bedrock .step-badge { background: rgba(140,79,255,0.15); color: var(--bedrock-purple); }
+  .bedrock .step-content:hover { border-color: rgba(140,79,255,0.5); }
+
+  .tp .step-number, .tp .connector-dot { background: var(--tp-cyan); }
+  .tp .step-content { border-color: rgba(6,182,212,0.25); }
+  .tp .step-badge { background: rgba(6,182,212,0.15); color: var(--tp-cyan); }
+  .tp .step-content:hover { border-color: rgba(6,182,212,0.5); }
+
+  .search .step-number, .search .connector-dot { background: var(--search-emerald); }
+  .search .step-content { border-color: rgba(16,185,129,0.25); }
+  .search .step-badge { background: rgba(16,185,129,0.15); color: var(--search-emerald); }
+  .search .step-content:hover { border-color: rgba(16,185,129,0.5); }
+
+  .dlq .step-number, .dlq .connector-dot { background: var(--dlq-red); }
+  .dlq .step-content { border-color: rgba(239,68,68,0.25); }
+  .dlq .step-badge { background: rgba(239,68,68,0.15); color: var(--dlq-red); }
+  .dlq .step-content:hover { border-color: rgba(239,68,68,0.5); }
+
+  /* Timeline layout */
+  .timeline {
+    position: relative;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 30px;
+    top: 0;
+    bottom: 80px;
+    width: 3px;
+    background: linear-gradient(to bottom,
+      var(--sf-blue),
+      var(--aws-orange),
+      var(--s3-green),
+      var(--eb-pink),
+      var(--lambda-orange),
+      var(--bedrock-purple),
+      var(--tp-cyan),
+      var(--search-emerald)
+    );
+    border-radius: 3px;
+    opacity: 0.4;
+  }
+
+  .tl-step {
+    position: relative;
+    padding-left: 76px;
+    margin-bottom: 28px;
+    opacity: 0;
+    transform: translateX(-12px);
+    animation: slideIn 0.4s ease forwards;
+  }
+  .tl-step:nth-child(1)  { animation-delay: 0.15s; }
+  .tl-step:nth-child(2)  { animation-delay: 0.3s; }
+  .tl-step:nth-child(3)  { animation-delay: 0.45s; }
+  .tl-step:nth-child(4)  { animation-delay: 0.6s; }
+  .tl-step:nth-child(5)  { animation-delay: 0.75s; }
+  .tl-step:nth-child(6)  { animation-delay: 0.9s; }
+  .tl-step:nth-child(7)  { animation-delay: 1.05s; }
+  .tl-step:nth-child(8)  { animation-delay: 1.2s; }
+  .tl-step:nth-child(9)  { animation-delay: 1.35s; }
+  .tl-step:nth-child(10) { animation-delay: 1.5s; }
+
+  @keyframes slideIn {
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .tl-dot {
+    position: absolute;
+    left: 20px;
+    top: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    z-index: 2;
+    box-shadow: 0 0 12px rgba(0,0,0,0.4);
+  }
+
+  .tl-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .tl-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+
+  .tl-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .tl-title {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .tl-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .tl-code {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: #CBD5E1;
+    line-height: 1.65;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .tl-meta {
+    display: flex;
+    gap: 12px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .tl-tag {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.05);
+    color: var(--muted);
+  }
+
+  .tl-file {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0.7;
+  }
+
+  /* Error branch callout */
+  .error-branch {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 8px;
+  }
+  .error-branch .tl-title {
+    color: var(--dlq-red);
+    font-size: 13px;
+  }
+  .error-branch .tl-desc {
+    font-size: 12px;
+  }
+
+  /* Latency summary bar */
+  .latency-bar {
+    max-width: 1000px;
+    margin: 0 auto 40px;
+    padding: 0 24px;
+  }
+  .latency-bar-inner {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    height: 32px;
+    background: var(--card);
+    border: 1px solid var(--border);
+  }
+  .lat-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: flex 0.3s;
+  }
+  .latency-label {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .latency-label strong {
+    color: var(--text);
+  }
+
+  @media (max-width: 700px) {
+    .timeline::before { left: 18px; }
+    .tl-step { padding-left: 56px; }
+    .tl-dot { left: 8px; width: 22px; height: 22px; font-size: 10px; }
+    .header h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Property Record &rarr; Searchable</h1>
+  <p>Full CDC pipeline trace: from a new Salesforce record to a hybrid-searchable document in Turbopuffer</p>
+</div>
+
+<!-- Latency bar -->
+<div class="latency-bar">
+  <div class="latency-bar-inner">
+    <div class="lat-seg" style="flex:5; background:var(--sf-blue);">CDC 1-5m</div>
+    <div class="lat-seg" style="flex:0.5; background:var(--s3-green);">&lt;1s</div>
+    <div class="lat-seg" style="flex:0.5; background:var(--eb-pink);">&lt;1s</div>
+    <div class="lat-seg" style="flex:1; background:var(--lambda-orange);">SOQL 1-5s</div>
+    <div class="lat-seg" style="flex:0.3; background:var(--lambda-orange); opacity:0.7;">Denorm</div>
+    <div class="lat-seg" style="flex:1; background:var(--bedrock-purple);">Embed 1-2s</div>
+    <div class="lat-seg" style="flex:0.5; background:var(--tp-cyan);">Upsert &lt;1s</div>
+  </div>
+  <p class="latency-label">End-to-end: <strong>~2-8 minutes</strong> (P50 &asymp; 4 min, dominated by AppFlow CDC polling)</p>
+</div>
+
+<div class="timeline">
+
+  <!-- Step 1: Salesforce CDC -->
+  <div class="tl-step sf">
+    <div class="tl-dot" style="background:var(--sf-blue);">1</div>
+    <div class="tl-card" style="border-color:rgba(0,161,224,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(0,161,224,0.15);color:var(--sf-blue);">Salesforce</span>
+        <span class="tl-title">CDC Platform Event Published</span>
+      </div>
+      <div class="tl-desc">
+        A user creates a new Property record. Salesforce automatically publishes an
+        <code>ascendix__Property__ChangeEvent</code> on the CDC channel with changeType
+        <strong>CREATE</strong>, the new record ID, and a commit timestamp.
+      </div>
+      <div class="tl-code">{
+  "ChangeEventHeader": {
+    "entityName": "ascendix__Property__ChangeEvent",
+    "changeType": "CREATE",
+    "recordIds": ["a01xx00000ABC123"],
+    "commitTimestamp": 1710720000000
+  },
+  "Name": "One Arts Plaza",
+  "ascendix__City__c": "Dallas"
+}</div>
+      <div class="tl-meta">
+        <span class="tl-tag">Trigger: automatic on DML</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: AppFlow -->
+  <div class="tl-step appflow">
+    <div class="tl-dot" style="background:var(--aws-orange);">2</div>
+    <div class="tl-card" style="border-color:rgba(255,153,0,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(255,153,0,0.15);color:var(--aws-orange);">AppFlow</span>
+        <span class="tl-title">CDC Stream &rarr; S3</span>
+      </div>
+      <div class="tl-desc">
+        AWS AppFlow polls the CDC channel using a JWT Bearer connector profile
+        (credentials in Secrets Manager). On detection, it writes the raw JSON
+        payload to S3.
+      </div>
+      <div class="tl-code">s3://salesforce-ai-search-cdc-{acct}-{region}/
+  cdc/ascendix__Property__c/
+    2026/03/18/1710720060000.json</div>
+      <div class="tl-meta">
+        <span class="tl-tag">Latency: 1-5 min polling</span>
+        <span class="tl-tag">Auth: JWT Bearer</span>
+        <span class="tl-file">lib/ingestion-stack.ts:105-225</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: S3 Notification -->
+  <div class="tl-step s3">
+    <div class="tl-dot" style="background:var(--s3-green);">3</div>
+    <div class="tl-card" style="border-color:rgba(63,134,36,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(63,134,36,0.15);color:var(--s3-green);">S3</span>
+        <span class="tl-title">Object Created Notification</span>
+      </div>
+      <div class="tl-desc">
+        The CDC bucket has EventBridge notifications enabled. When AppFlow writes
+        the JSON file, S3 emits an <code>Object Created</code> event to EventBridge.
+      </div>
+      <div class="tl-meta">
+        <span class="tl-tag">Latency: &lt;1s</span>
+        <span class="tl-tag">enableEventBridgeNotification()</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: EventBridge -->
+  <div class="tl-step eb">
+    <div class="tl-dot" style="background:var(--eb-pink);">4</div>
+    <div class="tl-card" style="border-color:rgba(231,21,123,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(231,21,123,0.15);color:var(--eb-pink);">EventBridge</span>
+        <span class="tl-title">Rule Match &rarr; Lambda Target</span>
+      </div>
+      <div class="tl-desc">
+        Rule <code>salesforce-ai-search-cdc-trigger</code> matches any S3 key
+        prefixed <code>cdc/</code>. It transforms the event into a flat payload
+        and invokes the CDC Sync Lambda.
+      </div>
+      <div class="tl-code">// Input transform
+{
+  "bucket": "salesforce-ai-search-cdc-...",
+  "key": "cdc/ascendix__Property__c/2026/...",
+  "eventTime": "2026-03-18T...",
+  "eventSource": "cdc"
+}</div>
+      <div class="tl-meta">
+        <span class="tl-tag">Latency: &lt;1s</span>
+        <span class="tl-file">lib/ingestion-stack.ts:965-1014</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 5: Lambda Parse -->
+  <div class="tl-step lam">
+    <div class="tl-dot" style="background:var(--lambda-orange);">5</div>
+    <div class="tl-card" style="border-color:rgba(245,133,54,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(245,133,54,0.15);color:var(--lambda-orange);">Lambda</span>
+        <span class="tl-title">Parse CDC Payload</span>
+      </div>
+      <div class="tl-desc">
+        The Lambda reads the S3 object, parses <code>ChangeEventHeader</code>,
+        and maps the entity through <code>CDC_ENTITY_MAP</code>:
+        <code>ascendix__Property__ChangeEvent &rarr; ascendix__Property__c</code>.
+        Extracts changeType and recordIds.
+      </div>
+      <div class="tl-code">CDC_ENTITY_MAP = {
+  "ascendix__Property__ChangeEvent": "ascendix__Property__c",
+  "ascendix__Property__c":          "ascendix__Property__c",
+  ...
+}
+# Result: CDCEvent(object_name, change_type, record_ids, commit_ts)</div>
+      <div class="tl-meta">
+        <span class="tl-file">lambda/cdc_sync/index.py:57-91</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 6: SOQL Re-query -->
+  <div class="tl-step lam">
+    <div class="tl-dot" style="background:var(--lambda-orange);">6</div>
+    <div class="tl-card" style="border-color:rgba(245,133,54,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(245,133,54,0.15);color:var(--lambda-orange);">Lambda + Salesforce API</span>
+        <span class="tl-title">SOQL Enrichment Query</span>
+      </div>
+      <div class="tl-desc">
+        CDC payloads only carry changed fields. The Lambda queries Salesforce
+        for the complete record using a SOQL built from <code>denorm_config.yaml</code>,
+        including parent lookups for OwnerLandlord, Market, and SubMarket.
+      </div>
+      <div class="tl-code">SELECT Id, LastModifiedDate,
+  Name, ascendix__City__c, ascendix__State__c,
+  ascendix__PropertyClass__c, ascendix__Description__c,
+  ascendix__TotalBuildingArea__c, ascendix__YearBuilt__c,
+  OwnerLandlord.Name, Market.Name, SubMarket.Name
+FROM ascendix__Property__c
+WHERE Id = 'a01xx00000ABC123' LIMIT 1</div>
+      <div class="tl-meta">
+        <span class="tl-tag">Latency: 1-5s</span>
+        <span class="tl-tag">REST API v59.0</span>
+        <span class="tl-file">lib/denormalize.py:85-115</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 7: Flatten + Build Text -->
+  <div class="tl-step lam">
+    <div class="tl-dot" style="background:var(--lambda-orange);">7</div>
+    <div class="tl-card" style="border-color:rgba(245,133,54,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(245,133,54,0.15);color:var(--lambda-orange);">Denormalize</span>
+        <span class="tl-title">Flatten &amp; Build Searchable Text</span>
+      </div>
+      <div class="tl-desc">
+        <code>flatten()</code> unpacks parent relationships into flat keys.
+        <code>build_text()</code> constructs a pipe-delimited string from
+        all embed fields — this becomes the BM25-indexed text and the
+        embedding input.
+      </div>
+      <div class="tl-code">// flatten() output
+{
+  "Name": "One Arts Plaza",
+  "ascendix__City__c": "Dallas",
+  "ascendix__State__c": "TX",
+  "ascendix__OwnerLandlord__c": {"Name": "Ascendix LLC"},
+  "ascendix__Market__c": {"Name": "Uptown"}
+}
+
+// build_text() output
+"Property: Name: One Arts Plaza | City: Dallas | State: TX
+ | PropertyClass: A | OwnerLandlord Name: Ascendix LLC
+ | Market Name: Uptown | SubMarket Name: Arts District"</div>
+      <div class="tl-meta">
+        <span class="tl-tag">Latency: &lt;100ms</span>
+        <span class="tl-file">lib/denormalize.py:123-192</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 8: Embedding -->
+  <div class="tl-step bedrock">
+    <div class="tl-dot" style="background:var(--bedrock-purple);">8</div>
+    <div class="tl-card" style="border-color:rgba(140,79,255,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(140,79,255,0.15);color:var(--bedrock-purple);">Bedrock</span>
+        <span class="tl-title">Generate Vector Embedding</span>
+      </div>
+      <div class="tl-desc">
+        The full text string is sent to <strong>Amazon Titan Embed Text v2</strong>
+        via Bedrock, returning a 1024-dimension normalized vector for semantic search.
+      </div>
+      <div class="tl-code">bedrock.invoke_model(
+  modelId="amazon.titan-embed-text-v2:0",
+  body={
+    "inputText": "Property: Name: One Arts Plaza | ...",
+    "dimensions": 1024,
+    "normalize": True
+  }
+)
+# → [0.0234, -0.0891, 0.0412, ... ] (1024 floats)</div>
+      <div class="tl-meta">
+        <span class="tl-tag">Latency: 1-2s</span>
+        <span class="tl-tag">1024 dimensions</span>
+        <span class="tl-tag">Cosine distance</span>
+        <span class="tl-file">lib/denormalize.py:293-307</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 9: Turbopuffer Upsert -->
+  <div class="tl-step tp">
+    <div class="tl-dot" style="background:var(--tp-cyan);">9</div>
+    <div class="tl-card" style="border-color:rgba(6,182,212,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(6,182,212,0.15);color:var(--tp-cyan);">Turbopuffer</span>
+        <span class="tl-title">Upsert Document</span>
+      </div>
+      <div class="tl-desc">
+        The final document is upserted into Turbopuffer namespace
+        <code>org_{salesforce_org_id}</code>. The <code>text</code> field is
+        indexed with <code>word_v3</code> tokenizer for BM25. The vector is
+        indexed for ANN. All metadata stored as filterable attributes.
+      </div>
+      <div class="tl-code">{
+  "id": "a01xx00000ABC123",
+  "vector": [0.0234, -0.0891, ...],      // 1024-dim
+  "text": "Property: Name: One Arts...",  // BM25 indexed
+  "object_type": "property",
+  "name": "One Arts Plaza",
+  "city": "Dallas",
+  "state": "TX",
+  "propertyclass": "A",
+  "totalbuildingarea": 250000,
+  "yearbuilt": 2007,
+  "ownerlandlord_name": "Ascendix LLC",
+  "market_name": "Uptown"
+}</div>
+      <div class="tl-meta">
+        <span class="tl-tag">Latency: &lt;1s</span>
+        <span class="tl-tag">Schema: word_v3 tokenizer</span>
+        <span class="tl-file">lib/turbopuffer_backend.py:313-329</span>
+      </div>
+
+      <!-- The record is now searchable callout -->
+      <div style="margin-top:14px;padding:10px 14px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:8px;">
+        <div style="font-size:13px;font-weight:600;color:var(--search-emerald);">
+          &#10003; Record is now searchable
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 10: Search (query time) -->
+  <div class="tl-step search">
+    <div class="tl-dot" style="background:var(--search-emerald);">10</div>
+    <div class="tl-card" style="border-color:rgba(16,185,129,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(16,185,129,0.15);color:var(--search-emerald);">Search</span>
+        <span class="tl-title">Hybrid Query (BM25 + ANN + RRF)</span>
+      </div>
+      <div class="tl-desc">
+        At query time, the search backend runs BM25 and vector ANN in parallel
+        via <code>multi_query</code>, then fuses results client-side using
+        Reciprocal Rank Fusion (k=60). Attribute filters narrow the scope.
+      </div>
+      <div class="tl-code">// multi_query: two parallel searches
+Query 1 (BM25):  rank_by=("text", "BM25", "arts plaza dallas")
+Query 2 (ANN):   rank_by=("vector", "ANN", embed("arts plaza dallas"))
+
+// RRF fusion
+score[doc] = Σ 1/(60 + rank_bm25) + 1/(60 + rank_ann)
+
+// Result
+[{id: "a01xx00000ABC123", name: "One Arts Plaza", dist: 0.92, ...}]</div>
+      <div class="tl-meta">
+        <span class="tl-tag">3 modes: ANN, BM25, Hybrid</span>
+        <span class="tl-tag">Filterable attributes</span>
+        <span class="tl-file">lib/turbopuffer_backend.py:163-211</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error path -->
+  <div class="tl-step dlq">
+    <div class="tl-dot" style="background:var(--dlq-red);">!</div>
+    <div class="tl-card" style="border-color:rgba(239,68,68,0.25);">
+      <div class="tl-header">
+        <span class="step-badge" style="background:rgba(239,68,68,0.15);color:var(--dlq-red);">Error Path</span>
+        <span class="tl-title">DLQ + CloudWatch Metrics</span>
+      </div>
+      <div class="tl-desc">
+        If any step (5-9) fails, the event is sent to
+        <code>salesforce-ai-search-ingestion-dlq</code> (14-day retention) with
+        the error and raw payload. On success, <code>CDCSyncLag</code> is emitted
+        to CloudWatch per SObject.
+      </div>
+      <div class="tl-code">// DLQ message on failure
+{
+  "object_name": "ascendix__Property__c",
+  "change_type": "CREATE",
+  "record_ids": ["a01xx00000ABC123"],
+  "error": "SalesforceQueryError: INVALID_SESSION_ID",
+  "raw": { ... }
+}
+
+// CloudWatch metric on success
+Namespace: SalesforceAISearch/CDCSync
+Metric:    CDCSyncLag = 4200 ms
+Dimension: SObject = ascendix__Property__c</div>
+      <div class="tl-meta">
+        <span class="tl-tag">DLQ retention: 14 days</span>
+        <span class="tl-file">lambda/cdc_sync/index.py:315-378</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -37,45 +37,45 @@ class TestListCurrentVersions:
 
     def test_returns_document_keys(self):
         keys = [
-            "documents/org1/property/a0x1.json",
-            "documents/org1/lease/a0x2.json",
+            "replay/org1/property/a0x1.json",
+            "replay/org1/lease/a0x2.json",
         ]
         s3 = self._make_s3(keys)
-        result = _list_current_versions(s3, "bucket", "documents/org1/", None)
+        result = _list_current_versions(s3, "bucket", "replay/org1/", None)
         assert result == keys
 
     def test_skips_meta_prefix(self):
         keys = [
-            "documents/org1/property/a0x1.json",
-            "documents/org1/_meta/denorm_config_bulk_load_20260318.yaml",
+            "replay/org1/property/a0x1.json",
+            "replay/org1/_meta/denorm_config_bulk_load_20260318.yaml",
         ]
         s3 = self._make_s3(keys)
-        result = _list_current_versions(s3, "bucket", "documents/org1/", None)
+        result = _list_current_versions(s3, "bucket", "replay/org1/", None)
         assert len(result) == 1
         assert "_meta/" not in result[0]
 
     def test_filters_by_object_type(self):
         keys = [
-            "documents/org1/property/a0x1.json",
-            "documents/org1/lease/a0x2.json",
-            "documents/org1/availability/a0x3.json",
+            "replay/org1/property/a0x1.json",
+            "replay/org1/lease/a0x2.json",
+            "replay/org1/availability/a0x3.json",
         ]
         s3 = self._make_s3(keys)
         result = _list_current_versions(
-            s3, "bucket", "documents/org1/", ["property"]
+            s3, "bucket", "replay/org1/", ["property"]
         )
         assert len(result) == 1
         assert "property" in result[0]
 
     def test_multiple_object_types(self):
         keys = [
-            "documents/org1/property/a0x1.json",
-            "documents/org1/lease/a0x2.json",
-            "documents/org1/availability/a0x3.json",
+            "replay/org1/property/a0x1.json",
+            "replay/org1/lease/a0x2.json",
+            "replay/org1/availability/a0x3.json",
         ]
         s3 = self._make_s3(keys)
         result = _list_current_versions(
-            s3, "bucket", "documents/org1/", ["property", "lease"]
+            s3, "bucket", "replay/org1/", ["property", "lease"]
         )
         assert len(result) == 2
 
@@ -84,7 +84,7 @@ class TestListCurrentVersions:
         paginator = MagicMock()
         paginator.paginate.return_value = [{}]
         s3.get_paginator.return_value = paginator
-        result = _list_current_versions(s3, "bucket", "documents/org1/", None)
+        result = _list_current_versions(s3, "bucket", "replay/org1/", None)
         assert result == []
 
 
@@ -103,9 +103,9 @@ class TestListPointInTimeVersions:
         paginator.paginate.return_value = [
             {
                 "Versions": [
-                    {"Key": "documents/org1/property/a0x1.json", "LastModified": t1, "VersionId": "v1"},
-                    {"Key": "documents/org1/property/a0x1.json", "LastModified": t2, "VersionId": "v2"},
-                    {"Key": "documents/org1/property/a0x1.json", "LastModified": t3, "VersionId": "v3"},
+                    {"Key": "replay/org1/property/a0x1.json", "LastModified": t1, "VersionId": "v1"},
+                    {"Key": "replay/org1/property/a0x1.json", "LastModified": t2, "VersionId": "v2"},
+                    {"Key": "replay/org1/property/a0x1.json", "LastModified": t3, "VersionId": "v3"},
                 ]
             }
         ]
@@ -113,12 +113,12 @@ class TestListPointInTimeVersions:
 
         cutoff = datetime(2026, 3, 16, tzinfo=timezone.utc)
         result = _list_point_in_time_versions(
-            s3, "bucket", "documents/org1/", cutoff, None
+            s3, "bucket", "replay/org1/", cutoff, None
         )
 
         assert len(result) == 1
         key, vid = result[0]
-        assert key == "documents/org1/property/a0x1.json"
+        assert key == "replay/org1/property/a0x1.json"
         assert vid == "v2"  # latest before cutoff
 
     def test_skips_meta_and_filters_object_type(self):
@@ -128,9 +128,9 @@ class TestListPointInTimeVersions:
         paginator.paginate.return_value = [
             {
                 "Versions": [
-                    {"Key": "documents/org1/property/a0x1.json", "LastModified": t1, "VersionId": "v1"},
-                    {"Key": "documents/org1/lease/a0x2.json", "LastModified": t1, "VersionId": "v2"},
-                    {"Key": "documents/org1/_meta/config.json", "LastModified": t1, "VersionId": "v3"},
+                    {"Key": "replay/org1/property/a0x1.json", "LastModified": t1, "VersionId": "v1"},
+                    {"Key": "replay/org1/lease/a0x2.json", "LastModified": t1, "VersionId": "v2"},
+                    {"Key": "replay/org1/_meta/config.json", "LastModified": t1, "VersionId": "v3"},
                 ]
             }
         ]
@@ -138,7 +138,7 @@ class TestListPointInTimeVersions:
 
         cutoff = datetime(2026, 3, 20, tzinfo=timezone.utc)
         result = _list_point_in_time_versions(
-            s3, "bucket", "documents/org1/", cutoff, ["property"]
+            s3, "bucket", "replay/org1/", cutoff, ["property"]
         )
 
         assert len(result) == 1
@@ -151,7 +151,7 @@ class TestListPointInTimeVersions:
         paginator.paginate.return_value = [
             {
                 "Versions": [
-                    {"Key": "documents/org1/property/a0x1.json", "LastModified": t_future, "VersionId": "v1"},
+                    {"Key": "replay/org1/property/a0x1.json", "LastModified": t_future, "VersionId": "v1"},
                 ]
             }
         ]
@@ -159,7 +159,7 @@ class TestListPointInTimeVersions:
 
         cutoff = datetime(2026, 3, 1, tzinfo=timezone.utc)
         result = _list_point_in_time_versions(
-            s3, "bucket", "documents/org1/", cutoff, None
+            s3, "bucket", "replay/org1/", cutoff, None
         )
         assert result == []
 
@@ -279,3 +279,93 @@ class TestAssertNamespaceEmpty:
             _assert_namespace_empty(backend, "ns_unreachable")
 
         assert exc_info.value.code == 1
+
+
+# ===================================================================
+# Backward compatibility: --prefix flag
+# ===================================================================
+
+
+class TestBackwardCompatPrefix:
+    """Verify --prefix flag wiring through main() and the real code path."""
+
+    def _run_main_dry_run(self, extra_args=None, caplog=None):
+        """Invoke real main() in --dry-run mode with mocked S3/boto3."""
+        import replay_from_audit
+
+        mock_s3 = MagicMock()
+        paginator = MagicMock()
+        paginator.paginate.return_value = [{}]  # empty bucket
+        mock_s3.get_paginator.return_value = paginator
+
+        mock_boto3 = MagicMock()
+        mock_boto3.client.return_value = mock_s3
+
+        argv = [
+            "replay_from_audit.py",
+            "--audit-bucket", "test-bucket",
+            "--namespace", "ns",
+            "--org-id", "org1",
+            "--dry-run",
+        ]
+        if extra_args:
+            argv.extend(extra_args)
+
+        with patch.object(sys, "argv", argv), \
+             patch.dict("sys.modules", {"boto3": mock_boto3}):
+            replay_from_audit.main()
+
+        return mock_s3
+
+    def test_default_prefix_uses_replay(self):
+        """Default run paginates under replay/{org_id}/."""
+        mock_s3 = self._run_main_dry_run()
+        paginator = mock_s3.get_paginator.return_value
+        call_kwargs = paginator.paginate.call_args[1]
+        assert call_kwargs["Prefix"] == "replay/org1/"
+
+    def test_documents_prefix_paginates_under_documents(self, caplog):
+        """--prefix documents paginates under documents/{org_id}/."""
+        import logging
+        caplog.set_level(logging.WARNING)
+
+        mock_s3 = self._run_main_dry_run(extra_args=["--prefix", "documents"], caplog=caplog)
+        paginator = mock_s3.get_paginator.return_value
+        call_kwargs = paginator.paginate.call_args[1]
+        assert call_kwargs["Prefix"] == "documents/org1/"
+        assert "documents/ prefix" in caplog.text
+        assert "legacy" in caplog.text
+
+    def test_validate_config_always_reads_from_documents_meta(self):
+        """--validate-config reads _meta/ from documents/ regardless of --prefix."""
+        import replay_from_audit
+
+        mock_s3 = MagicMock()
+        paginator = MagicMock()
+        paginator.paginate.return_value = [{}]  # no config snapshots, no keys
+        mock_s3.get_paginator.return_value = paginator
+
+        mock_boto3 = MagicMock()
+        mock_boto3.client.return_value = mock_s3
+
+        argv = [
+            "replay_from_audit.py",
+            "--audit-bucket", "test-bucket",
+            "--namespace", "ns",
+            "--org-id", "org1",
+            "--dry-run",
+            "--prefix", "replay",
+            "--validate-config",
+        ]
+
+        with patch.object(sys, "argv", argv), \
+             patch.dict("sys.modules", {"boto3": mock_boto3}):
+            replay_from_audit.main()
+
+        # paginate was called twice: once for _validate_config, once for listing
+        prefixes_used = [
+            c[1]["Prefix"]
+            for c in paginator.paginate.call_args_list
+        ]
+        assert "documents/org1/_meta/" in prefixes_used
+        assert "replay/org1/" in prefixes_used

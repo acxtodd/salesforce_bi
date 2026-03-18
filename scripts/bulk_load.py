@@ -44,7 +44,7 @@ from lib.denormalize import (
     clean_label,
     flatten,
 )
-from lib.audit_writer import AuditingBackend, write_config_snapshot
+from lib.audit_writer import AuditingBackend, write_config_snapshot, write_denorm_audit
 from lib.turbopuffer_backend import TurbopufferBackend
 
 LOG = logging.getLogger("bulk_load")
@@ -374,6 +374,8 @@ def load_object(
     namespace: str,
     salesforce_org_id: str,
     dry_run: bool = False,
+    audit_s3_client: Any = None,
+    audit_bucket: str = "",
 ) -> LoadSummary:
     """Run full pipeline for one object and return a structured summary."""
     LOG.info("=== Processing %s ===", object_name)
@@ -426,6 +428,40 @@ def load_object(
                 "parent_fields": parent_fields,
                 "text": text,
             }
+        )
+
+    # Stage 2.5: Write denorm audit artifacts (pre-vector, human-readable)
+    if audit_s3_client and audit_bucket and prepared_rows and not dry_run:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        denorm_audit_ok = 0
+        denorm_audit_failed = 0
+
+        def _write_denorm(row: dict) -> bool:
+            return write_denorm_audit(
+                audit_s3_client,
+                audit_bucket,
+                salesforce_org_id,
+                record_id=row["record_id"],
+                object_type=object_name,
+                direct_fields=row["direct_fields"],
+                parent_fields=row["parent_fields"],
+                text=row["text"],
+                salesforce_org_id=salesforce_org_id,
+                last_modified=row["direct_fields"].get("LastModifiedDate"),
+            )
+
+        with ThreadPoolExecutor(max_workers=min(len(prepared_rows), 20)) as pool:
+            futures = [pool.submit(_write_denorm, r) for r in prepared_rows]
+            for fut in as_completed(futures):
+                if fut.result():
+                    denorm_audit_ok += 1
+                else:
+                    denorm_audit_failed += 1
+        LOG.info(
+            "  Denorm audit: ok=%d failed=%d",
+            denorm_audit_ok,
+            denorm_audit_failed,
         )
 
     if dry_run:
@@ -599,6 +635,7 @@ def main() -> None:
     # Initialize Bedrock + Turbopuffer (only if not dry-run)
     bedrock_client = None
     backend = None
+    audit_s3_client = None
     if not args.dry_run:
         import boto3
 
@@ -618,6 +655,7 @@ def main() -> None:
     total_fetched = 0
     total_indexed = 0
     total_skipped = 0
+    audit_bkt = args.audit_bucket if audit_s3_client else ""
     for obj_name in object_names:
         summary = load_object(
             sf_client=sf,
@@ -628,6 +666,8 @@ def main() -> None:
             namespace=namespace,
             salesforce_org_id=org_id,
             dry_run=args.dry_run,
+            audit_s3_client=audit_s3_client,
+            audit_bucket=audit_bkt,
         )
         total_fetched += summary.fetched_count
         total_indexed += summary.indexed_count

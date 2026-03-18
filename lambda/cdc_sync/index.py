@@ -49,6 +49,7 @@ from lib.audit_writer import (  # noqa: E402
     AuditingBackend,
     write_audit_tombstone,
     write_config_snapshot,
+    write_denorm_audit,
 )
 from lib.turbopuffer_backend import TurbopufferBackend  # noqa: E402
 
@@ -478,6 +479,27 @@ def _process_cdc_event(
                     parent_config,
                     object_name,
                 )
+
+                # Write denorm audit artifact (pre-vector, human-readable)
+                if audit_bucket and audit_s3_client:
+                    _denorm_ok = write_denorm_audit(
+                        audit_s3_client,
+                        audit_bucket,
+                        salesforce_org_id,
+                        record_id=record_id,
+                        object_type=object_name,
+                        direct_fields=direct_fields,
+                        parent_fields=parent_fields,
+                        text=text,
+                        salesforce_org_id=salesforce_org_id,
+                        last_modified=direct_fields.get("LastModifiedDate"),
+                    )
+                    if isinstance(backend, AuditingBackend):
+                        if _denorm_ok:
+                            backend.stats.denorm_audit_ok += 1
+                        else:
+                            backend.stats.denorm_audit_failed += 1
+
                 vector = _embed_single(bedrock_client, text)
                 doc = build_document(
                     direct_fields=direct_fields,
@@ -584,7 +606,13 @@ def lambda_handler(event: dict, context: Any) -> dict:
 
     # Emit audit metrics once per invocation
     if isinstance(backend, AuditingBackend):
-        LOG.info("Audit stats: ok=%d failed=%d", backend.stats.audit_ok, backend.stats.audit_failed)
+        LOG.info(
+            "Audit stats: replay_ok=%d replay_failed=%d denorm_ok=%d denorm_failed=%d",
+            backend.stats.audit_ok,
+            backend.stats.audit_failed,
+            backend.stats.denorm_audit_ok,
+            backend.stats.denorm_audit_failed,
+        )
         backend.emit_audit_metrics(cloudwatch_client)
 
     LOG.info("CDC sync: %d succeeded, %d failed (of %d total)", succeeded, failed, len(cdc_events))

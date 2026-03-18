@@ -218,17 +218,31 @@ def main() -> None:
         "--require-empty", action="store_true",
         help="Verify target namespace is empty before replaying (authoritative mode)",
     )
+    parser.add_argument(
+        "--prefix",
+        default="replay",
+        help="S3 key prefix for document artifacts (default: replay). "
+        "Use 'documents' to read legacy inline-vector artifacts.",
+    )
 
     args = parser.parse_args()
 
     import boto3
 
     s3_client = boto3.client("s3")
-    prefix = f"documents/{args.org_id}/"
+    prefix = f"{args.prefix}/{args.org_id}/"
 
-    # Validate config if requested
+    if args.prefix == "documents":
+        LOG.warning(
+            "Reading from documents/ prefix — this only works for legacy "
+            "inline-vector artifacts that have NOT been overwritten by the "
+            "new denorm audit format."
+        )
+
+    # Validate config if requested — always reads from documents/_meta/
+    config_prefix = f"documents/{args.org_id}/"
     if args.validate_config:
-        _validate_config(s3_client, args.audit_bucket, prefix)
+        _validate_config(s3_client, args.audit_bucket, config_prefix)
 
     # Check --require-empty (fail closed: if we can't verify, abort)
     if args.require_empty and not args.dry_run:

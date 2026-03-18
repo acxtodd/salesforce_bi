@@ -34,7 +34,7 @@ from bulk_load import (
     validate_parents,
 )
 
-from lib.audit_writer import AuditingBackend, write_config_snapshot
+from lib.audit_writer import AuditingBackend, write_config_snapshot, write_denorm_audit
 
 
 # ===================================================================
@@ -935,12 +935,14 @@ class TestAuditBulkLoad:
         s3 = MagicMock()
         ab = AuditingBackend(inner, s3, "audit-bucket", "org123")
 
-        # Verify it delegates upsert and adds S3 writes
+        # Verify it delegates upsert and adds S3 writes to replay/ prefix
         docs = [{"id": "r1", "object_type": "property"}]
         ab.upsert("ns", documents=docs)
 
         inner.upsert.assert_called_once()
         s3.put_object.assert_called_once()
+        key = s3.put_object.call_args[1]["Key"]
+        assert key.startswith("replay/")
         assert ab.stats.audit_ok == 1
 
     def test_no_audit_without_flag(self):
@@ -983,3 +985,89 @@ class TestAuditBulkLoad:
         assert isinstance(config_dict, dict)
         assert "ascendix__Property__c" in config_dict
         assert "embed_fields" in raw_str
+
+
+# ===================================================================
+# Denorm audit in bulk load pipeline
+# ===================================================================
+
+
+class TestDenormAuditBulkLoad:
+    """Verify load_object writes denorm audit at Stage 2.5 before embedding."""
+
+    def _make_sf(self, records):
+        sf = MagicMock()
+        sf.describe.return_value = {"fields": []}
+        sf.query_all.return_value = records
+        return sf
+
+    def test_denorm_audit_written_before_embedding(self, caplog):
+        """Denorm audit captures records that later fail embedding."""
+        records = [
+            {"Id": "r1", "LastModifiedDate": "2025-01-01", "Name": "Good"},
+            {"Id": "r2", "LastModifiedDate": "2025-01-01", "Name": "Bad"},
+        ]
+        sf = self._make_sf(records)
+        audit_s3 = MagicMock()
+
+        def generate_side_effect(_bedrock, texts):
+            if any("Bad" in t for t in texts):
+                raise ValueError("embed failed")
+            return [[0.1] * 1024 for _ in texts]
+
+        with patch("bulk_load.generate_embeddings_batch", side_effect=generate_side_effect):
+            summary = load_object(
+                sf_client=sf,
+                bedrock_client=MagicMock(),
+                backend=MagicMock(aggregate=MagicMock(return_value={"count": 1})),
+                object_name="ascendix__Lease__c",
+                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+                namespace="ns",
+                salesforce_org_id="00Dxx",
+                audit_s3_client=audit_s3,
+                audit_bucket="audit-bucket",
+            )
+
+        # Both records should have denorm audits (written BEFORE embedding)
+        denorm_calls = [
+            c for c in audit_s3.put_object.call_args_list
+            if c[1]["Key"].startswith("documents/")
+        ]
+        assert len(denorm_calls) == 2
+
+        # Verify denorm audit content
+        bodies = [json.loads(c[1]["Body"]) for c in denorm_calls]
+        record_ids = {b["record_id"] for b in bodies}
+        assert "r1" in record_ids
+        assert "r2" in record_ids  # even though embedding failed for r2
+
+        # Each body should have direct_fields, parent_fields, text, no vector
+        for b in bodies:
+            assert "direct_fields" in b
+            assert "parent_fields" in b
+            assert "text" in b
+            assert "vector" not in b
+
+    def test_denorm_audit_skipped_without_params(self):
+        """No denorm audit when audit_s3_client/audit_bucket not provided."""
+        records = [
+            {"Id": "r1", "LastModifiedDate": "2025-01-01", "Name": "Good"},
+        ]
+        sf = self._make_sf(records)
+
+        with patch(
+            "bulk_load.generate_embeddings_batch",
+            return_value=[[0.1] * 1024],
+        ):
+            summary = load_object(
+                sf_client=sf,
+                bedrock_client=MagicMock(),
+                backend=MagicMock(aggregate=MagicMock(return_value={"count": 1})),
+                object_name="ascendix__Lease__c",
+                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+                namespace="ns",
+                salesforce_org_id="00Dxx",
+                # No audit_s3_client / audit_bucket
+            )
+
+        assert summary.indexed_count == 1

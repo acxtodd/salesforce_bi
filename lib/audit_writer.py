@@ -1,10 +1,15 @@
 """S3 audit trail for Turbopuffer document writes.
 
-Provides best-effort S3 mirroring of every upsert/delete so that documents
-can be audited, diffed, and replayed into any namespace without Salesforce
-or Bedrock credentials.
+Two artifact types at different pipeline stages:
 
-Key pattern: ``documents/{org_id}/{object_type}/{record_id}.json``
+1. **Denorm audit** (human-readable, pre-vector):
+   ``documents/{org_id}/{object_type}/{record_id}.json``
+   Structured JSON with ``direct_fields``, ``parent_fields``, ``text``.
+   Written after flatten+build_text, BEFORE embedding.
+
+2. **Replay artifact** (machine-readable, post-vector):
+   ``replay/{org_id}/{object_type}/{record_id}.json``
+   Full Turbopuffer payload with vector.  Written after upsert.
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from lib.denormalize import clean_label
 from lib.search_backend import SearchBackend
 
 LOG = logging.getLogger(__name__)
@@ -28,19 +34,73 @@ class AuditStats:
 
     audit_ok: int = 0
     audit_failed: int = 0
+    denorm_audit_ok: int = 0
+    denorm_audit_failed: int = 0
+
+
+def write_denorm_audit(
+    s3_client: Any,
+    bucket: str,
+    org_id: str,
+    *,
+    record_id: str,
+    object_type: str,
+    direct_fields: dict,
+    parent_fields: dict,
+    text: str,
+    salesforce_org_id: str,
+    last_modified: str | None,
+) -> bool:
+    """Write a human-readable denorm audit artifact to S3.
+
+    Captures the pre-vector pipeline state (after flatten+build_text, before
+    embedding) so stakeholders can inspect denormalization effectiveness.
+
+    S3 key: ``documents/{org_id}/{cleaned_type}/{record_id}.json``
+    Returns True on success; on failure logs a warning and returns False.
+    Never raises.
+    """
+    cleaned_type = clean_label(object_type).lower()
+    key = f"documents/{org_id}/{cleaned_type}/{record_id}.json"
+    body = {
+        "record_id": record_id,
+        "object_type": object_type,
+        "salesforce_org_id": salesforce_org_id,
+        "last_modified": last_modified,
+        "text": text,
+        "direct_fields": direct_fields,
+        "parent_fields": parent_fields,
+    }
+    try:
+        s3_client.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=json.dumps(body, indent=2, sort_keys=True, default=str),
+            ContentType="application/json",
+        )
+        return True
+    except Exception:
+        LOG.warning(
+            "Denorm audit write failed: record_id=%s object_type=%s",
+            record_id,
+            object_type,
+            exc_info=True,
+        )
+        return False
 
 
 def write_audit_document(
     s3_client: Any, bucket: str, org_id: str, doc: dict
 ) -> bool:
-    """Write a single document to the S3 audit trail.
+    """Write a single replay artifact (full Turbopuffer payload) to S3.
 
+    S3 key: ``replay/{org_id}/{object_type}/{record_id}.json``
     Returns True on success; on failure logs a structured warning and
     returns False.  Never raises.
     """
     object_type = doc.get("object_type", "unknown")
     record_id = doc.get("id", "unknown")
-    key = f"documents/{org_id}/{object_type}/{record_id}.json"
+    key = f"replay/{org_id}/{object_type}/{record_id}.json"
     try:
         s3_client.put_object(
             Bucket=bucket,
@@ -66,14 +126,17 @@ def write_audit_tombstone(
     object_type: str,
     record_ids: list[str],
 ) -> tuple[int, int]:
-    """Write delete tombstones to S3 for each record ID.
+    """Write delete tombstones to **both** S3 prefixes for each record ID.
 
-    Returns ``(ok_count, fail_count)``.
+    Writes to ``documents/{org_id}/{object_type}/{record_id}.json`` (denorm
+    audit) and ``replay/{org_id}/{object_type}/{record_id}.json`` (replay).
+
+    Returns ``(ok_count, fail_count)`` aggregated across both prefixes.
     """
     now = datetime.now(timezone.utc).isoformat()
 
-    def _write_one(record_id: str) -> bool:
-        key = f"documents/{org_id}/{object_type}/{record_id}.json"
+    def _write_one(prefix: str, record_id: str) -> bool:
+        key = f"{prefix}/{org_id}/{object_type}/{record_id}.json"
         body = {"deleted": True, "record_id": record_id, "deleted_at": now}
         try:
             s3_client.put_object(
@@ -85,7 +148,8 @@ def write_audit_tombstone(
             return True
         except Exception:
             LOG.warning(
-                "Audit tombstone failed: record_id=%s object_type=%s",
+                "Audit tombstone failed: prefix=%s record_id=%s object_type=%s",
+                prefix,
                 record_id,
                 object_type,
                 exc_info=True,
@@ -94,8 +158,13 @@ def write_audit_tombstone(
 
     ok = 0
     failed = 0
-    with ThreadPoolExecutor(max_workers=min(len(record_ids), 20)) as pool:
-        futures = [pool.submit(_write_one, rid) for rid in record_ids]
+    tasks = [
+        (prefix, rid)
+        for rid in record_ids
+        for prefix in ("documents", "replay")
+    ]
+    with ThreadPoolExecutor(max_workers=min(len(tasks), 20)) as pool:
+        futures = [pool.submit(_write_one, pfx, rid) for pfx, rid in tasks]
         for fut in as_completed(futures):
             if fut.result():
                 ok += 1
@@ -227,6 +296,16 @@ class AuditingBackend:
                     {
                         "MetricName": "AuditWriteFailure",
                         "Value": self.stats.audit_failed,
+                        "Unit": "Count",
+                    },
+                    {
+                        "MetricName": "DenormAuditWriteSuccess",
+                        "Value": self.stats.denorm_audit_ok,
+                        "Unit": "Count",
+                    },
+                    {
+                        "MetricName": "DenormAuditWriteFailure",
+                        "Value": self.stats.denorm_audit_failed,
                         "Unit": "Count",
                     },
                 ],

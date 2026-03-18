@@ -16,11 +16,128 @@ from lib.audit_writer import (
     write_audit_document,
     write_audit_tombstone,
     write_config_snapshot,
+    write_denorm_audit,
 )
 
 
 # ===================================================================
-# write_audit_document
+# write_denorm_audit
+# ===================================================================
+
+
+class TestWriteDenormAudit:
+    def test_structured_content(self):
+        s3 = MagicMock()
+        result = write_denorm_audit(
+            s3,
+            "my-bucket",
+            "org123",
+            record_id="a0x1",
+            object_type="ascendix__Lease__c",
+            direct_fields={"Name": "Office", "ascendix__LeaseType__c": "NNN"},
+            parent_fields={
+                "ascendix__Property__c": {"Name": "PPFC", "ascendix__City__c": "Plano"}
+            },
+            text="Lease: | Name: Office | Property Name: PPFC",
+            salesforce_org_id="00Dxx",
+            last_modified="2026-03-18T10:30:00Z",
+        )
+
+        assert result is True
+        s3.put_object.assert_called_once()
+        kwargs = s3.put_object.call_args[1]
+        body = json.loads(kwargs["Body"])
+        assert body["direct_fields"]["Name"] == "Office"
+        assert body["direct_fields"]["ascendix__LeaseType__c"] == "NNN"
+        assert body["parent_fields"]["ascendix__Property__c"]["Name"] == "PPFC"
+        assert body["text"] == "Lease: | Name: Office | Property Name: PPFC"
+        assert body["record_id"] == "a0x1"
+        assert body["salesforce_org_id"] == "00Dxx"
+        assert body["last_modified"] == "2026-03-18T10:30:00Z"
+
+    def test_no_vector_in_artifact(self):
+        s3 = MagicMock()
+        write_denorm_audit(
+            s3,
+            "bucket",
+            "org",
+            record_id="r1",
+            object_type="ascendix__Property__c",
+            direct_fields={"Name": "Test"},
+            parent_fields={},
+            text="text",
+            salesforce_org_id="00D",
+            last_modified=None,
+        )
+
+        body = json.loads(s3.put_object.call_args[1]["Body"])
+        assert "vector" not in body
+        # Recursively check no vector anywhere
+        assert "vector" not in json.dumps(body)
+
+    def test_pretty_printed(self):
+        s3 = MagicMock()
+        write_denorm_audit(
+            s3,
+            "bucket",
+            "org",
+            record_id="r1",
+            object_type="ascendix__Property__c",
+            direct_fields={"Name": "Test"},
+            parent_fields={},
+            text="text",
+            salesforce_org_id="00D",
+            last_modified=None,
+        )
+
+        raw_body = s3.put_object.call_args[1]["Body"]
+        # Pretty-printed JSON has newlines and indentation
+        assert "\n" in raw_body
+        assert "  " in raw_body
+
+    def test_key_uses_cleaned_lowercase(self):
+        s3 = MagicMock()
+        write_denorm_audit(
+            s3,
+            "bucket",
+            "org123",
+            record_id="a0x1",
+            object_type="ascendix__Lease__c",
+            direct_fields={},
+            parent_fields={},
+            text="t",
+            salesforce_org_id="00D",
+            last_modified=None,
+        )
+
+        key = s3.put_object.call_args[1]["Key"]
+        # Key path uses cleaned lowercase
+        assert key == "documents/org123/lease/a0x1.json"
+        # But JSON body preserves raw SF API name
+        body = json.loads(s3.put_object.call_args[1]["Body"])
+        assert body["object_type"] == "ascendix__Lease__c"
+
+    def test_best_effort_returns_false_on_error(self):
+        s3 = MagicMock()
+        s3.put_object.side_effect = RuntimeError("S3 down")
+        result = write_denorm_audit(
+            s3,
+            "bucket",
+            "org",
+            record_id="r1",
+            object_type="ascendix__Property__c",
+            direct_fields={},
+            parent_fields={},
+            text="t",
+            salesforce_org_id="00D",
+            last_modified=None,
+        )
+
+        assert result is False
+
+
+# ===================================================================
+# write_audit_document (replay artifact)
 # ===================================================================
 
 
@@ -34,7 +151,7 @@ class TestWriteAuditDocument:
         s3.put_object.assert_called_once()
         kwargs = s3.put_object.call_args[1]
         assert kwargs["Bucket"] == "my-bucket"
-        assert kwargs["Key"] == "documents/org123/property/a0x1.json"
+        assert kwargs["Key"] == "replay/org123/property/a0x1.json"
         body = json.loads(kwargs["Body"])
         assert body["id"] == "a0x1"
         assert body["object_type"] == "property"
@@ -54,7 +171,7 @@ class TestWriteAuditDocument:
         write_audit_document(s3, "bucket", "org", doc)
 
         key = s3.put_object.call_args[1]["Key"]
-        assert key == "documents/org/unknown/unknown.json"
+        assert key == "replay/org/unknown/unknown.json"
 
 
 # ===================================================================
@@ -63,19 +180,22 @@ class TestWriteAuditDocument:
 
 
 class TestWriteAuditTombstone:
-    def test_writes_per_record(self):
+    def test_writes_to_both_prefixes(self):
         s3 = MagicMock()
         ok, failed = write_audit_tombstone(
             s3, "bucket", "org123", "property", ["a0x1", "a0x2"]
         )
 
-        assert ok == 2
+        # 2 records x 2 prefixes = 4 writes
+        assert ok == 4
         assert failed == 0
-        assert s3.put_object.call_count == 2
+        assert s3.put_object.call_count == 4
 
         keys = [c[1]["Key"] for c in s3.put_object.call_args_list]
         assert "documents/org123/property/a0x1.json" in keys
         assert "documents/org123/property/a0x2.json" in keys
+        assert "replay/org123/property/a0x1.json" in keys
+        assert "replay/org123/property/a0x2.json" in keys
 
         body = json.loads(s3.put_object.call_args_list[0][1]["Body"])
         assert body["deleted"] is True
@@ -83,9 +203,10 @@ class TestWriteAuditTombstone:
 
     def test_partial_failure(self):
         s3 = MagicMock()
+        # 1 record x 2 prefixes = 2 writes; first succeeds, second fails
         s3.put_object.side_effect = [None, RuntimeError("fail")]
         ok, failed = write_audit_tombstone(
-            s3, "bucket", "org", "lease", ["r1", "r2"]
+            s3, "bucket", "org", "lease", ["r1"]
         )
         assert ok == 1
         assert failed == 1
@@ -153,6 +274,9 @@ class TestAuditingBackend:
             "ns", documents=docs, distance_metric="cosine_distance", schema={"text": {}}
         )
         assert s3.put_object.call_count == 2
+        # Verify keys use replay/ prefix
+        keys = [c[1]["Key"] for c in s3.put_object.call_args_list]
+        assert all(k.startswith("replay/") for k in keys)
 
     def test_audit_failure_does_not_break_upsert(self):
         ab, inner, s3 = self._make_backend(s3_ok=False)
@@ -213,6 +337,8 @@ class TestAuditingBackend:
         ab, _, _ = self._make_backend()
         ab.stats.audit_ok = 10
         ab.stats.audit_failed = 2
+        ab.stats.denorm_audit_ok = 5
+        ab.stats.denorm_audit_failed = 1
         cw = MagicMock()
 
         ab.emit_audit_metrics(cw)
@@ -223,3 +349,5 @@ class TestAuditingBackend:
         metrics = {m["MetricName"]: m["Value"] for m in kwargs["MetricData"]}
         assert metrics["AuditWriteSuccess"] == 10
         assert metrics["AuditWriteFailure"] == 2
+        assert metrics["DenormAuditWriteSuccess"] == 5
+        assert metrics["DenormAuditWriteFailure"] == 1

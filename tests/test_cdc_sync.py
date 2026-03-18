@@ -666,7 +666,7 @@ class TestAuditIntegration:
         return deps
 
     def test_upsert_audits_via_wrapper(self):
-        """AuditingBackend writes to S3 on upsert."""
+        """AuditingBackend writes to S3 replay/ prefix on upsert."""
         inner = MagicMock()
         s3 = MagicMock()
         ab = AuditingBackend(inner, s3, "audit-bucket", SALESFORCE_ORG_ID)
@@ -676,11 +676,13 @@ class TestAuditIntegration:
 
         inner.upsert.assert_called_once()
         s3.put_object.assert_called_once()
+        key = s3.put_object.call_args[1]["Key"]
+        assert key.startswith("replay/")
         assert ab.stats.audit_ok == 1
         assert ab.stats.audit_failed == 0
 
     def test_delete_writes_tombstone(self):
-        """DELETE event writes tombstone to S3 when audit_bucket is set."""
+        """DELETE event writes tombstones to both prefixes when audit_bucket is set."""
         deps = self._make_deps(audit_bucket="audit-bucket")
         # Wrap backend with AuditingBackend so stats are tracked
         inner_backend = deps["backend"]
@@ -698,14 +700,16 @@ class TestAuditIntegration:
         _process_cdc_event(cdc, **deps)
 
         inner_backend.delete.assert_called_once()
-        # Tombstone writes: one per record_id
+        # Tombstone writes: 2 records x 2 prefixes = 4
         audit_s3 = deps["audit_s3_client"]
-        assert audit_s3.put_object.call_count == 2
+        assert audit_s3.put_object.call_count == 4
         keys = [c[1]["Key"] for c in audit_s3.put_object.call_args_list]
-        assert any("a0x1.json" in k for k in keys)
-        assert any("a0x2.json" in k for k in keys)
+        assert any("documents/" in k and "a0x1.json" in k for k in keys)
+        assert any("replay/" in k and "a0x1.json" in k for k in keys)
+        assert any("documents/" in k and "a0x2.json" in k for k in keys)
+        assert any("replay/" in k and "a0x2.json" in k for k in keys)
         # Tombstone outcomes are rolled into the backend stats
-        assert ab.stats.audit_ok == 2
+        assert ab.stats.audit_ok == 4
         assert ab.stats.audit_failed == 0
 
     def test_audit_failure_counted_not_raised(self):
@@ -752,3 +756,195 @@ class TestAuditIntegration:
         keys = [c[1]["Key"] for c in s3.put_object.call_args_list]
         assert any("_meta/" in k and ".yaml" in k for k in keys)
         assert any("_meta/" in k and ".json" in k for k in keys)
+
+
+# ===================================================================
+# Denorm audit in CDC pipeline
+# ===================================================================
+
+
+class TestDenormAuditInCDC:
+    """Verify denorm audit is written BEFORE embedding in _process_cdc_event."""
+
+    def _make_deps(
+        self,
+        sf_records: list[dict] | None = None,
+        audit_bucket: str = "audit-bucket",
+        wrap_backend: bool = True,
+    ) -> dict:
+        sf = _make_sf_client_mock(sf_records)
+        audit_s3 = MagicMock()
+        inner_backend = MagicMock()
+        if wrap_backend:
+            backend = AuditingBackend(inner_backend, audit_s3, audit_bucket, SALESFORCE_ORG_ID)
+        else:
+            backend = inner_backend
+        return {
+            "sf_client": sf,
+            "bedrock_client": _make_bedrock_mock(),
+            "backend": backend,
+            "cloudwatch_client": MagicMock(),
+            "sqs_client": MagicMock(),
+            "namespace": NAMESPACE,
+            "salesforce_org_id": SALESFORCE_ORG_ID,
+            "denorm_config": DENORM_CONFIG,
+            "dlq_url": DLQ_URL,
+            "audit_bucket": audit_bucket,
+            "audit_s3_client": audit_s3,
+            "_inner_backend": inner_backend,
+        }
+
+    def test_denorm_audit_written_before_embedding(self):
+        """Embedding failure should NOT prevent denorm audit write."""
+        record = {
+            "Id": "a0x1",
+            "LastModifiedDate": "2025-03-01T00:00:00Z",
+            "Name": "Test Property",
+            "ascendix__City__c": "Dallas",
+            "ascendix__TotalBuildingArea__c": 50000,
+        }
+        deps = self._make_deps(sf_records=[record])
+        deps["bedrock_client"].invoke_model.side_effect = RuntimeError(
+            "Bedrock unavailable"
+        )
+
+        with pytest.raises(RuntimeError, match="Bedrock unavailable"):
+            cdc = CDCEvent(
+                object_name="ascendix__Property__c",
+                change_type="CREATE",
+                record_ids=["a0x1"],
+                commit_timestamp=1700000000000,
+            )
+            _process_cdc_event(cdc, **{k: v for k, v in deps.items() if k != "_inner_backend"})
+
+        # Denorm audit should have been written BEFORE embedding failed
+        audit_s3 = deps["audit_s3_client"]
+        assert audit_s3.put_object.call_count >= 1
+        # Find the denorm audit call (documents/ prefix)
+        denorm_calls = [
+            c for c in audit_s3.put_object.call_args_list
+            if c[1]["Key"].startswith("documents/")
+        ]
+        assert len(denorm_calls) == 1
+        body = json.loads(denorm_calls[0][1]["Body"])
+        assert body["record_id"] == "a0x1"
+        assert "direct_fields" in body
+        assert "parent_fields" in body
+        assert "text" in body
+        assert "vector" not in body
+
+    def test_denorm_audit_content_has_fields(self):
+        """Denorm audit preserves direct_fields, parent_fields, and text."""
+        record = {
+            "Id": "a0x1",
+            "LastModifiedDate": "2025-03-01T00:00:00Z",
+            "Name": "Test Property",
+            "ascendix__City__c": "Dallas",
+            "ascendix__TotalBuildingArea__c": 50000,
+        }
+        deps = self._make_deps(sf_records=[record])
+
+        cdc = CDCEvent(
+            object_name="ascendix__Property__c",
+            change_type="CREATE",
+            record_ids=["a0x1"],
+            commit_timestamp=1700000000000,
+        )
+        _process_cdc_event(cdc, **{k: v for k, v in deps.items() if k != "_inner_backend"})
+
+        audit_s3 = deps["audit_s3_client"]
+        denorm_calls = [
+            c for c in audit_s3.put_object.call_args_list
+            if c[1]["Key"].startswith("documents/")
+        ]
+        assert len(denorm_calls) == 1
+        body = json.loads(denorm_calls[0][1]["Body"])
+        assert body["object_type"] == "ascendix__Property__c"
+        assert body["salesforce_org_id"] == SALESFORCE_ORG_ID
+        assert "Name" in body["direct_fields"]
+        assert isinstance(body["text"], str)
+        assert len(body["text"]) > 0
+
+    def test_replay_artifact_goes_to_replay_prefix(self):
+        """After successful upsert, replay artifact uses replay/ prefix."""
+        record = {
+            "Id": "a0x1",
+            "LastModifiedDate": "2025-03-01T00:00:00Z",
+            "Name": "Test Property",
+            "ascendix__City__c": "Dallas",
+        }
+        deps = self._make_deps(sf_records=[record])
+
+        cdc = CDCEvent(
+            object_name="ascendix__Property__c",
+            change_type="CREATE",
+            record_ids=["a0x1"],
+            commit_timestamp=1700000000000,
+        )
+        _process_cdc_event(cdc, **{k: v for k, v in deps.items() if k != "_inner_backend"})
+
+        audit_s3 = deps["audit_s3_client"]
+        replay_calls = [
+            c for c in audit_s3.put_object.call_args_list
+            if c[1]["Key"].startswith("replay/")
+        ]
+        assert len(replay_calls) >= 1
+
+    def test_denorm_audit_stats_tracked_on_backend(self):
+        """Denorm audit success/failure is tracked on AuditingBackend.stats."""
+        record = {
+            "Id": "a0x1",
+            "LastModifiedDate": "2025-03-01T00:00:00Z",
+            "Name": "Test Property",
+            "ascendix__City__c": "Dallas",
+        }
+        deps = self._make_deps(sf_records=[record])
+
+        cdc = CDCEvent(
+            object_name="ascendix__Property__c",
+            change_type="CREATE",
+            record_ids=["a0x1"],
+            commit_timestamp=1700000000000,
+        )
+        _process_cdc_event(cdc, **{k: v for k, v in deps.items() if k != "_inner_backend"})
+
+        ab = deps["backend"]
+        assert ab.stats.denorm_audit_ok == 1
+        assert ab.stats.denorm_audit_failed == 0
+
+    def test_denorm_audit_failure_tracked_not_raised(self):
+        """S3 failure for denorm audit increments failed counter, doesn't block pipeline."""
+        record = {
+            "Id": "a0x1",
+            "LastModifiedDate": "2025-03-01T00:00:00Z",
+            "Name": "Test Property",
+            "ascendix__City__c": "Dallas",
+        }
+        deps = self._make_deps(sf_records=[record])
+        # Make S3 fail — but only for denorm audit (documents/ prefix).
+        # The AuditingBackend also uses the same s3 client for replay writes,
+        # so we use side_effect to fail first call (denorm) then succeed rest.
+        original_put = deps["audit_s3_client"].put_object
+        call_count = {"n": 0}
+
+        def selective_fail(**kwargs):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                raise RuntimeError("S3 down for denorm")
+            return original_put(**kwargs)
+
+        deps["audit_s3_client"].put_object = MagicMock(side_effect=selective_fail)
+
+        cdc = CDCEvent(
+            object_name="ascendix__Property__c",
+            change_type="CREATE",
+            record_ids=["a0x1"],
+            commit_timestamp=1700000000000,
+        )
+        _process_cdc_event(cdc, **{k: v for k, v in deps.items() if k != "_inner_backend"})
+
+        ab = deps["backend"]
+        assert ab.stats.denorm_audit_ok == 0
+        assert ab.stats.denorm_audit_failed == 1
+        # Pipeline still completed — upsert was called
+        deps["_inner_backend"].upsert.assert_called_once()

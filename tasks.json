@@ -1194,10 +1194,10 @@
         {
           "id": "3.3.1",
           "title": "Regression root-cause analysis",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T22:28:02.904597+00:00",
-          "updatedAt": "2026-03-18T06:29:29.511721+00:00",
+          "updatedAt": "2026-03-18T06:49:53.553796+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -1209,6 +1209,14 @@
             {
               "timestamp": "2026-03-18T06:29:29.511561+00:00",
               "note": "Root-cause analysis complete (2026-03-18). Task 3.1 acceptance suite is 15/15 — no regression queries. Scope broadened to carried-forward validator issues.\n\nFINDINGS (5):\n\nF-1 (Check 2) — Deal/Sale 0 docs. Classification: missing bulk-loaded objects + scope mismatch. bulk_load.py never run for Deal/Sale. Additionally, query-layer scope (system_prompt.py:223) explicitly excludes Deal/Sale while denorm_config.yaml and README include them in POC scope. Three-way inconsistency: indexed scope (denorm_config), CDC scope (cdc_sync CDC_ENTITY_MAP), and query-time scope (system_prompt TOOL_DEFINITIONS) disagree. Fix: either narrow indexed/CDC scope to match query-time scope, or expand query-time scope to match indexed scope. Product decision required. → 3.3.2\n\nF-2 (Check 7) — Hybrid 422 RankInput. Classification: SDK serialization bug. turbopuffer_backend.py:111 uses ('Sum', *rank_parts) but SDK 1.17.0 expects ('Sum', rank_parts) per Tuple[Literal['Sum'], Sequence[RankByText]] type signature. One-line fix. → 3.3.2\n\nF-3 (Check 5, property) — 0/10 market/submarket parent keys. Classification: null source data. Sandbox Property records lack Market/SubMarket FK values. Pipeline correctly skips nulls (denormalize.py:138-142). → Non-blocking (sandbox data quality)\n\nF-4 (Check 5, lease/availability) — Partial property parent keys. Classification: null source data. Parent Property records have null PropertySubType and TotalBuildingArea. Same correct-skip behavior. → Non-blocking\n\nF-5 (Check 8) — p95=155ms vs 50ms. Classification: environment artifact. Local Mac-to-GCP RTT dominates. 50ms target is for in-region Lambda (CLAUDE.md Known Failure Pattern 3). → Non-blocking (revalidate from Lambda at go/no-go)\n\n3.3.2 ITEMS: F-2 (hybrid rank_by one-line fix, high priority), F-1 (Deal/Sale scope alignment, pending product decision).\nNON-BLOCKING: F-3, F-4 (null source data), F-5 (latency environment).\n\nOPEN QUESTIONS: (1) Do Deal/Sale records exist in sandbox? (2) Should Deal/Sale be in POC query scope or deferred? (3) Is market/submarket data available in sandbox?"
+            },
+            {
+              "timestamp": "2026-03-18T06:49:46.738451+00:00",
+              "note": "Analysis complete and committed (2731e26). All 5 carried-forward findings classified, root-caused, and scoped. Hybrid fix (F-2) implemented and validated — check 7 PASS. Deal/Sale scope (F-1) resolved as 'narrow scope now' per spec D-10. README drift fixed. CLAUDE.md updated. Non-blocking items (F-3/F-4 null source data, F-5 latency environment) documented. No remaining unresolved issues block closure."
+            },
+            {
+              "timestamp": "2026-03-18T06:49:53.553798+00:00",
+              "note": "Task completed"
             }
           ],
           "parent": "3.3",
@@ -1220,7 +1228,8 @@
           ],
           "depends_on": [
             "3.1"
-          ]
+          ],
+          "completedAt": "2026-03-18T06:49:53.553548+00:00"
         },
         {
           "id": "3.3.2",
@@ -1228,11 +1237,16 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T22:28:03.163999+00:00",
-          "updatedAt": "2026-03-14T22:28:03.355555+00:00",
+          "updatedAt": "2026-03-18T06:58:37.757330+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-18T06:58:37.757154+00:00",
+              "note": "2026-03-18 follow-up task tree created from BA audits. Recommended execution order: (1) 3.3.2.1 geography scope alignment, (2) 3.3.2.2 acceptance harness tightening, (3) 3.3.2.3 sparse/orphan-aware parent validation, (4) 3.3.2.4 denorm text label disambiguation, (5) 3.3.2.5 bulk-load hardening, (6) 3.3.2.6 regenerate 3-object config and rebuild namespace. Conditional path: 3.3.2.7 only if 3.3.2.1 keeps geography in current POC scope. Sandbox/source data repair is external and not tracked here."
+            }
+          ],
           "parent": "3.3",
           "description": "For each proposed fix from 3.3.1 that is low-effort (add denorm field, tune prompt, adjust tool schema): implement the fix, re-run the specific failing query, verify it passes. Do not fix issues that require architectural changes — document those as v1 scope.",
           "acceptance_criteria": [
@@ -1243,6 +1257,158 @@
           "depends_on": [
             "3.3.1"
           ]
+        },
+        {
+          "id": "3.3.2.1",
+          "title": "Resolve geography scope mismatch across prompt, tools, config, and tests",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T06:56:13.648401+00:00",
+          "updatedAt": "2026-03-18T06:56:19.121141+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Establish whether market/submarket retrieval is in current POC scope and align current gate surfaces accordingly. Use the spec as source of truth, then reconcile prompt claims, tool aliases, denorm expectations, validator assumptions, and acceptance coverage so the system does not over-promise unsupported geography behavior.",
+          "technical_context": "BA audits found a real scope mismatch: tool_dispatch and system_prompt expose market/submarket, Property config includes geography parents, Availability does not denormalize geography, and acceptance coverage includes downtown/submarket scenarios. Sandbox data repair is being handled separately; this task is about product/code/test scope alignment, not seeding data.",
+          "parent": "3.3.2",
+          "acceptance_criteria": [
+            "An explicit yes/no decision is recorded for market/submarket retrieval in the current POC scope",
+            "Prompt claims, tool aliases, validator expectations, and acceptance tests are aligned to that decision",
+            "Any unsupported geography behavior is removed from current gate surfaces or scheduled as follow-up implementation work"
+          ]
+        },
+        {
+          "id": "3.3.2.2",
+          "title": "Tighten geography acceptance coverage to fail on zero-result false positives",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T06:56:26.136768+00:00",
+          "updatedAt": "2026-03-18T06:56:35.841871+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Fix the acceptance harness and the downtown/submarket semantic coverage so a geography-oriented test cannot pass when search_records returns zero results and the answer merely echoes the query term. Require positive retrieval evidence or remove the test from the current gate if geography is out of scope.",
+          "technical_context": "BA audit found nlp-01 passing despite result_count=0 and an answer that explicitly said no downtown availability was found. This is a harness defect, not a retrieval success. The task should use the scope decision from 3.3.2.1 to decide whether to strengthen or remove current geography gate expectations.",
+          "parent": "3.3.2",
+          "acceptance_criteria": [
+            "A downtown/submarket acceptance test cannot pass when the underlying tool result count is zero and the answer is a no-result explanation",
+            "Affected semantic acceptance cases are rerun and behave consistently with the scope decision from 3.3.2.1"
+          ],
+          "depends_on": [
+            "3.3.2.1"
+          ],
+          "gate_criteria": "Use the geography scope decision before tightening or removing gate tests."
+        },
+        {
+          "id": "3.3.2.3",
+          "title": "Make parent-field validation sparse- and orphan-aware",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T06:56:42.411486+00:00",
+          "updatedAt": "2026-03-18T06:56:50.992793+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Update validate_data.py parent-field checks so sparse relationships, null source values, and orphaned lookup rows are reported truthfully. Distinguish denorm/pipeline defects from missing source data or deleted parent rows, and downgrade the latter from hard FAIL when appropriate.",
+          "technical_context": "BA audits showed Property market/submarket parent keys are absent largely because referenced Geography rows are deleted or sparse in the sandbox, while Lease/Availability partial parent keys often come from null source fields. The current check 5 treats all of these as hard denorm failures, which overstates the product issue and erodes trust in validator output.",
+          "parent": "3.3.2",
+          "acceptance_criteria": [
+            "validate_data.py check 5 distinguishes lookup/denorm defects from null source data and orphaned parent references",
+            "Sparse or orphaned relationship cases can surface as WARN with evidence instead of blanket FAIL"
+          ],
+          "depends_on": [
+            "3.3.2.1"
+          ],
+          "gate_criteria": "Parent-field validation severity should follow the agreed geography scope and source-data expectations."
+        },
+        {
+          "id": "3.3.2.4",
+          "title": "Disambiguate parent labels in denormalized text",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T06:56:56.842853+00:00",
+          "updatedAt": "2026-03-18T06:57:02.762445+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Update build_text() so parent-derived values are labeled with the relationship name rather than repeating ambiguous field names like Name or City. This should improve BM25 and embedding quality for cross-object records without changing document attribute keys.",
+          "technical_context": "BA audit found Lease text strings containing multiple undifferentiated 'Name:' values from different parents. build_document() already prefixes document keys correctly, but build_text() still emits ambiguous labels, which weakens both keyword and semantic retrieval.",
+          "parent": "3.3.2",
+          "acceptance_criteria": [
+            "Parent-derived text labels include the relationship name (for example Property Name, Tenant Name) instead of ambiguous repeated field labels",
+            "Document attribute keys remain unchanged while representative retrieval or text-generation tests are updated to cover the new label format"
+          ]
+        },
+        {
+          "id": "3.3.2.5",
+          "title": "Harden bulk load with count verification and per-record tolerance",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T06:57:07.502755+00:00",
+          "updatedAt": "2026-03-18T06:57:19.661513+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Make bulk_load.py robust against silent partial loads. Add post-load object count verification and tolerate per-record flatten/text/embed failures by logging and continuing, then surface a clear summary of skipped records and any Salesforce-to-Turbopuffer count mismatch.",
+          "technical_context": "BA audit found the current namespace contains fewer Property/Lease/Availability docs than an earlier successful load, suggesting a partial reload or silent overwrite. The current loader has no post-load count verification and no per-record error tolerance, so operator mistakes or malformed records can leave the namespace in a misleading state.",
+          "parent": "3.3.2",
+          "acceptance_criteria": [
+            "Bulk load reports Salesforce fetched count, successfully indexed count, skipped-record count, and final Turbopuffer count per object",
+            "A malformed record does not abort the entire object load; the failure is logged and the run continues",
+            "A post-load mismatch between expected and indexed counts is surfaced clearly enough that a partial load cannot be mistaken for success"
+          ]
+        },
+        {
+          "id": "3.3.2.6",
+          "title": "Regenerate 3-object denorm config and rebuild the namespace",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T06:57:29.612936+00:00",
+          "updatedAt": "2026-03-18T06:58:30.017676+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Regenerate the denormalization config from live metadata for the current 3-object POC scope, review the parent-field set for low-value noise, then rebuild the Property/Lease/Availability namespace using the hardened bulk loader and re-run focused validation.",
+          "technical_context": "The committed denorm_config.yaml appears narrower than what the generator would emit even for current in-scope objects, suggesting manual drift after generation. This task should keep the spec's 3-object POC scope, not reintroduce Deal/Sale into active query scope. It should incorporate the loader hardening and text-label improvements before rebuilding.",
+          "parent": "3.3.2",
+          "acceptance_criteria": [
+            "A metadata-derived denorm config is regenerated for Property, Lease, and Availability and reviewed before use",
+            "The rebuilt namespace matches Salesforce counts for Property, Lease, and Availability, or any mismatch is explicitly explained by skipped-record reporting from the hardened loader",
+            "Focused validator and retrieval checks are rerun against the rebuilt namespace and any remaining failures are attributable to true source-data sparsity or out-of-scope behavior, not load/config drift"
+          ],
+          "depends_on": [
+            "3.3.2.1"
+          ],
+          "gate_criteria": "Use the current POC geography scope before regenerating config and treating remaining geography gaps as drift."
+        },
+        {
+          "id": "3.3.2.7",
+          "title": "If geography stays in scope, add Availability geography denorm and revalidate",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T06:58:16.247738+00:00",
+          "updatedAt": "2026-03-18T06:58:26.434468+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Implement current-phase geography support for Availability only if 3.3.2.1 confirms market/submarket retrieval remains in scope. Add the agreed geography parent fields to Availability denorm, rebuild affected data, and rerun targeted geography retrieval checks against repaired source data.",
+          "technical_context": "Current config denormalizes market/submarket onto Property but not Availability, while prompt/tooling/test surfaces still imply downtown/submarket availability search. User is coordinating source-data repair separately with a data analyst; this task covers the code/config side only if geography remains in scope after 3.3.2.1.",
+          "parent": "3.3.2",
+          "acceptance_criteria": [
+            "Availability denorm includes the agreed geography fields only if 3.3.2.1 keeps geography in current POC scope",
+            "Targeted geography retrieval checks are rerun against repaired source data and either pass or fail with evidence attributable to true retrieval behavior"
+          ],
+          "depends_on": [
+            "3.3.2.1"
+          ],
+          "gate_criteria": "Only execute if 3.3.2.1 keeps geography in current POC scope."
         },
         {
           "id": "3.3.3",
@@ -1280,7 +1446,8 @@
       "3.3.": 4,
       "2.": 6,
       "2.4.": 5,
-      "2.5.": 4
+      "2.5.": 4,
+      "3.3.2.": 8
     }
   }
 }

@@ -83,6 +83,28 @@ class TurbopufferBackend(SearchBackend):
 
     # -- SearchBackend interface ---------------------------------------------
 
+    # -- row conversion helpers ----------------------------------------------
+
+    @staticmethod
+    def _row_to_dict(
+        row: Any,
+        include_attributes: list[str] | bool | None,
+    ) -> dict[str, Any]:
+        """Convert a single SDK row to a plain dict."""
+        return_all = include_attributes is True
+        doc: dict[str, Any] = {"id": row.id, "dist": getattr(row, "$dist", None)}
+        if return_all:
+            extras = getattr(row, "model_extra", {}) or {}
+            for attr_name, val in extras.items():
+                if attr_name != "$dist" and val is not None:
+                    doc[attr_name] = val
+        elif include_attributes:
+            for attr in include_attributes:
+                doc[attr] = getattr(row, attr, None)
+        return doc
+
+    # -- SearchBackend interface ---------------------------------------------
+
     def search(
         self,
         namespace: str,
@@ -97,18 +119,24 @@ class TurbopufferBackend(SearchBackend):
         if vector is None and text_query is None:
             raise ValueError("At least one of 'vector' or 'text_query' must be provided")
 
-        # Build rank_by ---------------------------------------------------
-        rank_parts: list[tuple] = []
-        if text_query is not None:
-            rank_parts.append((text_field, "BM25", text_query))
-        if vector is not None:
-            rank_parts.append(("vector", "ANN", vector))
+        # Hybrid case: Turbopuffer doesn't support Sum(BM25, ANN) in a single
+        # query.  Use multi_query + RRF (Reciprocal Rank Fusion) instead.
+        if vector is not None and text_query is not None:
+            return self._hybrid_search(
+                namespace,
+                vector=vector,
+                text_query=text_query,
+                text_field=text_field,
+                filters=filters,
+                top_k=top_k,
+                include_attributes=include_attributes,
+            )
 
-        if len(rank_parts) == 1:
-            rank_by: tuple = rank_parts[0]
+        # Single-signal path: BM25-only or ANN-only
+        if text_query is not None:
+            rank_by: tuple = (text_field, "BM25", text_query)
         else:
-            # Hybrid: Sum of BM25 + ANN
-            rank_by = ("Sum", *rank_parts)
+            rank_by = ("vector", "ANN", vector)
 
         # Build kwargs ----------------------------------------------------
         kwargs: dict[str, Any] = {
@@ -120,7 +148,6 @@ class TurbopufferBackend(SearchBackend):
         if tpuf_filters is not None:
             kwargs["filters"] = tpuf_filters
 
-        # include_attributes: list → explicit attrs, True → all, None → id+dist only
         if include_attributes is True:
             kwargs["include_attributes"] = True
         elif include_attributes is not None:
@@ -129,23 +156,59 @@ class TurbopufferBackend(SearchBackend):
         # Execute ---------------------------------------------------------
         result = self._ns(namespace).query(**kwargs)
 
-        # Convert to plain dicts ------------------------------------------
-        return_all = include_attributes is True
-        rows: list[dict] = []
-        for row in result.rows:
-            # SDK uses '$dist' as the distance attribute name
-            doc: dict[str, Any] = {"id": row.id, "dist": getattr(row, "$dist", None)}
-            if return_all:
-                # Row is a Pydantic model; dynamic attributes live in model_extra.
-                extras = getattr(row, "model_extra", {}) or {}
-                for attr_name, val in extras.items():
-                    if attr_name != "$dist" and val is not None:
-                        doc[attr_name] = val
-            elif include_attributes:
-                for attr in include_attributes:
-                    doc[attr] = getattr(row, attr, None)
-            rows.append(doc)
-        return rows
+        return [
+            self._row_to_dict(row, include_attributes) for row in result.rows
+        ]
+
+    def _hybrid_search(
+        self,
+        namespace: str,
+        *,
+        vector: list[float],
+        text_query: str,
+        text_field: str = "text",
+        filters: dict | None = None,
+        top_k: int = 10,
+        include_attributes: list[str] | None = None,
+    ) -> list[dict]:
+        """Run BM25 + ANN via multi_query and fuse with RRF."""
+        shared: dict[str, Any] = {"top_k": top_k}
+
+        tpuf_filters = translate_filters(filters)
+        if tpuf_filters is not None:
+            shared["filters"] = tpuf_filters
+
+        if include_attributes is True:
+            shared["include_attributes"] = True
+        elif include_attributes is not None:
+            shared["include_attributes"] = include_attributes
+
+        bm25_query = {"rank_by": (text_field, "BM25", text_query), **shared}
+        ann_query = {"rank_by": ("vector", "ANN", vector), **shared}
+
+        response = self._ns(namespace).multi_query(queries=[bm25_query, ann_query])
+
+        bm25_rows = response.results[0].rows or []
+        ann_rows = response.results[1].rows or []
+
+        # RRF: score = sum(1 / (k + rank)) across lists, k=60 is standard
+        k = 60
+        scores: dict[str, float] = defaultdict(float)
+        row_map: dict[str, Any] = {}
+
+        for rank, row in enumerate(bm25_rows):
+            scores[row.id] += 1.0 / (k + rank + 1)
+            row_map[row.id] = row
+        for rank, row in enumerate(ann_rows):
+            scores[row.id] += 1.0 / (k + rank + 1)
+            row_map[row.id] = row  # ANN row overwrites; attrs are the same
+
+        ranked_ids = sorted(scores, key=scores.get, reverse=True)[:top_k]
+
+        return [
+            {**self._row_to_dict(row_map[rid], include_attributes), "dist": scores[rid]}
+            for rid in ranked_ids
+        ]
 
     def aggregate(
         self,

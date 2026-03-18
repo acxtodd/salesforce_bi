@@ -182,6 +182,92 @@ class TestSearchValidation:
         with pytest.raises(ValueError, match="aggregate_field is required"):
             backend.aggregate("test_ns", aggregate="avg")
 
+    def test_hybrid_uses_multi_query_with_rrf(self):
+        """Hybrid search must use multi_query (BM25 + ANN) with RRF fusion."""
+        from unittest.mock import MagicMock
+
+        backend = TurbopufferBackend.__new__(TurbopufferBackend)
+        backend._client = MagicMock()
+
+        mock_ns = MagicMock()
+
+        # Build mock rows with id and $dist attributes
+        def _make_row(rid, dist=0.5):
+            row = MagicMock()
+            row.id = rid
+            setattr(row, "$dist", dist)
+            row.model_extra = {}
+            return row
+
+        bm25_result = MagicMock()
+        bm25_result.rows = [_make_row("r1"), _make_row("r2"), _make_row("r3")]
+        ann_result = MagicMock()
+        ann_result.rows = [_make_row("r2"), _make_row("r3"), _make_row("r4")]
+
+        mock_response = MagicMock()
+        mock_response.results = [bm25_result, ann_result]
+        mock_ns.multi_query.return_value = mock_response
+        backend._client.namespace.return_value = mock_ns
+
+        vector = [0.1] * 8
+        results = backend.search("ns", vector=vector, text_query="test query")
+
+        # multi_query must be called (not query)
+        mock_ns.multi_query.assert_called_once()
+        mock_ns.query.assert_not_called()
+
+        call_kwargs = mock_ns.multi_query.call_args[1]
+        queries = call_kwargs["queries"]
+        assert len(queries) == 2
+        assert queries[0]["rank_by"] == ("text", "BM25", "test query")
+        assert queries[1]["rank_by"] == ("vector", "ANN", vector)
+
+        # RRF fusion: r2 and r3 appear in both lists, should rank higher
+        result_ids = [r["id"] for r in results]
+        assert "r2" in result_ids
+        assert "r3" in result_ids
+        # r2 and r3 are in both lists → higher RRF score than r1 or r4
+        r2_idx = result_ids.index("r2")
+        r1_idx = result_ids.index("r1") if "r1" in result_ids else len(result_ids)
+        assert r2_idx < r1_idx, "r2 (in both lists) should rank above r1 (BM25-only)"
+
+    def test_bm25_only_rank_by_is_bare_tuple(self):
+        """BM25-only search should produce a bare rank_by, not wrapped in Sum."""
+        from unittest.mock import MagicMock
+
+        backend = TurbopufferBackend.__new__(TurbopufferBackend)
+        backend._client = MagicMock()
+
+        mock_ns = MagicMock()
+        mock_result = MagicMock()
+        mock_result.rows = []
+        mock_ns.query.return_value = mock_result
+        backend._client.namespace.return_value = mock_ns
+
+        backend.search("ns", text_query="hello")
+
+        call_kwargs = mock_ns.query.call_args[1]
+        assert call_kwargs["rank_by"] == ("text", "BM25", "hello")
+
+    def test_ann_only_rank_by_is_bare_tuple(self):
+        """ANN-only search should produce a bare rank_by, not wrapped in Sum."""
+        from unittest.mock import MagicMock
+
+        backend = TurbopufferBackend.__new__(TurbopufferBackend)
+        backend._client = MagicMock()
+
+        mock_ns = MagicMock()
+        mock_result = MagicMock()
+        mock_result.rows = []
+        mock_ns.query.return_value = mock_result
+        backend._client.namespace.return_value = mock_ns
+
+        vector = [0.5] * 4
+        backend.search("ns", vector=vector)
+
+        call_kwargs = mock_ns.query.call_args[1]
+        assert call_kwargs["rank_by"] == ("vector", "ANN", vector)
+
 
 # =========================================================================
 # No-import guard

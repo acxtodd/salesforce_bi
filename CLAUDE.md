@@ -1,8 +1,8 @@
 # Scope
 
-This file is for repo-local agent guidance that is not obvious from quick code
-search. Keep it narrow. The canonical roadmap is `tasks.json`, updated only via
-`python3 scripts/task_manager.py`.
+This file holds repo-specific agent rules that are not obvious from code search.
+Keep it narrow. The canonical roadmap is `tasks.json`, and task state changes go
+through `python3 scripts/task_manager.py`.
 
 # Non-Negotiable Rules
 
@@ -10,48 +10,44 @@ search. Keep it narrow. The canonical roadmap is `tasks.json`, updated only via
 manually edit `tasks.json`.
 2. Do not run multiple `task_manager.py` write commands in parallel. Use one
 writer at a time or task updates can be lost.
-3. The primary CDC path for the new connector is `Salesforce CDC -> AppFlow ->
-S3 -> EventBridge -> lambda/cdc_sync/index.py`. Prefer fixing or finishing that
-path over designing a new transport.
-4. Treat `lambda/cdc_processor`, the Step Functions ingestion chain, the
+3. Do not change acceptance test definitions or thresholds during a validation
+gate rerun. If a task's acceptance criteria are wrong, revise the task criteria
+first, record the rationale, and track any carried-forward issues explicitly.
+4. Do not mark a task complete when unresolved validator, live-system, or data
+issues remain unless the task criteria were formally updated first and the
+follow-up work is tracked in child or downstream tasks.
+5. The primary CDC path for the new connector is `Salesforce CDC -> AppFlow ->
+S3 -> EventBridge -> lambda/cdc_sync/index.py`. Prefer fixing that path over
+designing a new transport.
+6. Treat `lambda/cdc_processor`, the Step Functions ingestion chain, the
 `/ingest` endpoint, and `AISearchBatchExport` as legacy or fallback
 infrastructure unless the task explicitly targets the old system.
-5. Before assuming AppFlow is active, verify it in AWS. Check actual
+7. Before assuming AppFlow is active, verify it in AWS. Check actual
 `AWS::AppFlow::*` resources or run `aws appflow list-flows`; CDK code alone is
 not evidence.
-6. AppFlow deploys are special. Follow the deploy recipe in `bin/app.ts`; if
-any of `salesforceInstanceUrl`, `salesforceSecretArn`, or
-`salesforceJwtToken` is passed via `-c`, all three must be passed, and AppFlow
-deploys must use the direct deploy path documented there.
-7. Do not claim full E2E validation from synthetic S3 writes or direct
-Turbopuffer checks. Real CDC validation requires both an AppFlow-written S3 CDC
-object and an observable downstream result.
 8. When a live AWS or Salesforce fix is required during validation, encode that
 fix in repo code or task notes before closing the task. Do not leave the source
 of truth in console-only state.
-9. For AppFlow CDC parsing, handle both ChangeEvent channel names and SObject
-entity names. Real AppFlow payloads may use `ascendix__Property__c` instead of
-`ascendix__Property__ChangeEvent`.
-10. Do not mark a task complete when the remaining work is still a live system
-leg. Keep the parent `in_progress` and create explicit follow-up tasks instead.
-11. Current closing path for Phase 2 is `2.4` AppFlow activation, then `2.5`
-LWC `/query` observability. Do not jump to Phase 3 before those are closed.
-12. When editing CDC-related docs, keep `README.md`, `TASK_TRACKING.md`, and
-the relevant task entries aligned in the same change.
 
 # Known Failure Patterns
 
-1. Existing AppFlow code in CDK does not mean AppFlow is active in AWS. In this
-repo, `bin/app.ts` can omit the props that would create the flows.
-2. AppFlow ConnectorProfile creation can reject SSM dynamic references, partial
-secret ARNs, or CloudFormation early validation. Use the literal context values
-and deploy method documented in `bin/app.ts`.
-3. The repo contains both old and new ingestion paths. Verify which path a
-Lambda or endpoint feeds before reusing it for the new connector.
-4. A successful downstream sync test is not the same as a user-visible
-Salesforce validation. Keep those as separate checks.
-5. Live fixes can drift from repo state. If the code does not reflect the fix,
-the next deploy can regress even if the last validation run passed.
+1. A successful downstream sync probe is not the same as user-visible
+Salesforce validation. Real CDC validation requires both an AppFlow-written S3
+CDC object and an observable downstream result.
+2. For validator or search probes, do not use `text_query=" "` as a
+"match-anything" query. Turbopuffer strips it. Use `aggregate()` or an explicit
+stopword query such as `"a the is of and"`.
+3. Local warm-latency results from a developer machine are not comparable to
+in-region Lambda targets. If a latency gate is environment-sensitive, record
+the environment in the task note before treating the result as a product issue.
+4. Turbopuffer does not support `Sum(BM25, ANN)` in a single query — the `Sum`
+combinator only accepts `RankByText` elements. Hybrid search uses `multi_query`
+(BM25 + ANN in parallel) with application-side RRF fusion. See
+`turbopuffer_backend.py:_hybrid_search`.
+5. `denorm_config.yaml` and CDC map include Deal and Sale for Phase 5 readiness,
+but the query layer (system prompt, tool schema, acceptance tests) scopes to
+Property, Lease, Availability only. Validator check 2 will report Deal/Sale as
+missing — this is expected config-vs-query scope divergence, not an ingestion bug.
 
 > Self-Feedback Loop: If a task is confusing due to missing or contradictory repo context, add a temporary note here with:
 > (a) what was confusing, (b) what wrong assumption it caused, and (c) the proposed permanent fix in code/docs.

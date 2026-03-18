@@ -53,7 +53,7 @@ The LLM decides the query strategy — single search, parallel cross-object sear
 
 | POC (Phase 0-3) | v1 (Phase 5+) |
 |-----------------|----------------|
-| Property, Lease, Availability, Deal, Sale | + Account, Contact |
+| Property, Lease, Availability | + Deal, Sale, Account, Contact |
 
 ## Key Design Decisions
 

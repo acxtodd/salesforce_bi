@@ -183,6 +183,7 @@ See [`TASK_TRACKING.md`](TASK_TRACKING.md) for task management commands and work
 ## Documentation
 
 - [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-connector-spec.md) — Unified product & design spec (start here)
+- [`docs/turbopuffer/README.md`](docs/turbopuffer/README.md) — Turbopuffer reference library with repo-specific usage notes
 - [`TASK_TRACKING.md`](TASK_TRACKING.md) — Task tracking guide
 - `docs/guides/` — Onboarding, operator guide, AppFlow setup, quick start
 - `docs/architecture/` — CDC pipeline summary, CDK reference, infrastructure

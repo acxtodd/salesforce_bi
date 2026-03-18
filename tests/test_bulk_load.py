@@ -27,6 +27,7 @@ from bulk_load import (
     embed_texts,
     flatten,
     generate_embeddings_batch,
+    load_object,
     upsert_documents,
     validate_parents,
 )
@@ -303,8 +304,9 @@ class TestBuildText:
         text = build_text(
             direct, parent, ["Name"], parent_config, "ascendix__Lease__c"
         )
-        assert "Name: One Arts Plaza" in text
-        assert "City: Dallas" in text
+        assert "Property Name: One Arts Plaza" in text
+        assert "Property City: Dallas" in text
+        assert " | Name: One Arts Plaza" not in text
 
     def test_null_values_skipped(self):
         direct = {"ascendix__LeaseType__c": "Office"}
@@ -704,6 +706,148 @@ class TestUpsertBatching:
 
 def calls_schema(mock, index):
     return mock.upsert.call_args_list[index].kwargs["schema"]
+
+
+class TestLoadObjectHardening:
+    def _make_sf(self, records):
+        sf = MagicMock()
+        sf.describe.return_value = {"fields": []}
+        sf.query_all.return_value = records
+        return sf
+
+    def _make_backend(self, final_count):
+        backend = MagicMock()
+        backend.aggregate.return_value = {"count": final_count}
+        return backend
+
+    def test_skips_bad_prepare_record_and_continues(self, caplog):
+        records = [
+            {"Id": "r1", "LastModifiedDate": "2025-01-01", "Name": "Good 1"},
+            {"Id": "r2", "LastModifiedDate": "2025-01-01", "Name": "Bad"},
+            {"Id": "r3", "LastModifiedDate": "2025-01-01", "Name": "Good 2"},
+        ]
+        sf = self._make_sf(records)
+        backend = self._make_backend(final_count=2)
+
+        def build_text_side_effect(direct, *_args, **_kwargs):
+            if direct["Name"] == "Bad":
+                raise ValueError("bad text")
+            return f"Lease: | Name: {direct['Name']}"
+
+        with patch("bulk_load.build_text", side_effect=build_text_side_effect):
+            with patch(
+                "bulk_load.generate_embeddings_batch",
+                return_value=[[0.1] * 1024, [0.2] * 1024],
+            ):
+                summary = load_object(
+                    sf_client=sf,
+                    bedrock_client=MagicMock(),
+                    backend=backend,
+                    object_name="ascendix__Lease__c",
+                    object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+                    namespace="ns",
+                    salesforce_org_id="00Dxx",
+                )
+
+        assert summary.fetched_count == 3
+        assert summary.indexed_count == 2
+        assert summary.skipped_count == 1
+        assert summary.turbopuffer_count == 2
+        assert summary.count_mismatch is False
+        assert "r2" in summary.skipped_ids
+        assert "Skipping record r2 during flatten/text preparation" in caplog.text
+        assert len(backend.upsert.call_args.kwargs["documents"]) == 2
+
+    def test_embedding_batch_falls_back_to_per_record(self, caplog):
+        records = [
+            {"Id": "r1", "LastModifiedDate": "2025-01-01", "Name": "Good 1"},
+            {"Id": "r2", "LastModifiedDate": "2025-01-01", "Name": "Bad"},
+            {"Id": "r3", "LastModifiedDate": "2025-01-01", "Name": "Good 2"},
+        ]
+        sf = self._make_sf(records)
+        backend = self._make_backend(final_count=2)
+
+        def generate_side_effect(_bedrock, texts):
+            if len(texts) > 1 and any("Bad" in text for text in texts):
+                raise ValueError("batch embed failed")
+            if any("Bad" in text for text in texts):
+                raise ValueError("record embed failed")
+            return [[0.1] * 1024 for _ in texts]
+
+        with patch("bulk_load.generate_embeddings_batch", side_effect=generate_side_effect):
+            summary = load_object(
+                sf_client=sf,
+                bedrock_client=MagicMock(),
+                backend=backend,
+                object_name="ascendix__Lease__c",
+                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+                namespace="ns",
+                salesforce_org_id="00Dxx",
+            )
+
+        assert summary.fetched_count == 3
+        assert summary.indexed_count == 2
+        assert summary.skipped_count == 1
+        assert summary.turbopuffer_count == 2
+        assert summary.count_mismatch is False
+        assert "r2" in summary.skipped_ids
+        assert "retrying per record" in caplog.text
+        assert "Skipping record r2 during embedding" in caplog.text
+
+    def test_count_mismatch_is_surfaced_clearly(self, caplog):
+        records = [
+            {"Id": "r1", "LastModifiedDate": "2025-01-01", "Name": "Good 1"},
+            {"Id": "r2", "LastModifiedDate": "2025-01-01", "Name": "Good 2"},
+        ]
+        sf = self._make_sf(records)
+        backend = self._make_backend(final_count=1)
+
+        with patch(
+            "bulk_load.generate_embeddings_batch",
+            return_value=[[0.1] * 1024, [0.2] * 1024],
+        ):
+            summary = load_object(
+                sf_client=sf,
+                bedrock_client=MagicMock(),
+                backend=backend,
+                object_name="ascendix__Lease__c",
+                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+                namespace="ns",
+                salesforce_org_id="00Dxx",
+            )
+
+        assert summary.indexed_count == 2
+        assert summary.turbopuffer_count == 1
+        assert summary.count_mismatch is True
+        assert "Post-load count mismatch" in caplog.text
+
+    def test_count_verification_failure_is_surfaced(self, caplog):
+        records = [
+            {"Id": "r1", "LastModifiedDate": "2025-01-01", "Name": "Good 1"},
+        ]
+        sf = self._make_sf(records)
+        backend = MagicMock()
+        backend.aggregate.side_effect = RuntimeError("aggregate failed")
+
+        with patch(
+            "bulk_load.generate_embeddings_batch",
+            return_value=[[0.1] * 1024],
+        ):
+            summary = load_object(
+                sf_client=sf,
+                bedrock_client=MagicMock(),
+                backend=backend,
+                object_name="ascendix__Lease__c",
+                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+                namespace="ns",
+                salesforce_org_id="00Dxx",
+            )
+
+        assert summary.indexed_count == 1
+        assert summary.turbopuffer_count is None
+        assert summary.count_mismatch is True
+        assert "Could not verify post-load count" in caplog.text
+        assert "Post-load count verification unavailable" in caplog.text
 
 
 # ===================================================================

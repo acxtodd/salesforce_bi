@@ -1172,6 +1172,24 @@
           "progress_notes": []
         },
         {
+          "id": "3.2.1",
+          "title": "Capture Turbopuffer query telemetry for perf and cost analysis",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T07:54:14.026579+00:00",
+          "updatedAt": "2026-03-18T07:54:25.419025+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Instrument the query path and validation tooling to record high-value Turbopuffer query telemetry such as cache temperature, cache hit ratio, logical bytes, and execution timing so later cost and performance analysis can use real backend signals instead of guesswork.",
+          "parent": "3.2",
+          "acceptance_criteria": [
+            "The query path and/or validation tooling capture available Turbopuffer telemetry fields needed for later cost/performance analysis, including timing and payload/billing-relevant metrics where exposed.",
+            "A sample artifact or log output demonstrates the captured telemetry for representative queries and documents any fields that are unavailable in the installed SDK or current backend wrapper."
+          ]
+        },
+        {
           "id": "3.3",
           "title": "Analyze regressions and make go/no-go decision",
           "description": "Orchestrator task — split into subtasks 3.3.1 through 3.3.3.",
@@ -1372,33 +1390,52 @@
         {
           "id": "3.3.2.4",
           "title": "Disambiguate parent labels in denormalized text",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T06:56:56.842853+00:00",
-          "updatedAt": "2026-03-18T06:57:02.762445+00:00",
+          "updatedAt": "2026-03-18T08:01:51.512704+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-18T08:01:38.126015+00:00",
+              "note": "2026-03-18 verified implementation: build_text() now prefixes parent-derived labels with the relationship name (for example Property Name, Property City, Tenant Name) while document attribute keys remain unchanged. Reviewed diff in lib/denormalize.py and tests/test_denormalize.py. Validation: python3 -m pytest tests/test_denormalize.py -q -> 31 passed."
+            },
+            {
+              "timestamp": "2026-03-18T08:01:51.512707+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Update build_text() so parent-derived values are labeled with the relationship name rather than repeating ambiguous field names like Name or City. This should improve BM25 and embedding quality for cross-object records without changing document attribute keys.",
           "technical_context": "BA audit found Lease text strings containing multiple undifferentiated 'Name:' values from different parents. build_document() already prefixes document keys correctly, but build_text() still emits ambiguous labels, which weakens both keyword and semantic retrieval.",
           "parent": "3.3.2",
           "acceptance_criteria": [
             "Parent-derived text labels include the relationship name (for example Property Name, Tenant Name) instead of ambiguous repeated field labels",
             "Document attribute keys remain unchanged while representative retrieval or text-generation tests are updated to cover the new label format"
-          ]
+          ],
+          "completedAt": "2026-03-18T08:01:51.512514+00:00"
         },
         {
           "id": "3.3.2.5",
           "title": "Harden bulk load with count verification and per-record tolerance",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T06:57:07.502755+00:00",
-          "updatedAt": "2026-03-18T06:57:19.661513+00:00",
+          "updatedAt": "2026-03-18T08:09:22.203081+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-18T08:09:19.866754+00:00",
+              "note": "2026-03-18 verified implementation: bulk_load.py now returns structured per-object load summaries, tolerates per-record preparation, embedding, and document-build failures by logging and skipping affected records, and performs post-load Turbopuffer count verification per object_type. Validation: python3 -m pytest tests/test_bulk_load.py -q -> 51 passed; python3 -m pytest tests/test_denormalize.py -q -> 31 passed. Count verification failures now surface as explicit bad outcomes instead of aborting silently after upsert."
+            },
+            {
+              "timestamp": "2026-03-18T08:09:22.203084+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Make bulk_load.py robust against silent partial loads. Add post-load object count verification and tolerate per-record flatten/text/embed failures by logging and continuing, then surface a clear summary of skipped records and any Salesforce-to-Turbopuffer count mismatch.",
           "technical_context": "BA audit found the current namespace contains fewer Property/Lease/Availability docs than an earlier successful load, suggesting a partial reload or silent overwrite. The current loader has no post-load count verification and no per-record error tolerance, so operator mistakes or malformed records can leave the namespace in a misleading state.",
           "parent": "3.3.2",
@@ -1406,7 +1443,8 @@
             "Bulk load reports Salesforce fetched count, successfully indexed count, skipped-record count, and final Turbopuffer count per object",
             "A malformed record does not abort the entire object load; the failure is logged and the run continues",
             "A post-load mismatch between expected and indexed counts is surfaced clearly enough that a partial load cannot be mistaken for success"
-          ]
+          ],
+          "completedAt": "2026-03-18T08:09:22.202938+00:00"
         },
         {
           "id": "3.3.2.6",
@@ -1456,6 +1494,23 @@
           "gate_criteria": "Only execute if 3.3.2.1 keeps geography in current POC scope."
         },
         {
+          "id": "3.3.2.8",
+          "title": "Pin Turbopuffer full-text tokenizer and schema settings explicitly",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T07:52:02.863887+00:00",
+          "updatedAt": "2026-03-18T07:52:45.490597+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Stop relying on Turbopuffer full-text defaults that may drift over time. Explicitly pin tokenizer-related full-text settings in the schema used by bulk load and CDC sync, then validate that BM25 behavior remains stable.",
+          "parent": "3.3.2",
+          "acceptance_criteria": [
+            "The Turbopuffer schema used by bulk load and CDC sync pins explicit full-text settings instead of relying on defaults."
+          ]
+        },
+        {
           "id": "3.3.3",
           "title": "Go/no-go decision document",
           "status": "pending",
@@ -1492,7 +1547,8 @@
       "2.": 6,
       "2.4.": 5,
       "2.5.": 4,
-      "3.3.2.": 8
+      "3.3.2.": 9,
+      "3.2.": 2
     }
   }
 }

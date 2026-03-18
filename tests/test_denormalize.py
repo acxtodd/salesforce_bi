@@ -263,16 +263,22 @@ class TestBuildText:
             "ascendix__Property__c": {
                 "Name": "One Arts Plaza",
                 "ascendix__City__c": "Dallas",
+            },
+            "ascendix__Tenant__c": {
+                "Name": "ACME Corp",
             }
         }
         parent_config = {
             "ascendix__Property__c": ["Name", "ascendix__City__c"],
+            "ascendix__Tenant__c": ["Name"],
         }
         text = build_text(
             direct, parent, ["Name"], parent_config, "ascendix__Lease__c"
         )
-        assert "Name: One Arts Plaza" in text
-        assert "City: Dallas" in text
+        assert "Property Name: One Arts Plaza" in text
+        assert "Property City: Dallas" in text
+        assert "Tenant Name: ACME Corp" in text
+        assert " | Name: One Arts Plaza" not in text
 
     def test_null_values_skipped(self):
         direct = {"ascendix__LeaseType__c": "Office"}

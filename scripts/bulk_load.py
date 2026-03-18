@@ -24,6 +24,7 @@ import logging
 import os
 import sys
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,19 @@ LOG = logging.getLogger("bulk_load")
 # Batch size constants (CLI-specific)
 EMBED_BATCH_SIZE = 25
 UPSERT_BATCH_SIZE = 100
+
+
+@dataclass
+class LoadSummary:
+    """Structured per-object load result used for logging and verification."""
+
+    object_name: str
+    fetched_count: int = 0
+    indexed_count: int = 0
+    skipped_count: int = 0
+    turbopuffer_count: int | None = None
+    count_mismatch: bool = False
+    skipped_ids: list[str] = field(default_factory=list)
 
 
 # ===================================================================
@@ -233,6 +247,97 @@ def upsert_documents(
         backend.upsert(namespace, documents=batch, schema=schema)
 
 
+def _embed_batch_with_retry(
+    bedrock_client: Any, texts: list[str], *, batch_start: int
+) -> list[list[float]]:
+    """Embed one batch with retry on throttling."""
+    backoff = 1.0
+    for attempt in range(5):
+        try:
+            return generate_embeddings_batch(bedrock_client, texts)
+        except Exception as e:
+            if _is_throttling(e):
+                LOG.warning(
+                    "  Throttled, retrying in %.1fs (attempt %d)",
+                    backoff,
+                    attempt + 1,
+                )
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            raise
+    raise RuntimeError(
+        f"Embedding failed after 5 attempts for batch starting at {batch_start}"
+    )
+
+
+def _embed_records_with_tolerance(
+    bedrock_client: Any, prepared_rows: list[dict[str, Any]]
+) -> tuple[list[list[float]], list[dict[str, Any]], list[str]]:
+    """Embed rows in batches, falling back to per-record skip on hard failures."""
+    embeddings: list[list[float]] = []
+    embedded_rows: list[dict[str, Any]] = []
+    skipped_ids: list[str] = []
+
+    for i in range(0, len(prepared_rows), EMBED_BATCH_SIZE):
+        batch_rows = prepared_rows[i : i + EMBED_BATCH_SIZE]
+        batch_texts = [row["text"] for row in batch_rows]
+        LOG.info(
+            "  Embedding batch %d (%d texts)",
+            i // EMBED_BATCH_SIZE + 1,
+            len(batch_rows),
+        )
+        try:
+            batch_embeddings = _embed_batch_with_retry(
+                bedrock_client, batch_texts, batch_start=i
+            )
+            embeddings.extend(batch_embeddings)
+            embedded_rows.extend(batch_rows)
+            continue
+        except Exception as exc:
+            LOG.warning(
+                "  Embedding batch %d failed (%s); retrying per record",
+                i // EMBED_BATCH_SIZE + 1,
+                exc,
+            )
+
+        for row in batch_rows:
+            record_id = row["record_id"]
+            try:
+                vector = _embed_batch_with_retry(
+                    bedrock_client, [row["text"]], batch_start=i
+                )[0]
+            except Exception as exc:
+                LOG.warning(
+                    "  Skipping record %s during embedding: %s", record_id, exc
+                )
+                skipped_ids.append(record_id)
+                continue
+            embeddings.append(vector)
+            embedded_rows.append(row)
+
+    return embeddings, embedded_rows, skipped_ids
+
+
+def _count_indexed_docs(
+    backend: TurbopufferBackend | None, namespace: str, object_name: str
+) -> int | None:
+    """Return final Turbopuffer count for one object type when available."""
+    if backend is None:
+        return None
+    obj_type = clean_label(object_name).lower()
+    try:
+        result = backend.aggregate(
+            namespace,
+            filters={"object_type": obj_type},
+            aggregate="count",
+        )
+    except Exception as exc:
+        LOG.error("  Could not verify post-load count for %s: %s", object_name, exc)
+        return None
+    return int(result.get("count", 0))
+
+
 # ===================================================================
 # Org ID
 # ===================================================================
@@ -256,9 +361,10 @@ def load_object(
     namespace: str,
     salesforce_org_id: str,
     dry_run: bool = False,
-) -> int:
-    """Run full pipeline for one object. Returns count of documents."""
+) -> LoadSummary:
+    """Run full pipeline for one object and return a structured summary."""
     LOG.info("=== Processing %s ===", object_name)
+    summary = LoadSummary(object_name=object_name)
 
     embed_fields = object_config.get("embed_fields", [])
     metadata_fields = object_config.get("metadata_fields", [])
@@ -274,75 +380,141 @@ def load_object(
     )
     LOG.info("  SOQL: %s", soql[:200])
     records = sf_client.query_all(soql)
-    LOG.info("  Fetched %d records", len(records))
+    summary.fetched_count = len(records)
+    LOG.info("  Fetched %d records", summary.fetched_count)
 
     if not records:
-        return 0
+        return summary
 
     # Stage 2 + 3: Flatten + build text
-    texts: list[str] = []
-    flat_data: list[tuple[dict, dict]] = []
+    prepared_rows: list[dict[str, Any]] = []
     for record in records:
-        direct_fields, parent_fields = flatten(
-            record, embed_fields, metadata_fields, parent_config, rel_map
+        record_id = record.get("Id", "<unknown>")
+        try:
+            direct_fields, parent_fields = flatten(
+                record, embed_fields, metadata_fields, parent_config, rel_map
+            )
+            text = build_text(
+                direct_fields, parent_fields, embed_fields, parent_config, object_name
+            )
+        except Exception as exc:
+            LOG.warning(
+                "  Skipping record %s during flatten/text preparation: %s",
+                record_id,
+                exc,
+            )
+            summary.skipped_count += 1
+            summary.skipped_ids.append(record_id)
+            continue
+        prepared_rows.append(
+            {
+                "record_id": record_id,
+                "direct_fields": direct_fields,
+                "parent_fields": parent_fields,
+                "text": text,
+            }
         )
-        text = build_text(
-            direct_fields, parent_fields, embed_fields, parent_config, object_name
-        )
-        texts.append(text)
-        flat_data.append((direct_fields, parent_fields))
 
     if dry_run:
         LOG.info("  [DRY RUN] Sample texts:")
-        for idx, text in enumerate(texts[:3]):
+        for idx, row in enumerate(prepared_rows[:3]):
+            text = row["text"]
             LOG.info("    [%d] %s", idx, text[:200])
-        LOG.info("  [DRY RUN] Sample document keys (first record):")
-        sample_doc = build_document(
-            direct_fields=flat_data[0][0],
-            parent_fields=flat_data[0][1],
-            text=texts[0],
-            vector=[0.0] * 8,  # placeholder
-            record_id=flat_data[0][0]["Id"],
-            object_type=object_name,
-            salesforce_org_id=salesforce_org_id,
-            embed_field_names=embed_fields,
-            metadata_field_names=metadata_fields,
-            parent_config=parent_config,
-        )
-        for k, v in sample_doc.items():
-            if k == "vector":
-                LOG.info("    %s: [placeholder]", k)
-            else:
-                LOG.info("    %s: %s", k, str(v)[:80])
-        return len(records)
+        if prepared_rows:
+            LOG.info("  [DRY RUN] Sample document keys (first record):")
+            sample = prepared_rows[0]
+            sample_doc = build_document(
+                direct_fields=sample["direct_fields"],
+                parent_fields=sample["parent_fields"],
+                text=sample["text"],
+                vector=[0.0] * 8,  # placeholder
+                record_id=sample["record_id"],
+                object_type=object_name,
+                salesforce_org_id=salesforce_org_id,
+                embed_field_names=embed_fields,
+                metadata_field_names=metadata_fields,
+                parent_config=parent_config,
+            )
+            for k, v in sample_doc.items():
+                if k == "vector":
+                    LOG.info("    %s: [placeholder]", k)
+                else:
+                    LOG.info("    %s: %s", k, str(v)[:80])
+        summary.indexed_count = len(prepared_rows)
+        return summary
+
+    if not prepared_rows:
+        LOG.warning("  No valid records remained after preparation")
+        summary.turbopuffer_count = _count_indexed_docs(backend, namespace, object_name)
+        return summary
 
     # Stage 3.5: Embed
-    LOG.info("  Embedding %d texts...", len(texts))
-    vectors = embed_texts(bedrock_client, texts)
+    LOG.info("  Embedding %d texts...", len(prepared_rows))
+    vectors, embedded_rows, embed_skipped_ids = _embed_records_with_tolerance(
+        bedrock_client, prepared_rows
+    )
+    summary.skipped_count += len(embed_skipped_ids)
+    summary.skipped_ids.extend(embed_skipped_ids)
 
     # Stage 4: Build documents
     documents: list[dict] = []
-    for idx, (direct_fields, parent_fields) in enumerate(flat_data):
-        doc = build_document(
-            direct_fields=direct_fields,
-            parent_fields=parent_fields,
-            text=texts[idx],
-            vector=vectors[idx],
-            record_id=direct_fields["Id"],
-            object_type=object_name,
-            salesforce_org_id=salesforce_org_id,
-            embed_field_names=embed_fields,
-            metadata_field_names=metadata_fields,
-            parent_config=parent_config,
-        )
+    for idx, row in enumerate(embedded_rows):
+        record_id = row["record_id"]
+        try:
+            doc = build_document(
+                direct_fields=row["direct_fields"],
+                parent_fields=row["parent_fields"],
+                text=row["text"],
+                vector=vectors[idx],
+                record_id=record_id,
+                object_type=object_name,
+                salesforce_org_id=salesforce_org_id,
+                embed_field_names=embed_fields,
+                metadata_field_names=metadata_fields,
+                parent_config=parent_config,
+            )
+        except Exception as exc:
+            LOG.warning("  Skipping record %s during document build: %s", record_id, exc)
+            summary.skipped_count += 1
+            summary.skipped_ids.append(record_id)
+            continue
         documents.append(doc)
+
+    summary.indexed_count = len(documents)
 
     # Stage 5: Upsert
     LOG.info("  Upserting %d documents to %s...", len(documents), namespace)
     upsert_documents(backend, namespace, documents)
-    LOG.info("  Done: %d documents loaded for %s", len(documents), object_name)
+    summary.turbopuffer_count = _count_indexed_docs(backend, namespace, object_name)
+    if summary.turbopuffer_count is None:
+        summary.count_mismatch = True
+        LOG.error(
+            "  Post-load count verification unavailable for %s: fetched=%d indexed=%d skipped=%d",
+            object_name,
+            summary.fetched_count,
+            summary.indexed_count,
+            summary.skipped_count,
+        )
+    elif summary.turbopuffer_count != summary.indexed_count:
+        summary.count_mismatch = True
+        LOG.error(
+            "  Post-load count mismatch for %s: fetched=%d indexed=%d skipped=%d turbopuffer=%d",
+            object_name,
+            summary.fetched_count,
+            summary.indexed_count,
+            summary.skipped_count,
+            summary.turbopuffer_count,
+        )
+    else:
+        LOG.info(
+            "  Done: fetched=%d indexed=%d skipped=%d turbopuffer=%d",
+            summary.fetched_count,
+            summary.indexed_count,
+            summary.skipped_count,
+            summary.turbopuffer_count,
+        )
 
-    return len(documents)
+    return summary
 
 
 def main() -> None:
@@ -415,9 +587,11 @@ def main() -> None:
         backend = TurbopufferBackend()
 
     # Process each object
-    total = 0
+    total_fetched = 0
+    total_indexed = 0
+    total_skipped = 0
     for obj_name in object_names:
-        count = load_object(
+        summary = load_object(
             sf_client=sf,
             bedrock_client=bedrock_client,
             backend=backend,
@@ -427,11 +601,15 @@ def main() -> None:
             salesforce_org_id=org_id,
             dry_run=args.dry_run,
         )
-        total += count
+        total_fetched += summary.fetched_count
+        total_indexed += summary.indexed_count
+        total_skipped += summary.skipped_count
 
     LOG.info(
-        "=== Complete: %d documents across %d objects ===",
-        total,
+        "=== Complete: fetched=%d indexed=%d skipped=%d across %d objects ===",
+        total_fetched,
+        total_indexed,
+        total_skipped,
         len(object_names),
     )
 

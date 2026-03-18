@@ -176,7 +176,7 @@ def build_text(
         for pf in pfield_names:
             val = parent_vals.get(pf)
             if val is not None:
-                parts.append(f"{clean_label(pf)}: {val}")
+                parts.append(f"{clean_label(ref_field)} {clean_label(pf)}: {val}")
 
     return " | ".join(parts)
 

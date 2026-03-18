@@ -28,6 +28,9 @@ not evidence.
 8. When a live AWS or Salesforce fix is required during validation, encode that
 fix in repo code or task notes before closing the task. Do not leave the source
 of truth in console-only state.
+9. For Turbopuffer API, schema, hybrid, or performance questions, consult
+`docs/turbopuffer/README.md` first, then confirm against
+`lib/turbopuffer_backend.py` before changing backend behavior.
 
 # Known Failure Patterns
 

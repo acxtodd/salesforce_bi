@@ -567,8 +567,9 @@ def main() -> None:
     parser.add_argument("--access-token", default="")
     parser.add_argument(
         "--audit-bucket",
-        default="",
-        help="S3 bucket for audit trail (optional). Wraps backend with AuditingBackend.",
+        default="salesforce-ai-search-audit-382211616288-us-west-2",
+        help="S3 bucket for audit trail. Defaults to the project audit bucket. "
+        "Pass empty string to disable: --audit-bucket ''",
     )
 
     args = parser.parse_args()

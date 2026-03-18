@@ -73,13 +73,15 @@ Full spec: [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-con
 ```
 ├── lib/                            # Search backend
 │   ├── search_backend.py           # Vendor-agnostic ABC (search, aggregate, upsert, delete, warm)
-│   └── turbopuffer_backend.py      # Turbopuffer implementation (only file that imports tpuf SDK)
+│   ├── turbopuffer_backend.py      # Turbopuffer implementation (only file that imports tpuf SDK)
+│   └── audit_writer.py             # S3 audit trail (AuditingBackend decorator + replay support)
 ├── scripts/
 │   ├── task_manager.py             # Task tracking CLI (manages tasks.json)
 │   ├── generate_denorm_config.py   # Metadata-driven field selection → YAML config
 │   ├── bundle_cdc_sync.sh          # CDK build bundler for cdc_sync Lambda
 │   ├── bundle_query.sh             # CDK build bundler for query Lambda
 │   ├── run_acceptance_tests.py     # Acceptance test runner
+│   ├── replay_from_audit.py        # Replay documents from S3 audit trail into any namespace
 │   ├── salesforce/                 # Apex scripts for Salesforce CLI (sf apex run)
 │   ├── one-off/                    # Historical utility scripts (backfills, audits, etc.)
 │   └── data/                       # Seed data and test fixtures
@@ -175,10 +177,28 @@ python3 scripts/task_manager.py phases
 |-------|------|--------|
 | 0 | Foundations | Completed |
 | 1 | Intelligence Layer | Completed |
-| 2 | Salesforce Integration | Completed (CDC E2E validated 2026-03-17; LWC UI smoke test deferred to Phase 3 UAT) |
-| 3 | Validation Gate | Pending (unblocked; next up) |
+| 2 | Salesforce Integration | Completed (CDC E2E validated 2026-03-17) |
+| 3 | Validation Gate | In progress — LWC first smoke passed 2026-03-18; index fully refreshed (3,480 docs); remaining: cost model, go/no-go, citation nav fix, record-context passthrough |
 
 See [`TASK_TRACKING.md`](TASK_TRACKING.md) for task management commands and workflow.
+
+## Audit Trail & Replay
+
+Every bulk load writes each denormalized document to S3 alongside the Turbopuffer upsert. This enables debugging, diffing, and replaying without Salesforce or Bedrock credentials.
+
+```bash
+# View an indexed document
+aws s3 cp s3://salesforce-ai-search-audit-382211616288-us-west-2/documents/00Ddl000003yx57EAA/property/<record_id>.json - | python3 -m json.tool
+
+# Replay into a test namespace (no SF/Bedrock needed)
+python3 scripts/replay_from_audit.py \
+  --bucket salesforce-ai-search-audit-382211616288-us-west-2 \
+  --org-id 00Ddl000003yx57EAA \
+  --target-namespace test_replay \
+  --dry-run
+```
+
+Key pattern: `documents/{org_id}/{object_type}/{record_id}.json`. Config snapshots at `documents/{org_id}/_meta/`.
 
 ## Documentation
 

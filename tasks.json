@@ -1700,6 +1700,56 @@
             "replay_from_audit.py can replay documents from S3 into any Turbopuffer namespace without Salesforce or Bedrock credentials. Supports --dry-run, --as-of for point-in-time, --require-empty for authoritative mode, and --validate-config for drift detection."
           ],
           "completedAt": "2026-03-18T15:19:54.209522+00:00"
+        },
+        {
+          "id": "3.5",
+          "title": "Fix citation click navigation in LWC",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T21:10:55.507911+00:00",
+          "updatedAt": "2026-03-18T21:11:16.855685+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Clicking a citation in the ascendixAiSearch LWC citations drawer does not navigate to the Salesforce record. Pre-existing bug discovered during LWC first smoke test on 2026-03-18. The handleCitationClick handler calls openCitationPreview which should call navigateToRecord via NavigationMixin, but navigation does not occur. Classify as ui rendering issue.",
+          "acceptance_criteria": [
+            "Citation click in the drawer navigates to the correct Salesforce record page",
+            "Ctrl/Cmd+click opens the record in a new tab",
+            "Inline answer hyperlinks also navigate correctly"
+          ]
+        },
+        {
+          "id": "3.6",
+          "title": "Pass record context from LWC to query Lambda",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T21:11:02.572059+00:00",
+          "updatedAt": "2026-03-18T21:11:18.850551+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "When ascendixAiSearch is placed on a record page (e.g. Account), the @api recordId is available but never sent in the request payload. The Apex controller sends only question, org_id, and session_id. Claude cannot resolve which record the user is viewing, so record-context queries like 'any leases for this account?' get a generic 'which account?' response. Fix: include recordId in the LWC request body, pass through Apex to the query Lambda, and provide it as context so Claude can use live_salesforce_query to resolve the record.",
+          "acceptance_criteria": [
+            "LWC includes recordId in the request body when on a record page",
+            "Apex controller forwards recordId to the query Lambda",
+            "Query Lambda provides record context to Claude so it can resolve the current record",
+            "Record-context query on an Account page returns results scoped to that account"
+          ]
+        },
+        {
+          "id": "3.7",
+          "title": "Set AUDIT_BUCKET env var on CDC Lambda",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-18T21:14:07.964126+00:00",
+          "updatedAt": "2026-03-18T21:14:07.964330+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "The cdc_sync Lambda reads AUDIT_BUCKET from its environment to enable S3 audit trail writes. The env var is not yet set. Set AUDIT_BUCKET=salesforce-ai-search-audit-382211616288-us-west-2 on the salesforce-ai-search-cdc-sync Lambda configuration. This aligns CDC with the bulk_load default (which now audits by default)."
         }
       ]
     }
@@ -1715,7 +1765,7 @@
       "2.5.": 4,
       "3.3.2.": 10,
       "3.2.": 2,
-      "3.": 5
+      "3.": 8
     }
   }
 }

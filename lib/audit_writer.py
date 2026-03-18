@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -69,10 +70,9 @@ def write_audit_tombstone(
 
     Returns ``(ok_count, fail_count)``.
     """
-    ok = 0
-    failed = 0
     now = datetime.now(timezone.utc).isoformat()
-    for record_id in record_ids:
+
+    def _write_one(record_id: str) -> bool:
         key = f"documents/{org_id}/{object_type}/{record_id}.json"
         body = {"deleted": True, "record_id": record_id, "deleted_at": now}
         try:
@@ -82,7 +82,7 @@ def write_audit_tombstone(
                 Body=json.dumps(body, default=str),
                 ContentType="application/json",
             )
-            ok += 1
+            return True
         except Exception:
             LOG.warning(
                 "Audit tombstone failed: record_id=%s object_type=%s",
@@ -90,7 +90,17 @@ def write_audit_tombstone(
                 object_type,
                 exc_info=True,
             )
-            failed += 1
+            return False
+
+    ok = 0
+    failed = 0
+    with ThreadPoolExecutor(max_workers=min(len(record_ids), 20)) as pool:
+        futures = [pool.submit(_write_one, rid) for rid in record_ids]
+        for fut in as_completed(futures):
+            if fut.result():
+                ok += 1
+            else:
+                failed += 1
     return ok, failed
 
 
@@ -176,11 +186,16 @@ class AuditingBackend:
             distance_metric=distance_metric,
             schema=schema,
         )
-        for doc in documents:
-            if write_audit_document(self._s3, self._bucket, self._org_id, doc):
-                self.stats.audit_ok += 1
-            else:
-                self.stats.audit_failed += 1
+        with ThreadPoolExecutor(max_workers=min(len(documents), 20)) as pool:
+            futures = {
+                pool.submit(write_audit_document, self._s3, self._bucket, self._org_id, doc): doc
+                for doc in documents
+            }
+            for fut in as_completed(futures):
+                if fut.result():
+                    self.stats.audit_ok += 1
+                else:
+                    self.stats.audit_failed += 1
 
     def delete(self, namespace: str, *, ids: list[str]) -> None:
         self._inner.delete(namespace, ids=ids)

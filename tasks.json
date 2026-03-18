@@ -1532,19 +1532,38 @@
         {
           "id": "3.3.2.9",
           "title": "Refine parent-field stale-vs-sparse classification for low-incidence relationships",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T09:20:49.411500+00:00",
-          "updatedAt": "2026-03-18T09:21:10.471856+00:00",
+          "updatedAt": "2026-03-18T09:24:55.615315+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-18T09:21:49.262469+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-18T09:23:55.788049+00:00",
+              "note": "2026-03-18 implementation in progress: updated check 5 sparse-classification to verify sampled Salesforce record IDs before calling a relationship stale. Low-incidence populated relationships elsewhere in the org now classify as sparse/low-incidence WARN instead of stale when the sampled records themselves have null FKs. Added focused tests for sampled-stale, sampled-none-but-global-some, and global-zero sparse cases."
+            },
+            {
+              "timestamp": "2026-03-18T09:24:44.194711+00:00",
+              "note": "2026-03-18 completion evidence: check 5 sparse-classification now verifies sampled Salesforce record IDs before calling a relationship stale. If sampled records have populated FKs missing from indexed docs, the relationship still reports stale index. If sampled records are null but the org has some populated rows elsewhere, the relationship now reports sparse or low-incidence instead of stale. Unit validation: python3 -m pytest tests/test_validate_data.py -q -> 38 passed; python3 -m pytest tests/test_search_backend.py -q -> 32 passed, 1 skipped. Live validator artifact: results/validate_data_20260318T092355Z.txt now reports property submarket as sparse or low-incidence (sampled SF records have 0/10 populated; SF has 5/2470 FKs populated) rather than stale index on namespace org_00Ddl000003yx57EAA."
+            },
+            {
+              "timestamp": "2026-03-18T09:24:55.615321+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Tighten validate_data.py check 5 so low-incidence parent relationships are not labeled as stale index based only on org-wide Salesforce counts. Compare sampled or explicit record IDs when possible before concluding the index is stale, and keep sparse-but-real relationships distinct from propagation defects.",
           "parent": "3.3.2",
           "acceptance_criteria": [
             "low-incidence sparse relationships that exist elsewhere in the org but not in the sampled docs surface as sparse or indeterminate WARN, not stale index"
-          ]
+          ],
+          "startedAt": "2026-03-18T09:21:49.262281+00:00",
+          "completedAt": "2026-03-18T09:24:55.615140+00:00"
         },
         {
           "id": "3.3.3",

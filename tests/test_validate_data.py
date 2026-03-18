@@ -346,9 +346,15 @@ class TestParentFieldViolation:
         assert "not loaded" in result.message.lower()
 
     def test_sparse_with_sf_client_stale_index(self):
-        # SF shows FKs populated but index is empty — stale index
+        # Sampled SF records have populated FKs — stale index
         sf = MagicMock()
         sf.query.side_effect = [
+            {
+                "records": [
+                    {"Id": "d1", "ascendix__Property__c": "a0y000000000001"},
+                    {"Id": "d2", "ascendix__Property__c": None},
+                ]
+            },
             {"totalSize": 100},  # COUNT() WHERE FK != null
             {"totalSize": 500},  # COUNT() total
         ]
@@ -362,10 +368,38 @@ class TestParentFieldViolation:
         assert "stale" in result.message.lower()
         assert "reindex" in result.message.lower()
 
+    def test_sparse_with_sf_client_low_incidence_not_stale(self):
+        # Sampled docs are null, but other org rows have FKs populated.
+        sf = MagicMock()
+        sf.query.side_effect = [
+            {
+                "records": [
+                    {"Id": "d1", "ascendix__Property__c": None},
+                    {"Id": "d2", "ascendix__Property__c": None},
+                ]
+            },
+            {"totalSize": 5},  # COUNT() WHERE FK != null
+            {"totalSize": 500},  # COUNT() total
+        ]
+        docs = [
+            {"id": "d1", "property_name": None, "property_city": None},
+            {"id": "d2", "property_name": None, "property_city": None},
+        ]
+        validator = self._make_validator(docs, sf_client=sf)
+        result = validator._check_parent_fields()
+        assert result.status == "WARN"
+        assert "low-incidence" in result.message.lower()
+        assert "stale" not in result.message.lower()
+
     def test_sparse_with_sf_client_truly_sparse(self):
         # SF also shows 0 FKs populated — truly sparse source
         sf = MagicMock()
         sf.query.side_effect = [
+            {
+                "records": [
+                    {"Id": "d1", "ascendix__Property__c": None},
+                ]
+            },
             {"totalSize": 0},  # COUNT() WHERE FK != null
             {"totalSize": 500},  # COUNT() total
         ]

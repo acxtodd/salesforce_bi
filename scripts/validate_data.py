@@ -477,7 +477,7 @@ class DataValidator:
                     # No docs have ANY parent keys — sparse source or stale
                     self._classify_sparse(
                         obj_name, ref_field, obj_type, parent_label,
-                        len(docs), warns, fails,
+                        docs, warns, fails,
                     )
                 elif partial_docs:
                     # Some keys present, some missing — classify the gap
@@ -526,13 +526,27 @@ class DataValidator:
         ref_field: str,
         obj_type: str,
         parent_label: str,
-        sample_size: int,
+        sampled_docs: list[dict[str, Any]],
         warns: list[str],
         fails: list[str],
     ) -> None:
         """Classify a 0/N sparse parent relationship using SF data if available."""
+        sample_size = len(sampled_docs)
         if self.sf_client:
             try:
+                sampled_ids = [doc.get("id") for doc in sampled_docs if doc.get("id")]
+                sampled_fk_count = 0
+                if sampled_ids:
+                    id_list = ", ".join(f"'{sid}'" for sid in sampled_ids)
+                    sampled_result = self.sf_client.query(
+                        f"SELECT Id, {ref_field} FROM {obj_name} "
+                        f"WHERE Id IN ({id_list})"
+                    )
+                    sampled_records = sampled_result.get("records", [])
+                    sampled_fk_count = sum(
+                        1 for record in sampled_records if record.get(ref_field) is not None
+                    )
+
                 count_result = self.sf_client.query(
                     f"SELECT COUNT() FROM {obj_name} "
                     f"WHERE {ref_field} != null"
@@ -547,11 +561,19 @@ class DataValidator:
                         f"{obj_type}: 0/{sample_size} {parent_label} keys "
                         f"(sparse — SF has 0/{total} FKs populated)"
                     )
+                elif sampled_fk_count > 0:
+                    warns.append(
+                        f"{obj_type}: 0/{sample_size} {parent_label} keys "
+                        f"(stale index — sampled SF records have {sampled_fk_count}/"
+                        f"{len(sampled_ids)} populated; SF has {fk_count}/{total} "
+                        f"FKs populated, needs reindex)"
+                    )
                 else:
                     warns.append(
                         f"{obj_type}: 0/{sample_size} {parent_label} keys "
-                        f"(stale index — SF has {fk_count}/{total} FKs "
-                        f"populated, needs reindex)"
+                        f"(sparse or low-incidence — sampled SF records have "
+                        f"0/{len(sampled_ids)} populated; SF has {fk_count}/{total} "
+                        f"FKs populated)"
                     )
                 return
             except Exception as e:

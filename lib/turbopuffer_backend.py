@@ -74,12 +74,66 @@ class TurbopufferBackend(SearchBackend):
 
     def __init__(self, region: str = "gcp-us-central1") -> None:
         self._client = Turbopuffer(region=region)
+        self._telemetry_events: list[dict[str, Any]] = []
 
     # -- helpers -------------------------------------------------------------
 
     def _ns(self, namespace: str):
         """Return a Turbopuffer namespace handle."""
         return self._client.namespace(namespace)
+
+    def _ensure_telemetry_buffer(self) -> list[dict[str, Any]]:
+        """Initialize telemetry storage for tests that bypass __init__."""
+        if not hasattr(self, "_telemetry_events"):
+            self._telemetry_events = []
+        return self._telemetry_events
+
+    @staticmethod
+    def _serialize_tpuf_obj(value: Any) -> Any:
+        """Convert SDK models and tuples into JSON-friendly structures."""
+        if isinstance(value, tuple):
+            return [TurbopufferBackend._serialize_tpuf_obj(v) for v in value]
+        if isinstance(value, list):
+            return [TurbopufferBackend._serialize_tpuf_obj(v) for v in value]
+        if isinstance(value, dict):
+            return {
+                k: TurbopufferBackend._serialize_tpuf_obj(v)
+                for k, v in value.items()
+            }
+        if hasattr(value, "model_dump"):
+            return value.model_dump(exclude_none=True)
+        if hasattr(value, "to_dict"):
+            return value.to_dict()
+        return value
+
+    def _record_telemetry(
+        self,
+        *,
+        operation: str,
+        namespace: str,
+        request: dict[str, Any],
+        response: Any,
+        result_count: int | None = None,
+    ) -> None:
+        """Capture billing/performance metadata from Turbopuffer responses."""
+        self._ensure_telemetry_buffer().append(
+            {
+                "operation": operation,
+                "namespace": namespace,
+                "request": self._serialize_tpuf_obj(request),
+                "result_count": result_count,
+                "billing": self._serialize_tpuf_obj(getattr(response, "billing", None)),
+                "performance": self._serialize_tpuf_obj(
+                    getattr(response, "performance", None)
+                ),
+            }
+        )
+
+    def drain_telemetry(self) -> list[dict[str, Any]]:
+        """Return and clear captured telemetry events."""
+        events = list(self._ensure_telemetry_buffer())
+        self._telemetry_events.clear()
+        return events
 
     # -- SearchBackend interface ---------------------------------------------
 
@@ -155,6 +209,13 @@ class TurbopufferBackend(SearchBackend):
 
         # Execute ---------------------------------------------------------
         result = self._ns(namespace).query(**kwargs)
+        self._record_telemetry(
+            operation="search",
+            namespace=namespace,
+            request=kwargs,
+            response=result,
+            result_count=len(result.rows or []),
+        )
 
         return [
             self._row_to_dict(row, include_attributes) for row in result.rows
@@ -187,6 +248,7 @@ class TurbopufferBackend(SearchBackend):
         ann_query = {"rank_by": ("vector", "ANN", vector), **shared}
 
         response = self._ns(namespace).multi_query(queries=[bm25_query, ann_query])
+        raw_counts = [len(result.rows or []) for result in response.results]
 
         bm25_rows = response.results[0].rows or []
         ann_rows = response.results[1].rows or []
@@ -204,6 +266,14 @@ class TurbopufferBackend(SearchBackend):
             row_map[row.id] = row  # ANN row overwrites; attrs are the same
 
         ranked_ids = sorted(scores, key=scores.get, reverse=True)[:top_k]
+        self._record_telemetry(
+            operation="hybrid_search",
+            namespace=namespace,
+            request={"queries": [bm25_query, ann_query]},
+            response=response,
+            result_count=len(ranked_ids),
+        )
+        self._telemetry_events[-1]["raw_result_counts"] = raw_counts
 
         return [
             {**self._row_to_dict(row_map[rid], include_attributes), "dist": scores[rid]}
@@ -248,24 +318,34 @@ class TurbopufferBackend(SearchBackend):
 
         # Attempt 1: zero-vector ANN scan using our indexed embedding size.
         try:
+            query_request = {"rank_by": ("vector", "ANN", [0.0] * 1024), **base_kwargs}
             result = self._ns(namespace).query(
-                rank_by=("vector", "ANN", [0.0] * 1024),
-                **base_kwargs,
+                **query_request,
             )
         except Exception:
             # Attempt 2: smaller vector dimension for defensive compatibility.
             try:
+                query_request = {"rank_by": ("vector", "ANN", [0.0] * 8), **base_kwargs}
                 result = self._ns(namespace).query(
-                    rank_by=("vector", "ANN", [0.0] * 8),
-                    **base_kwargs,
+                    **query_request,
                 )
             except Exception:
                 # Attempt 3: BM25 broad scan as a last resort. This is less
                 # complete than ANN, but still better than failing outright.
-                result = self._ns(namespace).query(
-                    rank_by=("text", "BM25", "a the is of and to in for"),
+                query_request = {
+                    "rank_by": ("text", "BM25", "a the is of and to in for"),
                     **base_kwargs,
+                }
+                result = self._ns(namespace).query(
+                    **query_request,
                 )
+        self._record_telemetry(
+            operation="aggregate_query",
+            namespace=namespace,
+            request=query_request,
+            response=result,
+            result_count=len(result.rows or []),
+        )
 
         # Compute aggregation locally ------------------------------------
         if group_by:
@@ -336,9 +416,16 @@ class TurbopufferBackend(SearchBackend):
     def warm(self, namespace: str) -> None:
         """Issue a lightweight query to warm the namespace cache."""
         try:
-            self._ns(namespace).query(
+            response = self._ns(namespace).query(
                 rank_by=("text", "BM25", " "),
                 top_k=1,
+            )
+            self._record_telemetry(
+                operation="warm",
+                namespace=namespace,
+                request={"rank_by": ("text", "BM25", " "), "top_k": 1},
+                response=response,
+                result_count=len(response.rows or []),
             )
         except Exception:
             # Warm is best-effort — swallow errors (e.g. empty namespace).

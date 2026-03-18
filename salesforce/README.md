@@ -2,6 +2,10 @@
 
 This directory contains all Salesforce metadata components for the AI Search POC.
 
+Before broad UAT, read **[LWC_READINESS_CHECKLIST.md](./LWC_READINESS_CHECKLIST.md)**.
+It is the current checklist for getting the LWC to a real working state without
+confusing setup drift with product defects.
+
 ## ⚠️ Important: Salesforce Instance Requirements
 
 **You do NOT need a Salesforce instance yet!** 
@@ -50,11 +54,32 @@ salesforce/
 
 ### 2. Configure Named Credential
 
-Edit `namedCredentials/Ascendix_RAG_API.namedCredential-meta.xml`:
+Do not assume the older Private Connect path is the current runtime path.
+Check `classes/AscendixAISearchController.cls` first, then align Salesforce
+setup to the credentials it actually uses.
+
+For the current query path, verify:
+
+- `namedCredentials/Ascendix_RAG_Query_API.namedCredential-meta.xml`
+- `externalCredentials/Ascendix_RAG_Query_API.externalCredential-meta.xml`
+
+Legacy or fallback paths may still use:
+
+- `namedCredentials/Ascendix_RAG_API.namedCredential-meta.xml`
+
+Edit the relevant credential metadata or configure the values directly in
+Salesforce. For the current query path:
+
+```xml
+<parameterValue>https://YOUR_QUERY_ENDPOINT</parameterValue>
+```
+
+and ensure the External Credential API key is replaced in setup.
+
+If you are intentionally using the older path, edit:
 
 ```xml
 <endpoint>https://YOUR_PRIVATELINK_ENDPOINT</endpoint>
-<password>YOUR_API_KEY</password>
 ```
 
 ### 3. Deploy to Salesforce
@@ -105,6 +130,7 @@ sfdx force:source:deploy -x package.xml -u my-sandbox
    - Navigate to an Account page
    - Submit test query: "Show open opportunities for this account"
    - Verify streaming response and citations
+   - Use `LWC_READINESS_CHECKLIST.md` for the full pre-UAT sequence
 
 ## Components Overview
 

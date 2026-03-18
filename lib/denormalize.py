@@ -20,8 +20,19 @@ EMBEDDING_DIMENSIONS = 1024
 # Turbopuffer schema
 # ===================================================================
 
+PINNED_TEXT_FULL_TEXT_SETTINGS: dict[str, Any] = {
+    # Pin tokenizer behavior so BM25 relevance does not drift with vendor defaults.
+    "tokenizer": "word_v3",
+    "language": "english",
+    "stemming": False,
+    "remove_stopwords": False,
+}
+
 FULL_TEXT_SEARCH_SCHEMA: dict[str, dict[str, Any]] = {
-    "text": {"type": "string", "full_text_search": True},
+    "text": {
+        "type": "string",
+        "full_text_search": PINNED_TEXT_FULL_TEXT_SETTINGS,
+    },
     # Declare numeric fields as float to avoid int/float inference conflicts
     "totalbuildingarea": {"type": "float"},
     "floors": {"type": "float"},

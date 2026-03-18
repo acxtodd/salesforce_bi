@@ -6,6 +6,9 @@
 
 **Ready to deploy?** → See **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)**
 
+**Need the current LWC go-live checklist?** → Read
+**[LWC_READINESS_CHECKLIST.md](./LWC_READINESS_CHECKLIST.md)**
+
 **Need a Salesforce org?** → Check **[SALESFORCE_INSTANCE_REQUIREMENTS.md](./SALESFORCE_INSTANCE_REQUIREMENTS.md)**
 
 ---
@@ -18,6 +21,7 @@
 |----------|---------|--------------|
 | **[QUICK_START.md](./QUICK_START.md)** | Quick overview and next steps | **Start here** |
 | **[README.md](./README.md)** | Complete component reference | When you need details |
+| **[LWC_READINESS_CHECKLIST.md](./LWC_READINESS_CHECKLIST.md)** | Current pre-UAT LWC checklist | Before LWC smoke or UAT |
 | **[SALESFORCE_INSTANCE_REQUIREMENTS.md](./SALESFORCE_INSTANCE_REQUIREMENTS.md)** | When you need SF org | Before requesting access |
 
 ### For Deployment
@@ -107,6 +111,9 @@
 
 ### "I'm ready to deploy"
 → Read **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)**
+
+### "I need to know what must be true before LWC UAT"
+→ Read **[LWC_READINESS_CHECKLIST.md](./LWC_READINESS_CHECKLIST.md)**
 
 ### "I need technical details about components"
 → Read **[README.md](./README.md)**

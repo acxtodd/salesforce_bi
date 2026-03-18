@@ -16,6 +16,7 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -777,6 +778,33 @@ class DataValidator:
         )
 
 
+def write_telemetry_artifact(
+    path: str,
+    *,
+    namespace: str,
+    query_text: str,
+    results: list[CheckResult],
+    telemetry_events: list[dict[str, Any]],
+) -> None:
+    """Write a JSON artifact with validation results and drained telemetry."""
+    payload = {
+        "namespace": namespace,
+        "query_text": query_text,
+        "results": [
+            {
+                "name": r.name,
+                "status": r.status,
+                "message": r.message,
+                "details": r.details,
+                "duration_ms": round(r.duration_ms, 2),
+            }
+            for r in results
+        ],
+        "telemetry_events": telemetry_events,
+    }
+    Path(path).write_text(json.dumps(payload, indent=2))
+
+
 # ===================================================================
 # Report formatting
 # ===================================================================
@@ -859,6 +887,10 @@ def main() -> None:
         "--verbose", "-v", action="store_true",
         help="Print returned document snippets",
     )
+    parser.add_argument(
+        "--telemetry-output", default="",
+        help="Optional path to write drained Turbopuffer telemetry JSON",
+    )
 
     args = parser.parse_args()
 
@@ -897,6 +929,21 @@ def main() -> None:
     # Print report
     report = format_report(results, args.namespace, args.config)
     print(report)
+
+    if args.telemetry_output:
+        telemetry_events = []
+        drain = getattr(backend, "drain_telemetry", None)
+        if callable(drain):
+            drained = drain()
+            if isinstance(drained, list):
+                telemetry_events = drained
+        write_telemetry_artifact(
+            args.telemetry_output,
+            namespace=args.namespace,
+            query_text=args.query_text,
+            results=results,
+            telemetry_events=telemetry_events,
+        )
 
     # Exit code: 0 if no FAIL, 1 if any FAIL
     has_failure = any(r.status == "FAIL" for r in results)

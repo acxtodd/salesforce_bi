@@ -22,38 +22,75 @@ You do NOT need to follow these deployment steps yet. This guide should be used 
 
 - Salesforce CLI (SFDX) installed
 - Access to target Salesforce sandbox/org with System Administrator profile
-- AWS Private API Gateway endpoint URL
-- API Gateway API key
-- Salesforce Private Connect configured (see Private Connect Setup section)
+- AWS query endpoint URL
+- API key for the query surface
+- Optional: Salesforce Private Connect configured if you are intentionally using
+  a private API Gateway path instead of the current default query path
 
-## Task 10.1: Create Named Credential for Private API Gateway
+## Current Runtime Path
+
+Before configuring Salesforce, check
+`salesforce/classes/AscendixAISearchController.cls`.
+
+At the time of this guide update, the runtime behavior is:
+
+- `callAnswerEndpoint()` sends requests to `/query` using
+  `Ascendix_RAG_Query_API`
+- `callRetrieveEndpoint()` sends requests to `/retrieve` using
+  `Ascendix_RAG_API`
+- `callActionEndpoint()` sends requests to `/action` using
+  `Ascendix_RAG_API`
+
+For first LWC smoke and most current validation work, the critical path is
+`Ascendix_RAG_Query_API` plus the `/query` endpoint.
+
+## Task 10.1: Configure Credentials For The Current Runtime Path
 
 ### Step 1: Get AWS API Gateway Details
 
-Before configuring the Named Credential, obtain the following from your AWS deployment:
+Before configuring Salesforce credentials, obtain the following from your AWS
+deployment:
 
-1. **PrivateLink Endpoint URL**: The private API Gateway endpoint URL
-   - Format: `https://vpce-xxxxx-xxxxx.execute-api.{region}.vpce.amazonaws.com/{stage}`
-   - This is output from the CDK deployment (APIStack)
+1. **Query endpoint URL**: the live URL used for the `/query` surface
+   - Current metadata uses a direct Lambda URL style endpoint
+   - Confirm the exact URL you intend Salesforce to call
 
-2. **API Key**: The API Gateway API key for authentication
-   - Retrieved from AWS Secrets Manager or API Gateway console
+2. **API key**: the credential value Salesforce should send for authentication
+   - Retrieved from the current backend deployment or secret store
    - Format: A long alphanumeric string
 
-### Step 2: Update Named Credential Configuration
+3. **Optional legacy/private endpoint details**:
+   - Only needed if you are intentionally wiring the older private `/retrieve`
+     or `/action` paths through `Ascendix_RAG_API`
 
-Edit `salesforce/namedCredentials/Ascendix_RAG_API.namedCredential-meta.xml`:
+### Step 2: Update Current Query Credential Configuration
+
+For the current query path, verify these files:
+
+- `salesforce/namedCredentials/Ascendix_RAG_Query_API.namedCredential-meta.xml`
+- `salesforce/externalCredentials/Ascendix_RAG_Query_API.externalCredential-meta.xml`
+
+The Named Credential should point at the live query endpoint:
 
 ```xml
-<endpoint>https://YOUR_PRIVATELINK_ENDPOINT_URL</endpoint>
-<password>YOUR_API_KEY</password>
+<parameterValue>https://YOUR_QUERY_ENDPOINT</parameterValue>
 ```
 
 Replace:
-- `YOUR_PRIVATELINK_ENDPOINT_URL` with the actual PrivateLink endpoint
-- `YOUR_API_KEY` with the actual API Gateway key
+- `YOUR_QUERY_ENDPOINT` with the actual query endpoint URL
 
-### Step 3: Deploy Named Credential
+Then set the External Credential API key in Salesforce setup. The metadata file
+contains a placeholder and should not be treated as already configured:
+
+```xml
+<parameterName>ApiKey</parameterName>
+<parameterValue>REPLACE_IN_SETUP</parameterValue>
+```
+
+If you are also using the older `Ascendix_RAG_API` path, configure that
+credential separately.
+
+### Step 3: Deploy Credentials
 
 ```bash
 # Navigate to salesforce directory
@@ -62,24 +99,31 @@ cd salesforce
 # Authenticate to your Salesforce org
 sfdx auth:web:login -a my-sandbox
 
-# Deploy the Named Credential
+# Deploy the current query credential
+sfdx force:source:deploy -m NamedCredential:Ascendix_RAG_Query_API -u my-sandbox
+sfdx force:source:deploy -m ExternalCredential:Ascendix_RAG_Query_API -u my-sandbox
+
+# Optional: deploy legacy/fallback credential if needed
 sfdx force:source:deploy -m NamedCredential:Ascendix_RAG_API -u my-sandbox
 ```
 
 ### Step 4: Test Connectivity
 
-After deployment, test the Named Credential:
+After deployment, test the current query credential:
 
 1. Navigate to **Setup** > **Named Credentials** in Salesforce
-2. Find **Ascendix RAG API**
+2. Find **Ascendix RAG Query API**
 3. Click **Edit**
 4. Scroll down and click **Test Connection**
 5. Verify successful connection (200 OK response)
 
 **Troubleshooting**:
-- If connection fails with timeout: Verify Private Connect is configured (see Task 10.3)
+- If connection fails with authentication error: Verify the External Credential
+  API key is populated correctly
+- If connection fails with timeout: Verify the endpoint URL is correct and the
+  backend is reachable
 - If connection fails with 403: Verify API key is correct
-- If connection fails with DNS error: Verify PrivateLink endpoint URL is correct
+- If connection fails with DNS error: Verify the configured endpoint URL is correct
 
 ---
 
@@ -112,7 +156,9 @@ sfdx force:source:deploy:report -u my-sandbox
 This deploys:
 - Lightning Web Component (ascendixAiSearch)
 - Apex Classes (AscendixAISearchController, AISearchBatchExport, AISearchBatchExportScheduler)
-- Named Credential (Ascendix_RAG_API)
+- Named Credential (`Ascendix_RAG_Query_API`)
+- External Credential (`Ascendix_RAG_Query_API`)
+- Optional legacy Named Credential (`Ascendix_RAG_API`)
 - Custom Metadata Type (AI_Search_Config__mdt)
 - Custom Object (AI_Search_Export_Error__c)
 
@@ -171,7 +217,7 @@ Test the LWC in Salesforce:
 
 **Expected Behavior**:
 - Query input field is visible and functional
-- Streaming tokens appear as they arrive
+- Answer text appears progressively after the Apex response is received
 - Citations drawer shows relevant records
 - No console errors in browser developer tools
 
@@ -179,15 +225,21 @@ Test the LWC in Salesforce:
 - If component doesn't appear: Check page layout assignment and activation
 - If query fails: Check Named Credential configuration and connectivity
 - If no results: Verify data has been ingested via CDC pipeline
+- If known shorthand queries fail but canonical phrasing works: treat as a
+  retrieval or normalization issue, not an LWC deployment failure
 - If console errors: Check browser console for detailed error messages
 
 ---
 
-## Task 10.3: Configure Salesforce Private Connect
+## Task 10.3: Configure Salesforce Private Connect (Optional / Legacy Path)
 
 ### Overview
 
 Salesforce Private Connect enables secure, private connectivity between Salesforce and AWS services without traversing the public internet. This is required for the Named Credential to reach the Private API Gateway.
+
+This is not the default requirement for the current `/query` path documented
+above. Use this section only if you are intentionally routing Salesforce through
+the older private API Gateway path.
 
 ### Prerequisites
 
@@ -293,15 +345,17 @@ The endpoint should resolve through Private Connect, not public internet.
 
 ### Pre-Deployment
 - [ ] AWS infrastructure deployed (all CDK stacks)
-- [ ] API Gateway endpoint URL obtained
-- [ ] API Gateway API key obtained
-- [ ] Private Connect configured and active
+- [ ] Query endpoint URL obtained
+- [ ] Query API key obtained
+- [ ] Current controller wiring reviewed
+- [ ] Private Connect configured and active if intentionally using the private path
 - [ ] Salesforce CLI installed and authenticated
 
 ### Deployment
-- [ ] Named Credential configured with correct endpoint and API key
-- [ ] Named Credential deployed to Salesforce
-- [ ] Named Credential connectivity tested
+- [ ] `Ascendix_RAG_Query_API` Named Credential configured with correct endpoint
+- [ ] `Ascendix_RAG_Query_API` External Credential API key populated
+- [ ] Current query credential deployed to Salesforce
+- [ ] Current query credential connectivity tested
 - [ ] All metadata components deployed via package.xml
 - [ ] LWC added to Account page layout
 - [ ] LWC added to Home page layout
@@ -310,17 +364,17 @@ The endpoint should resolve through Private Connect, not public internet.
 ### Post-Deployment
 - [ ] LWC visible on Account pages
 - [ ] Test query submitted successfully
-- [ ] Streaming response displays correctly
+- [ ] Answer and citations display correctly
 - [ ] Citations appear and are clickable
 - [ ] No console errors in browser
-- [ ] End-to-end connectivity verified through Private Connect
+- [ ] End-to-end connectivity verified for the currently configured path
 
 ### Smoke Tests
 - [ ] Query: "Show open opportunities for this account" returns results
 - [ ] Query: "Summarize recent cases" returns results with citations
 - [ ] Citation click opens preview panel
-- [ ] Facet filters (Region, BU, Quarter) work correctly
 - [ ] Error handling displays friendly messages
+- [ ] Known-good canonical query works before testing shorthand/alias phrasing
 
 ---
 
@@ -335,7 +389,7 @@ If issues arise, rollback in reverse order:
 
 ### Step 2: Disable Named Credential
 1. Navigate to **Setup** > **Named Credentials**
-2. Edit **Ascendix RAG API**
+2. Edit **Ascendix RAG Query API**
 3. Set **Callout Status** to **Disabled**
 4. Save
 
@@ -343,6 +397,8 @@ If issues arise, rollback in reverse order:
 ```bash
 # Remove all components
 sfdx force:source:delete -m LightningComponentBundle:ascendixAiSearch -u my-sandbox
+sfdx force:source:delete -m NamedCredential:Ascendix_RAG_Query_API -u my-sandbox
+sfdx force:source:delete -m ExternalCredential:Ascendix_RAG_Query_API -u my-sandbox
 sfdx force:source:delete -m NamedCredential:Ascendix_RAG_API -u my-sandbox
 ```
 
@@ -376,8 +432,10 @@ sfdx force:source:deploy -x package.xml -u production
 ```
 
 ### Production-Specific Configuration
-- Update Named Credential with production API Gateway endpoint
-- Update Private Connect with production VPC Endpoint Service
+- Update the current query credential with the production query endpoint
+- Update the query API key in Salesforce setup
+- Update Private Connect with production VPC Endpoint Service only if using the
+  private path
 - Assign permission sets to production users
 - Configure production page layouts
 - Schedule production smoke tests
@@ -389,8 +447,10 @@ sfdx force:source:deploy -x package.xml -u production
 ### Common Issues
 
 **Issue**: Named Credential test fails with timeout
-- **Cause**: Private Connect not configured or inactive
-- **Solution**: Complete Task 10.3 to configure Private Connect
+- **Cause**: Endpoint URL is wrong, backend is unreachable, or Private Connect is
+  misconfigured for the path you chose
+- **Solution**: First verify the current runtime path and credential wiring,
+  then use Task 10.3 only if you are intentionally using Private Connect
 
 **Issue**: LWC shows "Access Denied" error
 - **Cause**: User lacks permissions or Named Credential is disabled
@@ -433,6 +493,32 @@ sfdx force:apex:log:tail -u my-sandbox
 ## Appendix
 
 ### A. Named Credential Configuration Reference
+
+#### Current Query Path
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<NamedCredential xmlns="http://soap.sforce.com/2006/04/metadata">
+    <allowMergeFieldsInBody>false</allowMergeFieldsInBody>
+    <allowMergeFieldsInHeader>true</allowMergeFieldsInHeader>
+    <calloutStatus>Enabled</calloutStatus>
+    <generateAuthorizationHeader>false</generateAuthorizationHeader>
+    <label>Ascendix RAG Query API</label>
+    <namedCredentialParameters>
+        <parameterName>Url</parameterName>
+        <parameterType>Url</parameterType>
+        <parameterValue>https://YOUR_QUERY_ENDPOINT</parameterValue>
+    </namedCredentialParameters>
+    <namedCredentialParameters>
+        <externalCredential>Ascendix_RAG_Query_API</externalCredential>
+        <parameterName>ExternalCredential</parameterName>
+        <parameterType>Authentication</parameterType>
+    </namedCredentialParameters>
+    <namedCredentialType>SecuredEndpoint</namedCredentialType>
+</NamedCredential>
+```
+
+#### Legacy / Private Connect Path
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -531,6 +617,6 @@ These account IDs are required for the `--add-allowed-principals` step.
 ## Document Version
 
 - **Version**: 1.0
-- **Last Updated**: 2025-11-13
+- **Last Updated**: 2026-03-18
 - **Author**: Development Team
 - **Status**: Active

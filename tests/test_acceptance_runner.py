@@ -613,7 +613,7 @@ class TestIntegrationMocked:
         preloaded_cases = load_test_cases(yaml_file)
 
         with (
-            patch("scripts.run_acceptance_tests.TurbopufferBackend"),
+            patch("scripts.run_acceptance_tests.TurbopufferBackend") as MockBackend,
             patch("scripts.run_acceptance_tests.build_field_registry", return_value={}),
             patch("scripts.run_acceptance_tests.QueryHandler") as MockHandler,
             patch("scripts.run_acceptance_tests.load_test_cases", return_value=preloaded_cases),
@@ -621,6 +621,12 @@ class TestIntegrationMocked:
             patch("scripts.run_acceptance_tests.yaml.safe_load", return_value={}),
             patch("boto3.client"),
         ):
+            MockBackend.return_value.drain_telemetry.side_effect = [
+                [{"operation": "search", "billing": {"billable_logical_bytes_queried": 10}}],
+                [{"operation": "search", "billing": {"billable_logical_bytes_queried": 11}}],
+                [{"operation": "search", "billing": {"billable_logical_bytes_queried": 12}}],
+                [{"operation": "search", "billing": {"billable_logical_bytes_queried": 13}}],
+            ]
             mock_instance = MagicMock()
             mock_instance.query.return_value = mock_qr
             MockHandler.return_value = mock_instance
@@ -636,6 +642,8 @@ class TestIntegrationMocked:
         assert summary["pass_rate"] == 1.0
         assert summary["failed"] == 0
         assert len(summary["failures"]) == 0
+        assert summary["tpuf_telemetry_event_count"] == 4
+        assert summary["results"][0]["tpuf_telemetry"][0]["operation"] == "search"
 
     def test_error_handling(self, yaml_file, tmp_path):
         """Tests that throw exceptions are recorded as ERROR."""

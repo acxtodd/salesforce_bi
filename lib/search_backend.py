@@ -100,9 +100,10 @@ class SearchBackend(ABC):
         keys; all other keys are stored as attributes.
 
         *schema* is an optional dict declaring attribute types and indexing
-        behaviour.  Pass ``{"text": {"type": "string", "full_text_search": True}}``
-        to enable BM25 full-text search on the ``text`` field.  The schema
-        only needs to be sent on the first write (the backend remembers it).
+        behaviour.  Pass a ``text`` field schema with explicit
+        ``full_text_search`` settings to enable stable BM25 behavior on the
+        ``text`` field.  The schema only needs to be sent on the first write
+        (the backend remembers it).
         """
         ...
 

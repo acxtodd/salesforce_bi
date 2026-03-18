@@ -11,6 +11,7 @@ import os
 import time
 import pytest
 
+from lib.denormalize import FULL_TEXT_SEARCH_SCHEMA
 from lib.search_backend import SearchBackend
 from lib.turbopuffer_backend import (
     TurbopufferBackend,
@@ -320,6 +321,83 @@ class TestSearchValidation:
             "a the is of and to in for",
         )
 
+    def test_search_records_query_telemetry(self):
+        """Single-signal search should record billing/performance telemetry."""
+        from unittest.mock import MagicMock
+
+        backend = TurbopufferBackend.__new__(TurbopufferBackend)
+        backend._client = MagicMock()
+
+        mock_ns = MagicMock()
+        mock_result = MagicMock()
+        mock_result.rows = []
+        mock_result.billing = MagicMock()
+        mock_result.billing.model_dump.return_value = {
+            "billable_logical_bytes_queried": 10,
+            "billable_logical_bytes_returned": 1,
+        }
+        mock_result.performance = MagicMock()
+        mock_result.performance.model_dump.return_value = {
+            "cache_hit_ratio": 1.0,
+            "cache_temperature": "hot",
+            "query_execution_ms": 7,
+        }
+        mock_ns.query.return_value = mock_result
+        backend._client.namespace.return_value = mock_ns
+
+        backend.search("ns", text_query="hello")
+        events = backend.drain_telemetry()
+
+        assert len(events) == 1
+        assert events[0]["operation"] == "search"
+        assert events[0]["billing"]["billable_logical_bytes_queried"] == 10
+        assert events[0]["performance"]["cache_temperature"] == "hot"
+
+    def test_hybrid_records_multi_query_telemetry(self):
+        """Hybrid search should record top-level multi_query telemetry."""
+        from unittest.mock import MagicMock
+
+        backend = TurbopufferBackend.__new__(TurbopufferBackend)
+        backend._client = MagicMock()
+
+        mock_ns = MagicMock()
+
+        def _make_row(rid, dist=0.5):
+            row = MagicMock()
+            row.id = rid
+            setattr(row, "$dist", dist)
+            row.model_extra = {}
+            return row
+
+        bm25_result = MagicMock()
+        bm25_result.rows = [_make_row("r1")]
+        ann_result = MagicMock()
+        ann_result.rows = [_make_row("r2")]
+
+        mock_response = MagicMock()
+        mock_response.results = [bm25_result, ann_result]
+        mock_response.billing = MagicMock()
+        mock_response.billing.model_dump.return_value = {
+            "billable_logical_bytes_queried": 20,
+            "billable_logical_bytes_returned": 2,
+        }
+        mock_response.performance = MagicMock()
+        mock_response.performance.model_dump.return_value = {
+            "cache_hit_ratio": 0.5,
+            "cache_temperature": "warm",
+            "query_execution_ms": 11,
+        }
+        mock_ns.multi_query.return_value = mock_response
+        backend._client.namespace.return_value = mock_ns
+
+        backend.search("ns", vector=[0.1] * 8, text_query="test query")
+        events = backend.drain_telemetry()
+
+        assert len(events) == 1
+        assert events[0]["operation"] == "hybrid_search"
+        assert events[0]["raw_result_counts"] == [1, 1]
+        assert events[0]["performance"]["cache_temperature"] == "warm"
+
 
 # =========================================================================
 # No-import guard
@@ -401,7 +479,7 @@ class TestTurbopufferIntegration:
             _INTEGRATION_NS,
             documents=docs,
             distance_metric="cosine_distance",
-            schema={"text": {"type": "string", "full_text_search": True}},
+            schema={"text": FULL_TEXT_SEARCH_SCHEMA["text"]},
         )
 
         # Give Turbopuffer a moment to index.

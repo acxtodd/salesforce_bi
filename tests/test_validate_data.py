@@ -18,6 +18,7 @@ from validate_data import (
     _is_reference_value,
     expected_parent_keys,
     format_report,
+    write_telemetry_artifact,
 )
 
 
@@ -148,6 +149,26 @@ class TestFormatReport:
         ]
         report = format_report(results, "ns")
         assert "1 WARNED" in report
+
+
+class TestTelemetryArtifact:
+    def test_write_telemetry_artifact(self, tmp_path):
+        path = tmp_path / "telemetry.json"
+        results = [CheckResult("BM25 search", "PASS", "10 results", duration_ms=12.3)]
+        events = [{"operation": "search", "billing": {"billable_logical_bytes_queried": 10}}]
+
+        write_telemetry_artifact(
+            str(path),
+            namespace="org_test",
+            query_text="Dallas office",
+            results=results,
+            telemetry_events=events,
+        )
+
+        payload = path.read_text()
+        assert "org_test" in payload
+        assert "Dallas office" in payload
+        assert "billable_logical_bytes_queried" in payload
 
 
 # ===================================================================

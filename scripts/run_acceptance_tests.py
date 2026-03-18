@@ -92,9 +92,20 @@ class AcceptanceTestResult:
     error: str = ""
     tool_call_log: list[dict] = field(default_factory=list)
     turn_durations: list[float] = field(default_factory=list)
+    tpuf_telemetry: list[dict] = field(default_factory=list)
 
 
 TestCaseResult = AcceptanceTestResult
+
+
+def _drain_backend_telemetry(backend: Any) -> list[dict]:
+    """Return drained backend telemetry when supported by the backend."""
+    drain = getattr(backend, "drain_telemetry", None)
+    if callable(drain):
+        drained = drain()
+        if isinstance(drained, list):
+            return drained
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -327,14 +338,18 @@ def run_acceptance_tests(
     results: list[AcceptanceTestResult] = []
     for case in cases:
         LOG.info("Running test %s: %s", case.id, case.question)
+        tpuf_telemetry: list[dict] = []
         try:
             start = time.perf_counter()
             query_result = handler.query(case.question)
             latency_s = time.perf_counter() - start
 
             result = evaluate_result(case, query_result, latency_s)
+            tpuf_telemetry = _drain_backend_telemetry(backend)
+            result.tpuf_telemetry = tpuf_telemetry
         except Exception as exc:
             latency_s = time.perf_counter() - start if "start" in dir() else 0.0
+            tpuf_telemetry = _drain_backend_telemetry(backend)
             result = AcceptanceTestResult(
                 test_id=case.id,
                 question=case.question,
@@ -342,6 +357,7 @@ def run_acceptance_tests(
                 status="ERROR",
                 latency_s=latency_s,
                 error=str(exc),
+                tpuf_telemetry=tpuf_telemetry,
             )
         results.append(result)
 
@@ -410,6 +426,7 @@ def run_acceptance_tests(
         "latency_stats": latency_stats,
         "category_latency": category_latency,
         "failures": failures,
+        "tpuf_telemetry_event_count": sum(len(r.tpuf_telemetry) for r in results),
     }
 
     return summary

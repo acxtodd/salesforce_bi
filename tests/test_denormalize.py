@@ -14,6 +14,7 @@ from lib.denormalize import (
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL_ID,
     FULL_TEXT_SEARCH_SCHEMA,
+    PINNED_TEXT_FULL_TEXT_SETTINGS,
     build_document,
     build_soql,
     build_text,
@@ -437,7 +438,18 @@ class TestSchema:
     def test_text_field_has_full_text_search(self):
         assert "text" in FULL_TEXT_SEARCH_SCHEMA
         assert FULL_TEXT_SEARCH_SCHEMA["text"]["type"] == "string"
-        assert FULL_TEXT_SEARCH_SCHEMA["text"]["full_text_search"] is True
+        assert (
+            FULL_TEXT_SEARCH_SCHEMA["text"]["full_text_search"]
+            == PINNED_TEXT_FULL_TEXT_SETTINGS
+        )
+
+    def test_text_field_pins_expected_tokenizer_settings(self):
+        assert PINNED_TEXT_FULL_TEXT_SETTINGS == {
+            "tokenizer": "word_v3",
+            "language": "english",
+            "stemming": False,
+            "remove_stopwords": False,
+        }
 
     def test_numeric_fields_are_float(self):
         numeric_keys = [k for k in FULL_TEXT_SEARCH_SCHEMA if k != "text"]

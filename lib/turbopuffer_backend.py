@@ -232,12 +232,12 @@ class TurbopufferBackend(SearchBackend):
         # Deduplicate while preserving order.
         attrs_to_fetch = list(dict.fromkeys(attrs_to_fetch))
 
-        # Turbopuffer requires rank_by for every query.  For aggregations we
-        # want to scan all matching docs regardless of text.  Strategy:
-        # 1. Try BM25 on the 'text' field with common tokens.
-        # 2. If that returns nothing, fall back to a zero-vector ANN scan
-        #    (requires knowing dimensionality — we use 8 as a safe minimum
-        #    and let Turbopuffer return what it can).
+        # Turbopuffer requires rank_by for every query. For aggregations we
+        # want a broad scan over all matching docs regardless of text. BM25 on
+        # common stopwords can return a non-empty but incomplete subset, which
+        # is unacceptable for count verification. Prefer ANN with a zero vector
+        # and only fall back to BM25 if ANN fails for dimensionality/runtime
+        # reasons.
         tpuf_filters = translate_filters(filters)
 
         base_kwargs: dict[str, Any] = {"top_k": 10_000}
@@ -246,27 +246,24 @@ class TurbopufferBackend(SearchBackend):
         if attrs_to_fetch:
             base_kwargs["include_attributes"] = attrs_to_fetch
 
-        # Attempt 1: BM25 broad scan
+        # Attempt 1: zero-vector ANN scan using our indexed embedding size.
         try:
             result = self._ns(namespace).query(
-                rank_by=("text", "BM25", "a the is of and to in for"),
+                rank_by=("vector", "ANN", [0.0] * 1024),
                 **base_kwargs,
             )
-            if result.rows:
-                pass  # success — fall through
-            else:
-                raise ValueError("empty BM25 result")
         except Exception:
-            # Attempt 2: zero-vector ANN scan (catches all docs)
+            # Attempt 2: smaller vector dimension for defensive compatibility.
             try:
                 result = self._ns(namespace).query(
-                    rank_by=("vector", "ANN", [0.0] * 1024),
+                    rank_by=("vector", "ANN", [0.0] * 8),
                     **base_kwargs,
                 )
             except Exception:
-                # Attempt 3: smaller vector dimension
+                # Attempt 3: BM25 broad scan as a last resort. This is less
+                # complete than ANN, but still better than failing outright.
                 result = self._ns(namespace).query(
-                    rank_by=("vector", "ANN", [0.0] * 8),
+                    rank_by=("text", "BM25", "a the is of and to in for"),
                     **base_kwargs,
                 )
 

@@ -1,6 +1,11 @@
 # Denormalization config for Ascendix CRE objects
-# Corrected against live sandbox org 00Ddl000003yx57EAA
-# Generated: 2026-03-15
+# 2026-03-18 review: current 3-object POC sections were checked against live
+# metadata generation and kept as a hybrid reviewed config. The generated
+# output was trusted for scope/noise review, but the existing curated
+# Property/Lease/Availability field sets were retained where they better match
+# current query-time behavior and retrieval needs.
+# Deal/Sale entries remain below for later-phase readiness and are not part of
+# the current 3-object rebuild path.
 # Review and commit before use
 
 ascendix__Property__c:

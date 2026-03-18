@@ -268,6 +268,58 @@ class TestSearchValidation:
         call_kwargs = mock_ns.query.call_args[1]
         assert call_kwargs["rank_by"] == ("vector", "ANN", vector)
 
+    def test_aggregate_prefers_ann_scan_for_counts(self):
+        """Aggregate should use ANN first to avoid BM25 undercounting."""
+        from unittest.mock import MagicMock
+
+        backend = TurbopufferBackend.__new__(TurbopufferBackend)
+        backend._client = MagicMock()
+
+        mock_ns = MagicMock()
+        mock_result = MagicMock()
+        mock_result.rows = [MagicMock(), MagicMock(), MagicMock()]
+        mock_ns.query.return_value = mock_result
+        backend._client.namespace.return_value = mock_ns
+
+        result = backend.aggregate("ns", filters={"object_type": "property"})
+
+        assert result == {"count": 3}
+        call_kwargs = mock_ns.query.call_args[1]
+        assert call_kwargs["rank_by"] == ("vector", "ANN", [0.0] * 1024)
+        assert call_kwargs["filters"] == ("object_type", "Eq", "property")
+
+    def test_aggregate_falls_back_to_bm25_when_ann_fails(self):
+        """Aggregate should only use BM25 after ANN attempts fail."""
+        from unittest.mock import MagicMock
+
+        backend = TurbopufferBackend.__new__(TurbopufferBackend)
+        backend._client = MagicMock()
+
+        mock_ns = MagicMock()
+        mock_result = MagicMock()
+        mock_result.rows = [MagicMock(), MagicMock()]
+        mock_ns.query.side_effect = [
+            RuntimeError("1024-dim failed"),
+            RuntimeError("8-dim failed"),
+            mock_result,
+        ]
+        backend._client.namespace.return_value = mock_ns
+
+        result = backend.aggregate("ns")
+
+        assert result == {"count": 2}
+        assert mock_ns.query.call_count == 3
+        first_call = mock_ns.query.call_args_list[0].kwargs
+        second_call = mock_ns.query.call_args_list[1].kwargs
+        third_call = mock_ns.query.call_args_list[2].kwargs
+        assert first_call["rank_by"] == ("vector", "ANN", [0.0] * 1024)
+        assert second_call["rank_by"] == ("vector", "ANN", [0.0] * 8)
+        assert third_call["rank_by"] == (
+            "text",
+            "BM25",
+            "a the is of and to in for",
+        )
+
 
 # =========================================================================
 # No-import guard

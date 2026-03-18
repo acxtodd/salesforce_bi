@@ -137,6 +137,9 @@ SEMANTIC_ALIASES: dict[str, dict[str, str]] = {
         "property_class": "property_propertyclass",
         "property_subtype": "property_propertysubtype",
         "property_total_sf": "property_totalbuildingarea",
+        "market": "market_name",
+        "submarket": "submarket_name",
+        "region": "region_name",
     },
 }
 # NOTE: asking_rate_psf is intentionally absent from SEMANTIC_ALIASES.

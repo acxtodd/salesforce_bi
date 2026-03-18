@@ -1492,14 +1492,35 @@
         {
           "id": "3.3.2.7",
           "title": "If geography stays in scope, add Availability geography denorm and revalidate",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T06:58:16.247738+00:00",
-          "updatedAt": "2026-03-18T06:58:26.434468+00:00",
+          "updatedAt": "2026-03-18T12:47:18.776038+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-18T12:40:36.994297+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-18T12:40:36.996756+00:00",
+              "note": "2026-03-18 started after data-side repair: Availability geography lookups now exist for a limited but defensible subset of records (39 with Region/Market, 25 with SubMarket). Proceeding with native Availability geography denorm rather than inheriting via Property, then will rebuild Availability and rerun targeted retrieval checks."
+            },
+            {
+              "timestamp": "2026-03-18T12:43:14.579111+00:00",
+              "note": "2026-03-18 implementation in progress: added native Availability geography parents (Market/SubMarket/Region) to denorm config and exposed Availability market/submarket/region filters in the prompt and tool alias layer. Unit validation: python3 -m pytest tests/test_tool_dispatch.py tests/test_system_prompt.py -q -> 112 passed."
+            },
+            {
+              "timestamp": "2026-03-18T12:47:08.399131+00:00",
+              "note": "2026-03-18 completion evidence: added native Availability geography parents (Market/SubMarket/Region) to denorm_config.yaml and exposed Availability market/submarket/region filters through the prompt and semantic alias layer. Unit validation: python3 -m pytest tests/test_tool_dispatch.py tests/test_system_prompt.py -q -> 112 passed. Rebuilt Availability only into namespace org_00Ddl000003yx57EAA with live load result fetched=527 indexed=527 skipped=0 turbopuffer=527. Targeted index evidence now matches the repaired source data: availability market counts = Dallas-Fort Worth 12, New York Metro 2, Dublin 3, San Antonio 22; submarket counts = Northwest San Antonio 17, Northeast San Antonio / Live Oak 5, IFSC 2, Blanchardstown 1; region counts = US South 34, US Northeast 2, Europe 3. Retrieval checks pass: San Antonio + Northwest San Antonio returns 5 Availability rows from Callaghan Tower; exact submarket Northeast San Antonio / Live Oak returns 5 Availability rows including suite 5018 on Rittiman East Bldg 22; Dallas-Fort Worth market returns Preston Park / Renaissance examples. Validator artifact results/validate_data_20260318T124629Z.txt now sees Availability market/submarket/region as sparse-or-low-incidence rather than missing schema, which is consistent with the repaired-but-still-limited source coverage."
+            },
+            {
+              "timestamp": "2026-03-18T12:47:18.776042+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Implement current-phase geography support for Availability only if 3.3.2.1 confirms market/submarket retrieval remains in scope. Add the agreed geography parent fields to Availability denorm, rebuild affected data, and rerun targeted geography retrieval checks against repaired source data.",
           "technical_context": "Current config denormalizes market/submarket onto Property but not Availability, while prompt/tooling/test surfaces still imply downtown/submarket availability search. User is coordinating source-data repair separately with a data analyst; this task covers the code/config side only if geography remains in scope after 3.3.2.1.",
           "parent": "3.3.2",
@@ -1510,7 +1531,9 @@
           "depends_on": [
             "3.3.2.1"
           ],
-          "gate_criteria": "Only execute if 3.3.2.1 keeps geography in current POC scope."
+          "gate_criteria": "Only execute if 3.3.2.1 keeps geography in current POC scope.",
+          "startedAt": "2026-03-18T12:40:36.994144+00:00",
+          "completedAt": "2026-03-18T12:47:18.775884+00:00"
         },
         {
           "id": "3.3.2.8",

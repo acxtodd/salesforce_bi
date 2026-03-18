@@ -86,6 +86,9 @@ _AVAILABILITY_FIELDS = """\
   - lease_type: lease type for the space
   - lease_term_min: minimum lease term
   - lease_term_max: maximum lease term
+  - market: availability market (native geography relationship)
+  - submarket: availability submarket (native geography relationship)
+  - region: availability region (native geography relationship)
   - property_name: parent property name (denormalized)
   - property_city: parent property city (denormalized)
   - property_state: parent property state (denormalized)
@@ -222,10 +225,11 @@ _GUIDELINES = """\
 10. **Object types for POC.** Only Property, Lease, and Availability are
    available. Sale, Deal, Account, and Contact are out of scope.
 
-11. **Geography fields (market, submarket) are only on Property.** Lease and
-   Availability do not currently have market or submarket filters. For
-   geographic searches on leases or availabilities, use property_city and
-   property_state, or use text_query with neighborhood names.\
+11. **Geography scope is object-specific.** Property supports market and
+   submarket. Availability supports native market, submarket, and region when
+   those relationships are populated in Salesforce. Lease does not currently
+   support market or submarket filters; use property_city and property_state
+   for lease geography.\
 """
 
 # ---------------------------------------------------------------------------
@@ -297,9 +301,9 @@ TOOL_DEFINITIONS: list[dict] = [
                 "property_state, property_class, property_type, property_total_sf\n"
                 "  Availability: use_type, status, available_sf, rent_low, rent_high, "
                 "asking_price, available_date, max_contiguous, min_divisible, "
-                "lease_type, lease_term_min, lease_term_max, property_name, "
-                "property_city, property_state, property_class, property_type, "
-                "property_total_sf\n\n"
+                "lease_type, lease_term_min, lease_term_max, market, submarket, "
+                "region, property_name, property_city, property_state, "
+                "property_class, property_type, property_total_sf\n\n"
                 "Filter operators: append _gte, _lte, _gt, _lt, _in, _ne to field names."
             ),
             "inputSchema": {

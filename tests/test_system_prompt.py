@@ -194,6 +194,11 @@ class TestSystemPrompt:
     def test_mentions_cite_records(self):
         assert "cite" in SYSTEM_PROMPT.lower()
 
+    def test_mentions_availability_geography_scope(self):
+        assert "Availability supports native market, submarket, and region" in SYSTEM_PROMPT
+        assert "Lease does not currently" in SYSTEM_PROMPT
+        assert "support market or submarket filters" in SYSTEM_PROMPT
+
 
 # =========================================================================
 # 2. TOOL_DEFINITIONS structure

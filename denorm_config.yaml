@@ -90,6 +90,12 @@ ascendix__Availability__c:
       - ascendix__PropertyClass__c   # property class
       - ascendix__PropertySubType__c # property subtype
       - ascendix__TotalBuildingArea__c  # property total SF
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # market name
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # submarket name
+    ascendix__Region__c:             # -> ascendix__Geography__c
+      - Name                         # region name
 
 ascendix__Deal__c:
   embed_fields:

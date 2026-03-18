@@ -86,6 +86,9 @@ SAMPLE_CONFIG = {
             "ascendix__RentHigh__c",
         ],
         "parents": {
+            "ascendix__Market__c": ["Name"],
+            "ascendix__SubMarket__c": ["Name"],
+            "ascendix__Region__c": ["Name"],
             "ascendix__Property__c": [
                 "Name",
                 "ascendix__City__c",
@@ -227,6 +230,11 @@ class TestBuildFieldRegistry:
                   "property_propertyclass", "tenant_name", "ownerlandlord_name"):
             assert f in fs.filterable, f"missing {f}"
 
+    def test_availability_geography_parent_fields(self):
+        fs = self.registry["availability"]
+        for f in ("market_name", "submarket_name", "region_name"):
+            assert f in fs.filterable, f"missing {f}"
+
     def test_platform_fields_in_every_type(self):
         for obj_type, fs in self.registry.items():
             for pf in ("object_type", "text", "last_modified", "salesforce_org_id", "name"):
@@ -248,6 +256,12 @@ class TestBuildFieldRegistry:
         assert fs.aliases["leased_sf"] == "size"
         assert "start_date" in fs.aliases
         assert fs.aliases["start_date"] == "termcommencementdate"
+
+    def test_availability_geography_aliases_merged(self):
+        fs = self.registry["availability"]
+        assert fs.aliases["market"] == "market_name"
+        assert fs.aliases["submarket"] == "submarket_name"
+        assert fs.aliases["region"] == "region_name"
 
     def test_empty_config(self):
         reg = build_field_registry({})
@@ -642,6 +656,21 @@ class TestKnownGaps:
         call_kwargs = backend.aggregate.call_args[1]
         assert call_kwargs["filters"]["property_propertyclass"] == "A"
         assert call_kwargs["aggregate_field"] == "rentlow"
+
+    def test_availability_geography_filter_aliases(self):
+        d, backend = _make_dispatcher(search_return=[])
+        result = d.dispatch({
+            "name": "search_records",
+            "parameters": {
+                "object_type": "Availability",
+                "filters": {"market": "Dallas-Fort Worth", "submarket": "CBD"},
+                "text_query": "office",
+            },
+        })
+        assert "results" in result, f"Expected results, got: {result}"
+        call_kwargs = backend.search.call_args[1]
+        assert call_kwargs["filters"]["market_name"] == "Dallas-Fort Worth"
+        assert call_kwargs["filters"]["submarket_name"] == "CBD"
 
     def test_broker_name_rejected(self):
         """broker_name is not indexed in POC scope."""

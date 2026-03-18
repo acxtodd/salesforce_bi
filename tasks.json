@@ -1449,14 +1449,23 @@
         {
           "id": "3.3.2.6",
           "title": "Regenerate 3-object denorm config and rebuild the namespace",
-          "status": "pending",
+          "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T06:57:29.612936+00:00",
-          "updatedAt": "2026-03-18T06:58:30.017676+00:00",
+          "updatedAt": "2026-03-18T08:29:37.403621+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-18T08:29:22.438783+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-18T08:29:37.403459+00:00",
+              "note": "2026-03-18 progress: hardened generate_denorm_config.py to tolerate null-shaped Salesforce metadata payloads and added conservative filtering for system/audit fields, booleans, raw reference fields, and low-value/system parent refs. Unit validation: python3 -m pytest tests/test_denorm_generator.py -q -> 59 passed. Live smoke generation against ascendix-beta-sandbox now completes for the 3-object POC scope, but the reviewed output is still too lossy to approve unchanged for rebuild (for example current curated direct fields such as PropertySubType/Description/BuildingStatus and some Lease/Availability fields do not survive as generated). Rebuild not run yet; next step is to decide the reviewed 3-object config to use and the namespace rebuild strategy."
+            }
+          ],
           "description": "Regenerate the denormalization config from live metadata for the current 3-object POC scope, review the parent-field set for low-value noise, then rebuild the Property/Lease/Availability namespace using the hardened bulk loader and re-run focused validation.",
           "technical_context": "The committed denorm_config.yaml appears narrower than what the generator would emit even for current in-scope objects, suggesting manual drift after generation. This task should keep the spec's 3-object POC scope, not reintroduce Deal/Sale into active query scope. It should incorporate the loader hardening and text-label improvements before rebuilding.",
           "parent": "3.3.2",
@@ -1468,7 +1477,8 @@
           "depends_on": [
             "3.3.2.1"
           ],
-          "gate_criteria": "Use the current POC geography scope before regenerating config and treating remaining geography gaps as drift."
+          "gate_criteria": "Use the current POC geography scope before regenerating config and treating remaining geography gaps as drift.",
+          "startedAt": "2026-03-18T08:29:22.438443+00:00"
         },
         {
           "id": "3.3.2.7",

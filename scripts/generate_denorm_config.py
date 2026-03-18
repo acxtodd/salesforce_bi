@@ -64,6 +64,143 @@ THRESHOLD_EMBED = 20      # score >= 20 → embed_fields
 # Maximum list views to iterate per object (avoid API rate limits)
 MAX_LISTVIEWS = 10
 
+EXCLUDED_DIRECT_FIELD_NAMES = {
+    "Id",
+    "RecordType",
+    "OwnerId",
+    "RecordTypeId",
+    "CreatedById",
+    "LastModifiedById",
+    "CreatedDate",
+    "LastModifiedDate",
+    "SystemModstamp",
+}
+
+EXCLUDED_PARENT_REF_FIELDS = {
+    "OwnerId",
+    "RecordTypeId",
+    "CreatedById",
+    "LastModifiedById",
+}
+
+EXCLUDED_PARENT_OBJECTS = {
+    "User",
+    "RecordType",
+    "Group",
+    "ascendix__SOM__c",
+    "ascendix__Floor__c",
+}
+
+EXCLUDED_PARENT_COMPACT_FIELDS = {
+    "Title",
+    "AccountId",
+    "ParentId",
+    "CompanyName",
+    "BillingAddress",
+    "IsActive",
+    "OwnerId",
+}
+
+POC_PARENT_REF_ALLOWLIST: Dict[str, Set[str]] = {
+    "ascendix__Property__c": {
+        "ascendix__OwnerLandlord__c",
+        "ascendix__Market__c",
+        "ascendix__SubMarket__c",
+    },
+    "ascendix__Lease__c": {
+        "ascendix__Property__c",
+        "ascendix__Tenant__c",
+        "ascendix__OwnerLandlord__c",
+    },
+    "ascendix__Availability__c": {
+        "ascendix__Property__c",
+    },
+}
+
+POC_PARENT_EXTRA_FIELD_ALLOWLIST: Dict[str, Dict[str, Set[str]]] = {
+    "ascendix__Lease__c": {
+        "ascendix__Property__c": {
+            "ascendix__City__c",
+            "ascendix__State__c",
+            "ascendix__PropertyClass__c",
+            "ascendix__PropertySubType__c",
+            "ascendix__TotalBuildingArea__c",
+        },
+    },
+    "ascendix__Availability__c": {
+        "ascendix__Property__c": {
+            "ascendix__City__c",
+            "ascendix__State__c",
+            "ascendix__PropertyClass__c",
+            "ascendix__PropertySubType__c",
+            "ascendix__TotalBuildingArea__c",
+        },
+    },
+}
+
+
+def _as_dict(value: Any) -> Dict[str, Any]:
+    """Normalize null-shaped API payloads to an empty dict."""
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value: Any) -> List[Any]:
+    """Normalize null-shaped API payloads to an empty list."""
+    return value if isinstance(value, list) else []
+
+
+def _is_excluded_direct_field(meta: "ObjectMetadata", field_name: str) -> bool:
+    """Return True when a direct field should not be emitted in current configs."""
+    if field_name in EXCLUDED_DIRECT_FIELD_NAMES or field_name.startswith("toLabel("):
+        return True
+    finfo = meta.fields.get(field_name, {})
+    if finfo.get("type") == "reference":
+        return True
+    return finfo.get("type") == "boolean"
+
+
+def _should_include_parent_ref(
+    object_name: str,
+    ref_field: str,
+    parent_obj: str,
+) -> bool:
+    """Return True when a parent reference is useful for current POC configs."""
+    if ref_field in EXCLUDED_PARENT_REF_FIELDS:
+        return False
+    if parent_obj in EXCLUDED_PARENT_OBJECTS:
+        return False
+    if parent_obj == object_name:
+        return False
+    allowed_refs = POC_PARENT_REF_ALLOWLIST.get(object_name)
+    if allowed_refs is not None and ref_field not in allowed_refs:
+        return False
+    return True
+
+
+def _should_include_parent_field(
+    object_name: str,
+    ref_field: str,
+    field_name: str,
+    *,
+    is_name_field: bool = False,
+    is_dot_notation: bool = False,
+) -> bool:
+    """Return True when a parent-derived field is worth keeping."""
+    if not field_name:
+        return False
+    if field_name in EXCLUDED_PARENT_COMPACT_FIELDS:
+        return False
+    if field_name.startswith("toLabel("):
+        return False
+    if is_name_field:
+        return True
+    if is_dot_notation:
+        return True
+    allowed_fields = POC_PARENT_EXTRA_FIELD_ALLOWLIST.get(object_name, {}).get(
+        ref_field, set()
+    )
+    return field_name in allowed_fields
+
 
 # ===================================================================
 # Data containers
@@ -186,29 +323,35 @@ class SalesforceHarvester:
         """
         try:
             result = self.sf.restful(f"sobjects/{parent_obj}/describe/compactLayouts/")
+            result = _as_dict(result)
             primary = result.get("defaultCompactLayoutId")
-            for cl in result.get("compactLayouts", []):
+            compact_layouts = _as_list(result.get("compactLayouts"))
+            for cl in compact_layouts:
+                cl = _as_dict(cl)
                 if cl.get("id") == primary:
                     return [
-                        fi.get("layoutComponents", [{}])[0].get("value", "")
-                        for fi in cl.get("fieldItems", [])
-                        if fi.get("layoutComponents")
+                        _as_dict(components[0]).get("value", "")
+                        for fi in _as_list(cl.get("fieldItems"))
+                        for components in [_as_list(_as_dict(fi).get("layoutComponents"))]
+                        if components
                     ]
             # If no primary found, try first compact layout
-            if result.get("compactLayouts"):
-                cl = result["compactLayouts"][0]
+            if compact_layouts:
+                cl = _as_dict(compact_layouts[0])
                 return [
-                    fi.get("layoutComponents", [{}])[0].get("value", "")
-                    for fi in cl.get("fieldItems", [])
-                    if fi.get("layoutComponents")
+                    _as_dict(components[0]).get("value", "")
+                    for fi in _as_list(cl.get("fieldItems"))
+                    for components in [_as_list(_as_dict(fi).get("layoutComponents"))]
+                    if components
                 ]
         except Exception as e:
             print(f"  Warning: compact layout fetch failed for {parent_obj}: {e}")
 
         # Fallback — get nameField from describe
         try:
-            desc = self.sf.restful(f"sobjects/{parent_obj}/describe")
-            for f in desc.get("fields", []):
+            desc = _as_dict(self.sf.restful(f"sobjects/{parent_obj}/describe"))
+            for f in _as_list(desc.get("fields")):
+                f = _as_dict(f)
                 if f.get("nameField"):
                     return [f["name"]]
         except Exception:
@@ -218,8 +361,9 @@ class SalesforceHarvester:
     def fetch_parent_name_field(self, parent_obj: str) -> str:
         """Return the nameField for a parent object."""
         try:
-            desc = self.sf.restful(f"sobjects/{parent_obj}/describe")
-            for f in desc.get("fields", []):
+            desc = _as_dict(self.sf.restful(f"sobjects/{parent_obj}/describe"))
+            for f in _as_list(desc.get("fields")):
+                f = _as_dict(f)
                 if f.get("nameField"):
                     return f["name"]
         except Exception:
@@ -230,15 +374,16 @@ class SalesforceHarvester:
 
     def _harvest_describe(self, meta: ObjectMetadata) -> None:
         try:
-            desc = self.sf.restful(f"sobjects/{meta.api_name}/describe")
+            desc = _as_dict(self.sf.restful(f"sobjects/{meta.api_name}/describe"))
         except Exception as e:
             print(f"  ERROR: describe failed for {meta.api_name}: {e}")
             return
 
         meta.label = desc.get("label", meta.api_name)
-        meta.child_relationships = desc.get("childRelationships", [])
+        meta.child_relationships = _as_list(desc.get("childRelationships"))
 
-        for f in desc.get("fields", []):
+        for f in _as_list(desc.get("fields")):
+            f = _as_dict(f)
             name = f.get("name", "")
             if not name or f.get("deprecatedAndHidden"):
                 continue
@@ -271,19 +416,21 @@ class SalesforceHarvester:
 
     def _harvest_compact_layouts(self, meta: ObjectMetadata) -> None:
         try:
-            result = self.sf.restful(
+            result = _as_dict(self.sf.restful(
                 f"sobjects/{meta.api_name}/describe/compactLayouts/"
-            )
+            ))
         except Exception as e:
             print(f"  Warning: compact layout fetch failed for {meta.api_name}: {e}")
             return
 
         fields_seen: Set[str] = set()
-        for cl in result.get("compactLayouts", []):
-            for fi in cl.get("fieldItems", []):
-                components = fi.get("layoutComponents", [])
+        for cl in _as_list(result.get("compactLayouts")):
+            cl = _as_dict(cl)
+            for fi in _as_list(cl.get("fieldItems")):
+                fi = _as_dict(fi)
+                components = _as_list(fi.get("layoutComponents"))
                 if components:
-                    fname = components[0].get("value", "")
+                    fname = _as_dict(components[0]).get("value", "")
                     if fname and fname not in fields_seen:
                         fields_seen.add(fname)
                         fs = meta.ensure_field_score(fname)
@@ -300,9 +447,13 @@ class SalesforceHarvester:
             print(f"  Warning: search layout fetch failed for {meta.api_name}: {e}")
             return
 
+        if result is None:
+            return
         layouts = result if isinstance(result, list) else [result]
         for layout in layouts:
-            for col in layout.get("searchColumns", []):
+            layout = _as_dict(layout)
+            for col in _as_list(layout.get("searchColumns")):
+                col = _as_dict(col)
                 fname = col.get("name", "")
                 if fname:
                     fs = meta.ensure_field_score(fname)
@@ -314,33 +465,41 @@ class SalesforceHarvester:
 
     def _harvest_page_layouts(self, meta: ObjectMetadata) -> None:
         try:
-            result = self.sf.restful(
+            result = _as_dict(self.sf.restful(
                 f"sobjects/{meta.api_name}/describe/layouts"
-            )
+            ))
         except Exception as e:
             print(f"  Warning: page layout fetch failed for {meta.api_name}: {e}")
             return
 
-        for layout in result.get("layouts", []):
+        for layout in _as_list(result.get("layouts")):
+            layout = _as_dict(layout)
             # Walk detail layout sections
-            for section in layout.get("detailLayoutSections", []):
-                for row in section.get("layoutRows", []):
-                    for item in row.get("layoutItems", []):
-                        for comp in item.get("layoutComponents", []):
+            for section in _as_list(layout.get("detailLayoutSections")):
+                section = _as_dict(section)
+                for row in _as_list(section.get("layoutRows")):
+                    row = _as_dict(row)
+                    for item in _as_list(row.get("layoutItems")):
+                        item = _as_dict(item)
+                        for comp in _as_list(item.get("layoutComponents")):
+                            comp = _as_dict(comp)
                             fname = comp.get("value", "")
                             if fname and fname in meta.fields:
-                                finfo = meta.fields[fname]
                                 fs = meta.ensure_field_score(fname)
                                 # Required fields on page layout get the weight
                                 if item.get("required"):
                                     fs.is_required = True
 
             # Also walk editLayoutSections as fallback
-            for section in layout.get("editLayoutSections", []):
-                for row in section.get("layoutRows", []):
-                    for item in row.get("layoutItems", []):
+            for section in _as_list(layout.get("editLayoutSections")):
+                section = _as_dict(section)
+                for row in _as_list(section.get("layoutRows")):
+                    row = _as_dict(row)
+                    for item in _as_list(row.get("layoutItems")):
+                        item = _as_dict(item)
                         if item.get("required"):
-                            for comp in item.get("layoutComponents", []):
+                            for comp in _as_list(item.get("layoutComponents")):
+                                comp = _as_dict(comp)
                                 fname = comp.get("value", "")
                                 if fname:
                                     fs = meta.ensure_field_score(fname)
@@ -350,13 +509,14 @@ class SalesforceHarvester:
 
     def _harvest_list_views(self, meta: ObjectMetadata) -> None:
         try:
-            result = self.sf.restful(f"sobjects/{meta.api_name}/listviews")
+            result = _as_dict(self.sf.restful(f"sobjects/{meta.api_name}/listviews"))
         except Exception as e:
             print(f"  Warning: list views fetch failed for {meta.api_name}: {e}")
             return
 
-        listviews = result.get("listviews", [])
+        listviews = _as_list(result.get("listviews"))
         for lv in listviews[:MAX_LISTVIEWS]:
+            lv = _as_dict(lv)
             lv_id = lv.get("id")
             if not lv_id:
                 continue
@@ -369,7 +529,9 @@ class SalesforceHarvester:
                 continue
 
             # Columns
-            for col in desc.get("columns", []):
+            desc = _as_dict(desc)
+            for col in _as_list(desc.get("columns")):
+                col = _as_dict(col)
                 col_name = col.get("fieldNameOrPath", "")
                 if not col_name:
                     continue
@@ -398,15 +560,16 @@ class SalesforceHarvester:
         self, where_clause: Dict[str, Any], meta: ObjectMetadata
     ) -> None:
         """Recursively extract field names from list view WHERE conditions."""
-        conditions = where_clause.get("conditions", [])
+        conditions = _as_list(where_clause.get("conditions"))
         for cond in conditions:
+            cond = _as_dict(cond)
             fname = cond.get("field", "")
             if fname:
                 fs = meta.ensure_field_score(fname)
                 fs.list_view_filter_appearances += 1
 
         # Recurse into sub-clauses
-        for sub in where_clause.get("subConditions", []):
+        for sub in _as_list(where_clause.get("subConditions")):
             if isinstance(sub, dict):
                 self._extract_filter_fields(sub, meta)
 
@@ -439,6 +602,8 @@ def build_config_for_object(
     for fname, fs in sorted(
         meta.field_scores.items(), key=lambda kv: kv[1].score, reverse=True
     ):
+        if _is_excluded_direct_field(meta, fname):
+            continue
         sc = fs.score
         if sc >= THRESHOLD_EMBED:
             embed_fields.append((fname, sc, fs.provenance_str))
@@ -448,26 +613,40 @@ def build_config_for_object(
     # --- Parent denormalization ---
     parents: Dict[str, List[Tuple[str, str]]] = {}  # ref_field → [(field, comment)]
     for ref_field, parent_obj in meta.reference_fields.items():
+        if not _should_include_parent_ref(meta.api_name, ref_field, parent_obj):
+            continue
         parent_fields: List[Tuple[str, str]] = []
         seen: Set[str] = set()
 
         if harvester is not None:
             # Fetch parent nameField
             name_field = harvester.fetch_parent_name_field(parent_obj)
-            if name_field not in seen:
+            if (
+                name_field not in seen
+                and _should_include_parent_field(
+                    meta.api_name, ref_field, name_field, is_name_field=True
+                )
+            ):
                 parent_fields.append((name_field, "parent nameField"))
                 seen.add(name_field)
 
             # Fetch parent compact layout fields
             compact_fields = harvester.fetch_parent_compact_fields(parent_obj)
             for cf in compact_fields:
-                if cf and cf not in seen:
+                if (
+                    cf
+                    and cf not in seen
+                    and _should_include_parent_field(meta.api_name, ref_field, cf)
+                ):
                     parent_fields.append((cf, "parent compact"))
                     seen.add(cf)
         else:
             # Mock / offline — always include Name
-            parent_fields.append(("Name", "parent nameField"))
-            seen.add("Name")
+            if _should_include_parent_field(
+                meta.api_name, ref_field, "Name", is_name_field=True
+            ):
+                parent_fields.append(("Name", "parent nameField"))
+                seen.add("Name")
 
         # Check dot-notation columns from child list views
         # Convert ref field to relationship name: ascendix__Property__c → ascendix__Property__r
@@ -480,7 +659,15 @@ def build_config_for_object(
         for dot_col in meta.dot_notation_columns:
             if dot_col.startswith(rel_name + "."):
                 parent_field = dot_col.split(".", 1)[1]
-                if parent_field not in seen:
+                if (
+                    parent_field not in seen
+                    and _should_include_parent_field(
+                        meta.api_name,
+                        ref_field,
+                        parent_field,
+                        is_dot_notation=True,
+                    )
+                ):
                     parent_fields.append(
                         (parent_field, f"child list_view dot notation ({dot_col})")
                     )

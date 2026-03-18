@@ -9,6 +9,7 @@ import os
 import sys
 import tempfile
 import textwrap
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -31,6 +32,7 @@ from generate_denorm_config import (
     FieldScore,
     MockParentFetcher,
     ObjectMetadata,
+    SalesforceHarvester,
     build_config_for_object,
     build_mock_metadata,
     render_yaml,
@@ -282,6 +284,97 @@ class TestBuildConfigForObject:
         cfg = build_config_for_object(meta, None, set(), "ascendix__")
         assert "CustomNonNS__c" not in cfg["children"]
         assert "ascendix__Note__c" in cfg["children"]
+
+    def test_filters_out_system_and_boolean_direct_fields(self):
+        meta = ObjectMetadata("ascendix__Property__c")
+        _add_mock_field(meta, "Name", name_field=True, filterable=True)
+        meta.ensure_field_score("Name").compact_layout_appearances = 1
+
+        _add_mock_field(meta, "Id", filterable=True)
+        meta.ensure_field_score("Id").list_view_column_appearances = 3
+
+        _add_mock_field(meta, "CreatedDate")
+        meta.ensure_field_score("CreatedDate").list_view_column_appearances = 3
+
+        _add_mock_field(meta, "ascendix__Pool__c", sf_type="boolean", required=True)
+        meta.ensure_field_score("ascendix__Pool__c").list_view_column_appearances = 1
+
+        _add_mock_field(meta, "toLabel(RecordType.Name)")
+        meta.ensure_field_score("toLabel(RecordType.Name)").search_layout_appearances = 1
+
+        _add_mock_field(meta, "RecordType")
+        meta.ensure_field_score("RecordType").list_view_column_appearances = 3
+
+        _add_mock_field(
+            meta, "ascendix__OwnerLandlord__c", sf_type="reference", reference_to="Account"
+        )
+        meta.ensure_field_score("ascendix__OwnerLandlord__c").compact_layout_appearances = 1
+
+        cfg = build_config_for_object(meta, None, set(), "ascendix__")
+        embed_names = [f[0] for f in cfg["embed_fields"]]
+        meta_names = [f[0] for f in cfg["metadata_fields"]]
+        all_names = embed_names + meta_names
+
+        assert "Name" in embed_names
+        assert "Id" not in all_names
+        assert "CreatedDate" not in all_names
+        assert "ascendix__Pool__c" not in all_names
+        assert "toLabel(RecordType.Name)" not in all_names
+        assert "RecordType" not in all_names
+        assert "ascendix__OwnerLandlord__c" not in all_names
+
+    def test_filters_parent_refs_for_current_poc_objects(self):
+        meta = ObjectMetadata("ascendix__Lease__c")
+        _add_mock_field(meta, "Name", name_field=True)
+        _add_mock_field(
+            meta,
+            "ascendix__Property__c",
+            sf_type="reference",
+            reference_to="ascendix__Property__c",
+        )
+        _add_mock_field(
+            meta, "ascendix__Tenant__c", sf_type="reference", reference_to="Account"
+        )
+        _add_mock_field(
+            meta,
+            "ascendix__OwnerLandlord__c",
+            sf_type="reference",
+            reference_to="Account",
+        )
+        _add_mock_field(
+            meta,
+            "ascendix__Floor__c",
+            sf_type="reference",
+            reference_to="ascendix__Floor__c",
+        )
+        _add_mock_field(
+            meta,
+            "ascendix__OriginatingDeal__c",
+            sf_type="reference",
+            reference_to="ascendix__Deal__c",
+        )
+        _add_mock_field(meta, "CreatedById", sf_type="reference", reference_to="User")
+        meta.dot_notation_columns = ["ascendix__Property__r.ascendix__City__c"]
+
+        fetcher = MockParentFetcher()
+        cfg = build_config_for_object(meta, fetcher, set(), "ascendix__")
+
+        assert set(cfg["parents"]) == {
+            "ascendix__Property__c",
+            "ascendix__Tenant__c",
+            "ascendix__OwnerLandlord__c",
+        }
+        property_fields = [pf[0] for pf in cfg["parents"]["ascendix__Property__c"]]
+        tenant_fields = [pf[0] for pf in cfg["parents"]["ascendix__Tenant__c"]]
+        assert "Name" in property_fields
+        assert "ascendix__City__c" in property_fields
+        assert "Industry" not in tenant_fields
+
+    def test_generic_parent_refs_default_to_name_only_outside_poc_allowlist(self):
+        meta = self._make_simple_meta()
+        cfg = build_config_for_object(meta, MockParentFetcher(), set(), "")
+        assert "Parent__c" in cfg["parents"]
+        assert [pf[0] for pf in cfg["parents"]["Parent__c"]] == ["Name"]
 
 
 # ===================================================================
@@ -665,3 +758,58 @@ class TestMockParentFetcher:
     def test_name_field_for_unknown(self):
         fetcher = MockParentFetcher()
         assert fetcher.fetch_parent_name_field("Unknown__c") == "Name"
+
+
+class TestSalesforceHarvesterNullSafety:
+    def test_fetch_parent_compact_fields_handles_null_compact_layouts(self):
+        sf = MagicMock()
+        sf.restful.side_effect = [
+            {"compactLayouts": None, "defaultCompactLayoutId": None},
+            {"fields": [{"name": "Name", "nameField": True}]},
+        ]
+        harvester = SalesforceHarvester(sf)
+        assert harvester.fetch_parent_compact_fields("Account") == ["Name"]
+
+    def test_harvest_search_layouts_handles_none_and_null_columns(self):
+        sf = MagicMock()
+        sf.restful.return_value = [None, {"searchColumns": None}]
+        harvester = SalesforceHarvester(sf)
+        meta = ObjectMetadata("Test__c")
+        harvester._harvest_search_layouts(meta)
+        assert meta.field_scores == {}
+
+    def test_harvest_page_layouts_handles_null_nested_arrays(self):
+        sf = MagicMock()
+        sf.restful.return_value = {
+            "layouts": [
+                {
+                    "detailLayoutSections": None,
+                    "editLayoutSections": [
+                        {"layoutRows": None},
+                    ],
+                }
+            ]
+        }
+        harvester = SalesforceHarvester(sf)
+        meta = ObjectMetadata("Test__c")
+        harvester._harvest_page_layouts(meta)
+        assert meta.field_scores == {}
+
+    def test_harvest_list_views_handles_null_views_and_columns(self):
+        sf = MagicMock()
+        sf.restful.side_effect = [
+            {"listviews": [{"id": "lv1"}]},
+            {"columns": None, "where": None},
+        ]
+        harvester = SalesforceHarvester(sf)
+        meta = ObjectMetadata("Test__c")
+        harvester._harvest_list_views(meta)
+        assert meta.field_scores == {}
+
+    def test_extract_filter_fields_handles_null_conditions(self):
+        harvester = SalesforceHarvester(MagicMock())
+        meta = ObjectMetadata("Test__c")
+        harvester._extract_filter_fields(
+            {"conditions": None, "subConditions": None}, meta
+        )
+        assert meta.field_scores == {}

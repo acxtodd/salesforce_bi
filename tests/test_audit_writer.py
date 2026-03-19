@@ -3,7 +3,7 @@
 import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -18,6 +18,23 @@ from lib.audit_writer import (
     write_config_snapshot,
     write_denorm_audit,
 )
+
+
+class _RecordingExecutor:
+    def __init__(self, max_workers: int):
+        self.max_workers = max_workers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def submit(self, fn, *args, **kwargs):
+        result = fn(*args, **kwargs)
+        fut = MagicMock()
+        fut.result.return_value = result
+        return fut
 
 
 # ===================================================================
@@ -211,6 +228,27 @@ class TestWriteAuditTombstone:
         assert ok == 1
         assert failed == 1
 
+    def test_respects_configured_concurrency(self):
+        s3 = MagicMock()
+        s3.put_object.side_effect = [None] * 20
+
+        with patch(
+            "lib.audit_writer.ThreadPoolExecutor",
+            side_effect=lambda max_workers: _RecordingExecutor(max_workers),
+        ) as executor, patch("lib.audit_writer.as_completed", side_effect=lambda futures: list(futures)):
+            ok, failed = write_audit_tombstone(
+                s3,
+                "bucket",
+                "org",
+                "lease",
+                [f"r{i}" for i in range(10)],
+                audit_concurrency=7,
+            )
+
+        assert executor.call_args[1]["max_workers"] == 7
+        assert ok == 20
+        assert failed == 0
+
 
 # ===================================================================
 # write_config_snapshot
@@ -301,6 +339,32 @@ class TestAuditingBackend:
         ab.upsert("ns", documents=docs)
 
         assert ab.stats.audit_ok == 1
+        assert ab.stats.audit_failed == 1
+
+    def test_upsert_respects_configured_concurrency_and_counts(self):
+        inner = MagicMock()
+        s3 = MagicMock()
+        s3.put_object.side_effect = [None] * 9 + [RuntimeError("fail")]
+        ab = AuditingBackend(
+            inner,
+            s3,
+            "bucket",
+            "org",
+            audit_concurrency=7,
+        )
+        docs = [
+            {"id": f"a0x{i}", "object_type": "property"}
+            for i in range(10)
+        ]
+
+        with patch(
+            "lib.audit_writer.ThreadPoolExecutor",
+            side_effect=lambda max_workers: _RecordingExecutor(max_workers),
+        ) as executor, patch("lib.audit_writer.as_completed", side_effect=lambda futures: list(futures)):
+            ab.upsert("ns", documents=docs)
+
+        assert executor.call_args[1]["max_workers"] == 7
+        assert ab.stats.audit_ok == 9
         assert ab.stats.audit_failed == 1
 
     def test_delete_delegates_only(self):

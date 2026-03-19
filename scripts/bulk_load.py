@@ -24,6 +24,7 @@ import logging
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -46,7 +47,12 @@ from lib.denormalize import (
     clean_label,
     flatten,
 )
-from lib.audit_writer import AuditingBackend, write_config_snapshot, write_denorm_audit
+from lib.audit_writer import (
+    DEFAULT_AUDIT_CONCURRENCY,
+    AuditingBackend,
+    write_config_snapshot,
+    write_denorm_audit,
+)
 from lib.turbopuffer_backend import TurbopufferBackend
 
 LOG = logging.getLogger("bulk_load")
@@ -54,6 +60,11 @@ LOG = logging.getLogger("bulk_load")
 # Batch size constants (CLI-specific)
 EMBED_BATCH_SIZE = 25
 UPSERT_BATCH_SIZE = 100
+DEFAULT_EMBEDDING_CONCURRENCY = 4
+DEFAULT_AUDIT_WRITE_CONCURRENCY = DEFAULT_AUDIT_CONCURRENCY
+EMBED_MAX_ATTEMPTS = 5
+EMBEDDING_CONCURRENCY_ENV = "BULK_LOAD_EMBED_CONCURRENCY"
+AUDIT_CONCURRENCY_ENV = "BULK_LOAD_AUDIT_CONCURRENCY"
 
 
 @dataclass
@@ -67,6 +78,9 @@ class LoadSummary:
     turbopuffer_count: int | None = None
     count_mismatch: bool = False
     skipped_ids: list[str] = field(default_factory=list)
+    denorm_audit_ok: int = 0
+    denorm_audit_failed: int = 0
+    stage_timings: dict[str, float] = field(default_factory=dict)
 
 
 # ===================================================================
@@ -176,61 +190,211 @@ def _is_throttling(exc: Exception) -> bool:
     return False
 
 
-def generate_embeddings_batch(
-    bedrock_client: Any, texts: list[str]
-) -> list[list[float]]:
-    """Generate embeddings for a batch of texts using Bedrock Titan v2."""
-    embeddings: list[list[float]] = []
-    for text in texts:
-        request_body = {
-            "inputText": text,
-            "dimensions": EMBEDDING_DIMENSIONS,
-            "normalize": True,
-        }
-        response = bedrock_client.invoke_model(
-            modelId=EMBEDDING_MODEL_ID,
-            contentType="application/json",
-            accept="application/json",
-            body=json.dumps(request_body),
+def _normalize_concurrency(value: int | None, *, default: int, label: str) -> int:
+    """Return a validated positive concurrency value."""
+    if value is None:
+        return default
+    if value < 1:
+        raise ValueError(f"{label} must be >= 1 (got {value})")
+    return value
+
+
+def resolve_embedding_concurrency(explicit: int | None = None) -> int:
+    """Resolve embedding concurrency from CLI or environment."""
+    if explicit is not None:
+        return _normalize_concurrency(
+            explicit,
+            default=DEFAULT_EMBEDDING_CONCURRENCY,
+            label="embedding concurrency",
         )
-        response_body = json.loads(response["body"].read())
-        embeddings.append(response_body["embedding"])
-    return embeddings
+    env_value = os.getenv(EMBEDDING_CONCURRENCY_ENV)
+    if env_value:
+        try:
+            parsed = int(env_value)
+        except ValueError as exc:
+            raise ValueError(
+                f"{EMBEDDING_CONCURRENCY_ENV} must be an integer >= 1 (got {env_value!r})"
+            ) from exc
+        return _normalize_concurrency(
+            parsed,
+            default=DEFAULT_EMBEDDING_CONCURRENCY,
+            label=f"{EMBEDDING_CONCURRENCY_ENV}",
+        )
+    return DEFAULT_EMBEDDING_CONCURRENCY
+
+
+def resolve_audit_concurrency(explicit: int | None = None) -> int:
+    """Resolve audit write concurrency from CLI or environment."""
+    if explicit is not None:
+        return _normalize_concurrency(
+            explicit,
+            default=DEFAULT_AUDIT_WRITE_CONCURRENCY,
+            label="audit concurrency",
+        )
+    env_value = os.getenv(AUDIT_CONCURRENCY_ENV)
+    if env_value:
+        try:
+            parsed = int(env_value)
+        except ValueError as exc:
+            raise ValueError(
+                f"{AUDIT_CONCURRENCY_ENV} must be an integer >= 1 (got {env_value!r})"
+            ) from exc
+        return _normalize_concurrency(
+            parsed,
+            default=DEFAULT_AUDIT_WRITE_CONCURRENCY,
+            label=f"{AUDIT_CONCURRENCY_ENV}",
+        )
+    return DEFAULT_AUDIT_WRITE_CONCURRENCY
+
+
+def create_s3_audit_client(audit_concurrency: int) -> Any:
+    """Create an S3 client sized for the configured audit writer concurrency."""
+    import boto3
+    from botocore.config import Config
+
+    resolved_concurrency = _normalize_concurrency(
+        audit_concurrency,
+        default=DEFAULT_AUDIT_WRITE_CONCURRENCY,
+        label="audit concurrency",
+    )
+    return boto3.client(
+        "s3",
+        config=Config(max_pool_connections=max(resolved_concurrency, 10)),
+    )
+
+
+def _generate_embedding_request(
+    bedrock_client: Any, text: str
+) -> list[float]:
+    """Generate a single embedding request via Bedrock Titan v2."""
+    request_body = {
+        "inputText": text,
+        "dimensions": EMBEDDING_DIMENSIONS,
+        "normalize": True,
+    }
+    response = bedrock_client.invoke_model(
+        modelId=EMBEDDING_MODEL_ID,
+        contentType="application/json",
+        accept="application/json",
+        body=json.dumps(request_body),
+    )
+    response_body = json.loads(response["body"].read())
+    return response_body["embedding"]
+
+
+def _embed_text_with_retry(
+    bedrock_client: Any,
+    text: str,
+    *,
+    request_index: int,
+) -> list[float]:
+    """Embed one text with per-request retry on throttling."""
+    backoff = 1.0
+    for attempt in range(EMBED_MAX_ATTEMPTS):
+        try:
+            return _generate_embedding_request(bedrock_client, text)
+        except Exception as exc:
+            if _is_throttling(exc):
+                LOG.warning(
+                    "  Throttled request %d, retrying in %.1fs (attempt %d/%d)",
+                    request_index,
+                    backoff,
+                    attempt + 1,
+                    EMBED_MAX_ATTEMPTS,
+                )
+                time.sleep(backoff)
+                backoff *= 2
+                continue
+            raise
+    raise RuntimeError(
+        f"Embedding failed after {EMBED_MAX_ATTEMPTS} attempts for request {request_index}"
+    )
+
+
+def _embed_batch_results(
+    bedrock_client: Any,
+    texts: list[str],
+    *,
+    batch_start: int,
+    concurrency: int,
+) -> list[list[float] | Exception]:
+    """Embed a logical batch concurrently and preserve input ordering."""
+    if not texts:
+        return []
+
+    worker_count = min(
+        len(texts),
+        _normalize_concurrency(
+            concurrency,
+            default=DEFAULT_EMBEDDING_CONCURRENCY,
+            label="embedding concurrency",
+        ),
+    )
+    ordered_results: list[list[float] | Exception | None] = [None] * len(texts)
+    with ThreadPoolExecutor(max_workers=worker_count) as pool:
+        futures = {
+            pool.submit(
+                _embed_text_with_retry,
+                bedrock_client,
+                text,
+                request_index=batch_start + idx,
+            ): idx
+            for idx, text in enumerate(texts)
+        }
+        for fut in as_completed(futures):
+            idx = futures[fut]
+            try:
+                ordered_results[idx] = fut.result()
+            except Exception as exc:
+                ordered_results[idx] = exc
+    return [result for result in ordered_results if result is not None]
+
+
+def generate_embeddings_batch(
+    bedrock_client: Any,
+    texts: list[str],
+    *,
+    concurrency: int = DEFAULT_EMBEDDING_CONCURRENCY,
+) -> list[list[float]]:
+    """Generate embeddings for a logical batch with bounded concurrency."""
+    results = _embed_batch_results(
+        bedrock_client,
+        texts,
+        batch_start=0,
+        concurrency=concurrency,
+    )
+    for result in results:
+        if isinstance(result, Exception):
+            raise result
+    return [result for result in results if not isinstance(result, Exception)]
 
 
 def embed_texts(
-    bedrock_client: Any, texts: list[str]
+    bedrock_client: Any,
+    texts: list[str],
+    *,
+    concurrency: int = DEFAULT_EMBEDDING_CONCURRENCY,
 ) -> list[list[float]]:
-    """Embed all texts in batches of 25 with retry on throttling."""
+    """Embed all texts in batches of 25 with bounded concurrency."""
     all_embeddings: list[list[float]] = []
     for i in range(0, len(texts), EMBED_BATCH_SIZE):
         batch = texts[i : i + EMBED_BATCH_SIZE]
         LOG.info(
-            "  Embedding batch %d (%d texts)",
+            "  Embedding batch %d (%d texts, concurrency=%d)",
             i // EMBED_BATCH_SIZE + 1,
             len(batch),
+            min(len(batch), _normalize_concurrency(
+                concurrency,
+                default=DEFAULT_EMBEDDING_CONCURRENCY,
+                label="embedding concurrency",
+            )),
         )
-        backoff = 1.0
-        for attempt in range(5):
-            try:
-                embeddings = generate_embeddings_batch(bedrock_client, batch)
-                all_embeddings.extend(embeddings)
-                break
-            except Exception as e:
-                if _is_throttling(e):
-                    LOG.warning(
-                        "  Throttled, retrying in %.1fs (attempt %d)",
-                        backoff,
-                        attempt + 1,
-                    )
-                    time.sleep(backoff)
-                    backoff *= 2
-                else:
-                    raise
-        else:
-            raise RuntimeError(
-                f"Embedding failed after 5 attempts for batch starting at {i}"
-            )
+        embeddings = generate_embeddings_batch(
+            bedrock_client,
+            batch,
+            concurrency=concurrency,
+        )
+        all_embeddings.extend(embeddings)
     return all_embeddings
 
 
@@ -261,34 +425,13 @@ def upsert_documents(
         )
 
 
-def _embed_batch_with_retry(
-    bedrock_client: Any, texts: list[str], *, batch_start: int
-) -> list[list[float]]:
-    """Embed one batch with retry on throttling."""
-    backoff = 1.0
-    for attempt in range(5):
-        try:
-            return generate_embeddings_batch(bedrock_client, texts)
-        except Exception as e:
-            if _is_throttling(e):
-                LOG.warning(
-                    "  Throttled, retrying in %.1fs (attempt %d)",
-                    backoff,
-                    attempt + 1,
-                )
-                time.sleep(backoff)
-                backoff *= 2
-                continue
-            raise
-    raise RuntimeError(
-        f"Embedding failed after 5 attempts for batch starting at {batch_start}"
-    )
-
-
 def _embed_records_with_tolerance(
-    bedrock_client: Any, prepared_rows: list[dict[str, Any]]
+    bedrock_client: Any,
+    prepared_rows: list[dict[str, Any]],
+    *,
+    concurrency: int,
 ) -> tuple[list[list[float]], list[dict[str, Any]], list[str]]:
-    """Embed rows in batches, falling back to per-record skip on hard failures."""
+    """Embed rows in batches, skipping only records that fail all retries."""
     embeddings: list[list[float]] = []
     embedded_rows: list[dict[str, Any]] = []
     skipped_ids: list[str] = []
@@ -297,40 +440,94 @@ def _embed_records_with_tolerance(
         batch_rows = prepared_rows[i : i + EMBED_BATCH_SIZE]
         batch_texts = [row["text"] for row in batch_rows]
         LOG.info(
-            "  Embedding batch %d (%d texts)",
+            "  Embedding batch %d (%d texts, concurrency=%d)",
             i // EMBED_BATCH_SIZE + 1,
             len(batch_rows),
+            min(
+                len(batch_rows),
+                _normalize_concurrency(
+                    concurrency,
+                    default=DEFAULT_EMBEDDING_CONCURRENCY,
+                    label="embedding concurrency",
+                ),
+            ),
         )
-        try:
-            batch_embeddings = _embed_batch_with_retry(
-                bedrock_client, batch_texts, batch_start=i
-            )
-            embeddings.extend(batch_embeddings)
-            embedded_rows.extend(batch_rows)
-            continue
-        except Exception as exc:
-            LOG.warning(
-                "  Embedding batch %d failed (%s); retrying per record",
-                i // EMBED_BATCH_SIZE + 1,
-                exc,
-            )
-
-        for row in batch_rows:
+        batch_results = _embed_batch_results(
+            bedrock_client,
+            batch_texts,
+            batch_start=i,
+            concurrency=concurrency,
+        )
+        for row, result in zip(batch_rows, batch_results):
             record_id = row["record_id"]
-            try:
-                vector = _embed_batch_with_retry(
-                    bedrock_client, [row["text"]], batch_start=i
-                )[0]
-            except Exception as exc:
+            if isinstance(result, Exception):
                 LOG.warning(
-                    "  Skipping record %s during embedding: %s", record_id, exc
+                    "  Skipping record %s during embedding: %s", record_id, result
                 )
                 skipped_ids.append(record_id)
                 continue
-            embeddings.append(vector)
+            embeddings.append(result)
             embedded_rows.append(row)
 
     return embeddings, embedded_rows, skipped_ids
+
+
+def _write_denorm_audits(
+    audit_s3_client: Any,
+    audit_bucket: str,
+    salesforce_org_id: str,
+    object_name: str,
+    prepared_rows: list[dict[str, Any]],
+    *,
+    audit_concurrency: int,
+) -> tuple[int, int]:
+    """Write denorm audit artifacts with bounded shared concurrency."""
+    if not prepared_rows:
+        return 0, 0
+
+    def _write_denorm(row: dict[str, Any]) -> bool:
+        return write_denorm_audit(
+            audit_s3_client,
+            audit_bucket,
+            salesforce_org_id,
+            record_id=row["record_id"],
+            object_type=object_name,
+            direct_fields=row["direct_fields"],
+            parent_fields=row["parent_fields"],
+            text=row["text"],
+            salesforce_org_id=salesforce_org_id,
+            last_modified=row["direct_fields"].get("LastModifiedDate"),
+        )
+
+    ok = 0
+    failed = 0
+    worker_count = min(
+        len(prepared_rows),
+        _normalize_concurrency(
+            audit_concurrency,
+            default=DEFAULT_AUDIT_WRITE_CONCURRENCY,
+            label="audit concurrency",
+        ),
+    )
+    with ThreadPoolExecutor(max_workers=worker_count) as pool:
+        futures = [pool.submit(_write_denorm, row) for row in prepared_rows]
+        for fut in as_completed(futures):
+            if fut.result():
+                ok += 1
+            else:
+                failed += 1
+    return ok, failed
+
+
+def _log_stage_timings(prefix: str, stage_timings: dict[str, float]) -> None:
+    """Emit stable human-readable stage timing output."""
+    ordered_keys = ("fetch", "prep_audit", "embed", "upsert", "total")
+    parts = [
+        f"{key}={stage_timings[key]:.2f}s"
+        for key in ordered_keys
+        if key in stage_timings
+    ]
+    LOG.info("%s stage timings: %s", prefix, " ".join(parts))
 
 
 def _count_indexed_docs(
@@ -377,10 +574,13 @@ def load_object(
     dry_run: bool = False,
     audit_s3_client: Any = None,
     audit_bucket: str = "",
+    embedding_concurrency: int = DEFAULT_EMBEDDING_CONCURRENCY,
+    audit_write_concurrency: int = DEFAULT_AUDIT_WRITE_CONCURRENCY,
 ) -> LoadSummary:
     """Run full pipeline for one object and return a structured summary."""
     LOG.info("=== Processing %s ===", object_name)
     summary = LoadSummary(object_name=object_name)
+    object_started = time.perf_counter()
 
     embed_fields = object_config.get("embed_fields", [])
     metadata_fields = object_config.get("metadata_fields", [])
@@ -395,14 +595,22 @@ def load_object(
         object_name, embed_fields, metadata_fields, parent_config, rel_map
     )
     LOG.info("  SOQL: %s", soql[:200])
+    fetch_started = time.perf_counter()
     records = sf_client.query_all(soql)
+    summary.stage_timings["fetch"] = time.perf_counter() - fetch_started
     summary.fetched_count = len(records)
     LOG.info("  Fetched %d records", summary.fetched_count)
 
     if not records:
+        summary.stage_timings["prep_audit"] = 0.0
+        summary.stage_timings["embed"] = 0.0
+        summary.stage_timings["upsert"] = 0.0
+        summary.stage_timings["total"] = time.perf_counter() - object_started
+        _log_stage_timings(f"  {object_name}", summary.stage_timings)
         return summary
 
     # Stage 2 + 3: Flatten + build text
+    prep_started = time.perf_counter()
     prepared_rows: list[dict[str, Any]] = []
     for record in records:
         record_id = record.get("Id", "<unknown>")
@@ -438,37 +646,25 @@ def load_object(
 
     # Stage 2.5: Write denorm audit artifacts (pre-vector, human-readable)
     if audit_s3_client and audit_bucket and prepared_rows and not dry_run:
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
-        denorm_audit_ok = 0
-        denorm_audit_failed = 0
-
-        def _write_denorm(row: dict) -> bool:
-            return write_denorm_audit(
-                audit_s3_client,
-                audit_bucket,
-                salesforce_org_id,
-                record_id=row["record_id"],
-                object_type=object_name,
-                direct_fields=row["direct_fields"],
-                parent_fields=row["parent_fields"],
-                text=row["text"],
-                salesforce_org_id=salesforce_org_id,
-                last_modified=row["direct_fields"].get("LastModifiedDate"),
-            )
-
-        with ThreadPoolExecutor(max_workers=min(len(prepared_rows), 20)) as pool:
-            futures = [pool.submit(_write_denorm, r) for r in prepared_rows]
-            for fut in as_completed(futures):
-                if fut.result():
-                    denorm_audit_ok += 1
-                else:
-                    denorm_audit_failed += 1
+        denorm_audit_ok, denorm_audit_failed = _write_denorm_audits(
+            audit_s3_client,
+            audit_bucket,
+            salesforce_org_id,
+            object_name,
+            prepared_rows,
+            audit_concurrency=audit_write_concurrency,
+        )
+        summary.denorm_audit_ok = denorm_audit_ok
+        summary.denorm_audit_failed = denorm_audit_failed
+        if isinstance(backend, AuditingBackend):
+            backend.stats.denorm_audit_ok += denorm_audit_ok
+            backend.stats.denorm_audit_failed += denorm_audit_failed
         LOG.info(
             "  Denorm audit: ok=%d failed=%d",
             denorm_audit_ok,
             denorm_audit_failed,
         )
+    summary.stage_timings["prep_audit"] = time.perf_counter() - prep_started
 
     if dry_run:
         LOG.info("  [DRY RUN] Sample texts:")
@@ -497,18 +693,30 @@ def load_object(
                 else:
                     LOG.info("    %s: %s", k, str(v)[:80])
         summary.indexed_count = len(prepared_rows)
+        summary.stage_timings["embed"] = 0.0
+        summary.stage_timings["upsert"] = 0.0
+        summary.stage_timings["total"] = time.perf_counter() - object_started
+        _log_stage_timings(f"  {object_name}", summary.stage_timings)
         return summary
 
     if not prepared_rows:
         LOG.warning("  No valid records remained after preparation")
         summary.turbopuffer_count = _count_indexed_docs(backend, namespace, object_name)
+        summary.stage_timings["embed"] = 0.0
+        summary.stage_timings["upsert"] = 0.0
+        summary.stage_timings["total"] = time.perf_counter() - object_started
+        _log_stage_timings(f"  {object_name}", summary.stage_timings)
         return summary
 
     # Stage 3.5: Embed
     LOG.info("  Embedding %d texts...", len(prepared_rows))
+    embed_started = time.perf_counter()
     vectors, embedded_rows, embed_skipped_ids = _embed_records_with_tolerance(
-        bedrock_client, prepared_rows
+        bedrock_client,
+        prepared_rows,
+        concurrency=embedding_concurrency,
     )
+    summary.stage_timings["embed"] = time.perf_counter() - embed_started
     summary.skipped_count += len(embed_skipped_ids)
     summary.skipped_ids.extend(embed_skipped_ids)
 
@@ -541,7 +749,9 @@ def load_object(
 
     # Stage 5: Upsert
     LOG.info("  Upserting %d documents to %s...", len(documents), namespace)
+    upsert_started = time.perf_counter()
     upsert_documents(backend, namespace, documents)
+    summary.stage_timings["upsert"] = time.perf_counter() - upsert_started
     summary.turbopuffer_count = _count_indexed_docs(backend, namespace, object_name)
     if summary.turbopuffer_count is None:
         summary.count_mismatch = True
@@ -571,6 +781,8 @@ def load_object(
             summary.turbopuffer_count,
         )
 
+    summary.stage_timings["total"] = time.perf_counter() - object_started
+    _log_stage_timings(f"  {object_name}", summary.stage_timings)
     return summary
 
 
@@ -615,8 +827,35 @@ def main() -> None:
         help="S3 bucket for audit trail. Defaults to the project audit bucket. "
         "Pass empty string to disable: --audit-bucket ''",
     )
+    parser.add_argument(
+        "--embedding-concurrency",
+        type=int,
+        default=None,
+        help=(
+            "Max concurrent Bedrock embedding requests per logical batch "
+            f"(default: env {EMBEDDING_CONCURRENCY_ENV} or {DEFAULT_EMBEDDING_CONCURRENCY})."
+        ),
+    )
+    parser.add_argument(
+        "--audit-concurrency",
+        type=int,
+        default=None,
+        help=(
+            "Max concurrent S3 audit writes for denorm and replay artifacts "
+            f"(default: env {AUDIT_CONCURRENCY_ENV} or {DEFAULT_AUDIT_WRITE_CONCURRENCY})."
+        ),
+    )
 
     args = parser.parse_args()
+    try:
+        embedding_concurrency = resolve_embedding_concurrency(
+            args.embedding_concurrency
+        )
+        audit_write_concurrency = resolve_audit_concurrency(
+            args.audit_concurrency
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
     # Load config
     config, raw_yaml_str = load_config_with_raw(args.config)
@@ -639,6 +878,11 @@ def main() -> None:
     org_id = get_org_id(sf)
     namespace = args.namespace or f"org_{org_id}"
     LOG.info("Namespace: %s", namespace)
+    LOG.info(
+        "Loader concurrency: embedding=%d audit=%d",
+        embedding_concurrency,
+        audit_write_concurrency,
+    )
 
     # Initialize Bedrock + Turbopuffer (only if not dry-run)
     bedrock_client = None
@@ -652,17 +896,32 @@ def main() -> None:
 
         # Wrap with audit writer if --audit-bucket provided
         if args.audit_bucket:
-            audit_s3_client = boto3.client("s3")
-            backend = AuditingBackend(backend, audit_s3_client, args.audit_bucket, org_id)
+            audit_s3_client = create_s3_audit_client(audit_write_concurrency)
+            backend = AuditingBackend(
+                backend,
+                audit_s3_client,
+                args.audit_bucket,
+                org_id,
+                audit_concurrency=audit_write_concurrency,
+            )
             write_config_snapshot(
                 audit_s3_client, args.audit_bucket, org_id,
                 config, raw_yaml_str, "bulk_load",
             )
 
     # Process each object
+    run_started = time.perf_counter()
     total_fetched = 0
     total_indexed = 0
     total_skipped = 0
+    total_denorm_audit_ok = 0
+    total_denorm_audit_failed = 0
+    aggregate_stage_timings = {
+        "fetch": 0.0,
+        "prep_audit": 0.0,
+        "embed": 0.0,
+        "upsert": 0.0,
+    }
     audit_bkt = args.audit_bucket if audit_s3_client else ""
     for obj_name in object_names:
         summary = load_object(
@@ -676,18 +935,36 @@ def main() -> None:
             dry_run=args.dry_run,
             audit_s3_client=audit_s3_client,
             audit_bucket=audit_bkt,
+            embedding_concurrency=embedding_concurrency,
+            audit_write_concurrency=audit_write_concurrency,
         )
         total_fetched += summary.fetched_count
         total_indexed += summary.indexed_count
         total_skipped += summary.skipped_count
+        total_denorm_audit_ok += summary.denorm_audit_ok
+        total_denorm_audit_failed += summary.denorm_audit_failed
+        for key in aggregate_stage_timings:
+            aggregate_stage_timings[key] += summary.stage_timings.get(key, 0.0)
 
     if isinstance(backend, AuditingBackend):
         LOG.info(
-            "Audit stats: audit_ok=%d audit_failed=%d",
+            "Audit stats: replay_ok=%d replay_failed=%d denorm_ok=%d denorm_failed=%d",
             backend.stats.audit_ok,
             backend.stats.audit_failed,
+            backend.stats.denorm_audit_ok,
+            backend.stats.denorm_audit_failed,
+        )
+    elif audit_s3_client:
+        LOG.info(
+            "Audit stats: replay_ok=%d replay_failed=%d denorm_ok=%d denorm_failed=%d",
+            0,
+            0,
+            total_denorm_audit_ok,
+            total_denorm_audit_failed,
         )
 
+    aggregate_stage_timings["total"] = time.perf_counter() - run_started
+    _log_stage_timings("Bulk load total", aggregate_stage_timings)
     LOG.info(
         "=== Complete: fetched=%d indexed=%d skipped=%d across %d objects ===",
         total_fetched,

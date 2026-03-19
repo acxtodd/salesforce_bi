@@ -27,6 +27,8 @@ from lib.search_backend import SearchBackend
 
 LOG = logging.getLogger(__name__)
 
+DEFAULT_AUDIT_CONCURRENCY = 20
+
 
 @dataclass
 class AuditStats:
@@ -36,6 +38,13 @@ class AuditStats:
     audit_failed: int = 0
     denorm_audit_ok: int = 0
     denorm_audit_failed: int = 0
+
+
+def _audit_max_workers(work_item_count: int, audit_concurrency: int) -> int:
+    """Return a bounded worker count for audit writer pools."""
+    if work_item_count <= 0:
+        return 0
+    return max(1, min(work_item_count, max(1, audit_concurrency)))
 
 
 def write_denorm_audit(
@@ -125,6 +134,8 @@ def write_audit_tombstone(
     org_id: str,
     object_type: str,
     record_ids: list[str],
+    *,
+    audit_concurrency: int = DEFAULT_AUDIT_CONCURRENCY,
 ) -> tuple[int, int]:
     """Write delete tombstones to **both** S3 prefixes for each record ID.
 
@@ -163,7 +174,11 @@ def write_audit_tombstone(
         for rid in record_ids
         for prefix in ("documents", "replay")
     ]
-    with ThreadPoolExecutor(max_workers=min(len(tasks), 20)) as pool:
+    worker_count = _audit_max_workers(len(tasks), audit_concurrency)
+    if worker_count == 0:
+        return ok, failed
+
+    with ThreadPoolExecutor(max_workers=worker_count) as pool:
         futures = [pool.submit(_write_one, pfx, rid) for pfx, rid in tasks]
         for fut in as_completed(futures):
             if fut.result():
@@ -232,11 +247,14 @@ class AuditingBackend:
         s3_client: Any,
         bucket: str,
         org_id: str,
+        *,
+        audit_concurrency: int = DEFAULT_AUDIT_CONCURRENCY,
     ) -> None:
         self._inner = inner
         self._s3 = s3_client
         self._bucket = bucket
         self._org_id = org_id
+        self._audit_concurrency = audit_concurrency
         self.stats = AuditStats()
 
     # -- write path (audited) -----------------------------------------------
@@ -255,7 +273,11 @@ class AuditingBackend:
             distance_metric=distance_metric,
             schema=schema,
         )
-        with ThreadPoolExecutor(max_workers=min(len(documents), 20)) as pool:
+        worker_count = _audit_max_workers(len(documents), self._audit_concurrency)
+        if worker_count == 0:
+            return
+
+        with ThreadPoolExecutor(max_workers=worker_count) as pool:
             futures = {
                 pool.submit(write_audit_document, self._s3, self._bucket, self._org_id, doc): doc
                 for doc in documents

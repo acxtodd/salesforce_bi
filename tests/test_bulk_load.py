@@ -3,8 +3,9 @@
 import io
 import json
 import sys
+import types
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -19,17 +20,23 @@ from bulk_load import (
     FULL_TEXT_SEARCH_SCHEMA,
     UPSERT_BATCH_SIZE,
     _is_throttling,
+    _embed_records_with_tolerance,
+    _write_denorm_audits,
     build_document,
     build_relationship_map,
     build_soql,
     build_text,
     clean_label,
+    create_s3_audit_client,
     embed_texts,
     flatten,
     generate_embeddings_batch,
     load_config,
     load_config_with_raw,
     load_object,
+    main,
+    resolve_audit_concurrency,
+    resolve_embedding_concurrency,
     upsert_documents,
     validate_parents,
 )
@@ -81,6 +88,23 @@ SAMPLE_PARENT_CONFIG = {
     "ascendix__Property__c": ["Name", "ascendix__City__c", "ascendix__State__c"],
     "ascendix__Tenant__c": ["Name", "Industry"],
 }
+
+
+class _RecordingExecutor:
+    def __init__(self, max_workers: int):
+        self.max_workers = max_workers
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def submit(self, fn, *args, **kwargs):
+        result = fn(*args, **kwargs)
+        fut = MagicMock()
+        fut.result.return_value = result
+        return fut
 
 SAMPLE_SF_RECORD = {
     "attributes": {"type": "ascendix__Lease__c", "url": "/services/data/v59.0/..."},
@@ -649,8 +673,73 @@ class TestEmbedding:
         texts = [f"text_{i}" for i in range(30)]
         embeddings = embed_texts(bedrock, texts)
         assert len(embeddings) == 30
-        # Should have called invoke_model 30 times (one per text)
         assert bedrock.invoke_model.call_count == 30
+
+    def test_concurrent_batch_preserves_input_order(self):
+        bedrock = MagicMock()
+        delays = {"first": 0.03, "second": 0.01, "third": 0.0}
+        values = {"first": 1.0, "second": 2.0, "third": 3.0}
+
+        def invoke_side_effect(**kwargs):
+            body = json.loads(kwargs["body"])
+            text = body["inputText"]
+            time_to_sleep = delays[text]
+            if time_to_sleep:
+                import time
+
+                time.sleep(time_to_sleep)
+            return {
+                "body": io.BytesIO(
+                    json.dumps({"embedding": [values[text]] * 2}).encode()
+                )
+            }
+
+        bedrock.invoke_model.side_effect = invoke_side_effect
+
+        embeddings = generate_embeddings_batch(
+            bedrock,
+            ["first", "second", "third"],
+            concurrency=3,
+        )
+
+        assert embeddings == [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]
+
+    def test_partial_failures_retry_only_failed_requests(self):
+        bedrock = MagicMock()
+        throttle_exc = Exception("ThrottlingException")
+        throttle_exc.response = {"Error": {"Code": "ThrottlingException"}}
+        attempts: dict[str, int] = {}
+
+        def invoke_side_effect(**kwargs):
+            body = json.loads(kwargs["body"])
+            text = body["inputText"]
+            attempts[text] = attempts.get(text, 0) + 1
+            if text == "retry-me" and attempts[text] == 1:
+                raise throttle_exc
+            return {
+                "body": io.BytesIO(
+                    json.dumps({"embedding": [float(attempts[text])] * 2}).encode()
+                )
+            }
+
+        prepared_rows = [
+            {"record_id": "r1", "text": "first"},
+            {"record_id": "r2", "text": "retry-me"},
+            {"record_id": "r3", "text": "third"},
+        ]
+        bedrock.invoke_model.side_effect = invoke_side_effect
+
+        with patch("bulk_load.time.sleep"):
+            embeddings, embedded_rows, skipped_ids = _embed_records_with_tolerance(
+                bedrock,
+                prepared_rows,
+                concurrency=3,
+            )
+
+        assert attempts == {"first": 1, "retry-me": 2, "third": 1}
+        assert skipped_ids == []
+        assert [row["record_id"] for row in embedded_rows] == ["r1", "r2", "r3"]
+        assert embeddings == [[1.0, 1.0], [2.0, 2.0], [1.0, 1.0]]
 
     def test_throttling_triggers_retry(self):
         """ThrottlingException should trigger retry with backoff."""
@@ -677,6 +766,18 @@ class TestEmbedding:
         # time.sleep should have been called for the retries
         assert mock_sleep.call_count == 2
 
+    def test_final_throttling_failure_surfaces_clearly(self):
+        bedrock = MagicMock()
+        throttle_exc = Exception("ThrottlingException")
+        throttle_exc.response = {"Error": {"Code": "ThrottlingException"}}
+        bedrock.invoke_model.side_effect = throttle_exc
+
+        with patch("bulk_load.time.sleep"), pytest.raises(
+            RuntimeError,
+            match="Embedding failed after 5 attempts for request 0",
+        ):
+            generate_embeddings_batch(bedrock, ["test"], concurrency=1)
+
     def test_non_throttling_exception_propagates(self):
         """Non-throttling exceptions should propagate immediately."""
         bedrock = MagicMock()
@@ -698,6 +799,41 @@ class TestEmbedding:
         exc = Exception("error")
         exc.response = {"Error": {"Code": "ValidationException"}}
         assert _is_throttling(exc) is False
+
+
+class TestConcurrencyConfig:
+    def test_invalid_embedding_env_raises_clear_value_error(self, monkeypatch):
+        monkeypatch.setenv("BULK_LOAD_EMBED_CONCURRENCY", "abc")
+
+        with pytest.raises(
+            ValueError,
+            match="BULK_LOAD_EMBED_CONCURRENCY must be an integer >= 1",
+        ):
+            resolve_embedding_concurrency()
+
+    def test_invalid_audit_env_raises_clear_value_error(self, monkeypatch):
+        monkeypatch.setenv("BULK_LOAD_AUDIT_CONCURRENCY", "abc")
+
+        with pytest.raises(
+            ValueError,
+            match="BULK_LOAD_AUDIT_CONCURRENCY must be an integer >= 1",
+        ):
+            resolve_audit_concurrency()
+
+    def test_main_exits_with_cli_error_for_invalid_env(self, monkeypatch, capsys):
+        monkeypatch.setenv("BULK_LOAD_EMBED_CONCURRENCY", "abc")
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["bulk_load.py", "--config", "denorm_config.yaml", "--dry-run"],
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+
+        assert exc_info.value.code == 2
+        captured = capsys.readouterr()
+        assert "BULK_LOAD_EMBED_CONCURRENCY must be an integer >= 1" in captured.err
 
 
 # ===================================================================
@@ -806,19 +942,15 @@ class TestLoadObjectHardening:
             return f"Lease: | Name: {direct['Name']}"
 
         with patch("bulk_load.build_text", side_effect=build_text_side_effect):
-            with patch(
-                "bulk_load.generate_embeddings_batch",
-                return_value=[[0.1] * 1024, [0.2] * 1024],
-            ):
-                summary = load_object(
-                    sf_client=sf,
-                    bedrock_client=MagicMock(),
-                    backend=backend,
-                    object_name="ascendix__Lease__c",
-                    object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
-                    namespace="ns",
-                    salesforce_org_id="00Dxx",
-                )
+            summary = load_object(
+                sf_client=sf,
+                bedrock_client=_make_bedrock_mock(),
+                backend=backend,
+                object_name="ascendix__Lease__c",
+                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+                namespace="ns",
+                salesforce_org_id="00Dxx",
+            )
 
         assert summary.fetched_count == 3
         assert summary.indexed_count == 2
@@ -829,7 +961,7 @@ class TestLoadObjectHardening:
         assert "Skipping record r2 during flatten/text preparation" in caplog.text
         assert len(backend.upsert.call_args.kwargs["documents"]) == 2
 
-    def test_embedding_batch_falls_back_to_per_record(self, caplog):
+    def test_embedding_skips_only_failed_record(self, caplog):
         records = [
             {"Id": "r1", "LastModifiedDate": "2025-01-01", "Name": "Good 1"},
             {"Id": "r2", "LastModifiedDate": "2025-01-01", "Name": "Bad"},
@@ -837,24 +969,26 @@ class TestLoadObjectHardening:
         ]
         sf = self._make_sf(records)
         backend = self._make_backend(final_count=2)
+        bedrock = MagicMock()
 
-        def generate_side_effect(_bedrock, texts):
-            if len(texts) > 1 and any("Bad" in text for text in texts):
-                raise ValueError("batch embed failed")
-            if any("Bad" in text for text in texts):
+        def invoke_side_effect(**kwargs):
+            body = json.loads(kwargs["body"])
+            text = body["inputText"]
+            if "Bad" in text:
                 raise ValueError("record embed failed")
-            return [[0.1] * 1024 for _ in texts]
+            return {"body": io.BytesIO(json.dumps({"embedding": [0.1] * 1024}).encode())}
 
-        with patch("bulk_load.generate_embeddings_batch", side_effect=generate_side_effect):
-            summary = load_object(
-                sf_client=sf,
-                bedrock_client=MagicMock(),
-                backend=backend,
-                object_name="ascendix__Lease__c",
-                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
-                namespace="ns",
-                salesforce_org_id="00Dxx",
-            )
+        bedrock.invoke_model.side_effect = invoke_side_effect
+
+        summary = load_object(
+            sf_client=sf,
+            bedrock_client=bedrock,
+            backend=backend,
+            object_name="ascendix__Lease__c",
+            object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            namespace="ns",
+            salesforce_org_id="00Dxx",
+        )
 
         assert summary.fetched_count == 3
         assert summary.indexed_count == 2
@@ -862,7 +996,6 @@ class TestLoadObjectHardening:
         assert summary.turbopuffer_count == 2
         assert summary.count_mismatch is False
         assert "r2" in summary.skipped_ids
-        assert "retrying per record" in caplog.text
         assert "Skipping record r2 during embedding" in caplog.text
 
     def test_count_mismatch_is_surfaced_clearly(self, caplog):
@@ -873,19 +1006,15 @@ class TestLoadObjectHardening:
         sf = self._make_sf(records)
         backend = self._make_backend(final_count=1)
 
-        with patch(
-            "bulk_load.generate_embeddings_batch",
-            return_value=[[0.1] * 1024, [0.2] * 1024],
-        ):
-            summary = load_object(
-                sf_client=sf,
-                bedrock_client=MagicMock(),
-                backend=backend,
-                object_name="ascendix__Lease__c",
-                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
-                namespace="ns",
-                salesforce_org_id="00Dxx",
-            )
+        summary = load_object(
+            sf_client=sf,
+            bedrock_client=_make_bedrock_mock(),
+            backend=backend,
+            object_name="ascendix__Lease__c",
+            object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            namespace="ns",
+            salesforce_org_id="00Dxx",
+        )
 
         assert summary.indexed_count == 2
         assert summary.turbopuffer_count == 1
@@ -900,25 +1029,44 @@ class TestLoadObjectHardening:
         backend = MagicMock()
         backend.aggregate.side_effect = RuntimeError("aggregate failed")
 
-        with patch(
-            "bulk_load.generate_embeddings_batch",
-            return_value=[[0.1] * 1024],
-        ):
-            summary = load_object(
-                sf_client=sf,
-                bedrock_client=MagicMock(),
-                backend=backend,
-                object_name="ascendix__Lease__c",
-                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
-                namespace="ns",
-                salesforce_org_id="00Dxx",
-            )
+        summary = load_object(
+            sf_client=sf,
+            bedrock_client=_make_bedrock_mock(),
+            backend=backend,
+            object_name="ascendix__Lease__c",
+            object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            namespace="ns",
+            salesforce_org_id="00Dxx",
+        )
 
         assert summary.indexed_count == 1
         assert summary.turbopuffer_count is None
         assert summary.count_mismatch is True
         assert "Could not verify post-load count" in caplog.text
         assert "Post-load count verification unavailable" in caplog.text
+
+    def test_stage_timings_are_recorded_and_logged(self, caplog):
+        caplog.set_level("INFO")
+        records = [
+            {"Id": "r1", "LastModifiedDate": "2025-01-01", "Name": "Good 1"},
+        ]
+        sf = self._make_sf(records)
+        backend = self._make_backend(final_count=1)
+
+        summary = load_object(
+            sf_client=sf,
+            bedrock_client=_make_bedrock_mock(),
+            backend=backend,
+            object_name="ascendix__Lease__c",
+            object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            namespace="ns",
+            salesforce_org_id="00Dxx",
+        )
+
+        for key in ("fetch", "prep_audit", "embed", "upsert", "total"):
+            assert key in summary.stage_timings
+            assert summary.stage_timings[key] >= 0.0
+        assert "stage timings:" in caplog.text
 
 
 # ===================================================================
@@ -1032,6 +1180,54 @@ class TestAuditBulkLoad:
         keys = [c[1]["Key"] for c in s3.put_object.call_args_list]
         assert any("_meta/" in k and "bulk_load" in k for k in keys)
 
+    def test_write_denorm_audits_respects_configured_concurrency(self):
+        audit_s3 = MagicMock()
+        rows = [
+            {
+                "record_id": f"r{i}",
+                "direct_fields": {"LastModifiedDate": "2025-01-01"},
+                "parent_fields": {},
+                "text": f"text {i}",
+            }
+            for i in range(5)
+        ]
+
+        with patch(
+            "bulk_load.ThreadPoolExecutor",
+            side_effect=lambda max_workers: _RecordingExecutor(max_workers),
+        ) as executor, patch(
+            "bulk_load.as_completed",
+            side_effect=lambda futures: list(futures),
+        ):
+            ok, failed = _write_denorm_audits(
+                audit_s3,
+                "audit-bucket",
+                "org123",
+                "ascendix__Lease__c",
+                rows,
+                audit_concurrency=3,
+            )
+
+        assert executor.call_args[1]["max_workers"] == 3
+        assert ok == 5
+        assert failed == 0
+
+    def test_create_s3_audit_client_pool_matches_concurrency(self):
+        captured: dict[str, object] = {}
+
+        def fake_client(service_name, *, config):
+            captured["service_name"] = service_name
+            captured["config"] = config
+            return "s3-client"
+
+        fake_boto3 = types.SimpleNamespace(client=fake_client)
+        with patch.dict(sys.modules, {"boto3": fake_boto3}):
+            client = create_s3_audit_client(23)
+
+        assert client == "s3-client"
+        assert captured["service_name"] == "s3"
+        assert captured["config"].max_pool_connections == 23
+
     def test_load_config_returns_dict(self, tmp_path):
         """load_config returns a plain dict (backwards-compatible)."""
         config_file = tmp_path / "test_config.yaml"
@@ -1076,24 +1272,28 @@ class TestDenormAuditBulkLoad:
         ]
         sf = self._make_sf(records)
         audit_s3 = MagicMock()
+        bedrock = MagicMock()
 
-        def generate_side_effect(_bedrock, texts):
-            if any("Bad" in t for t in texts):
+        def invoke_side_effect(**kwargs):
+            body = json.loads(kwargs["body"])
+            text = body["inputText"]
+            if "Bad" in text:
                 raise ValueError("embed failed")
-            return [[0.1] * 1024 for _ in texts]
+            return {"body": io.BytesIO(json.dumps({"embedding": [0.1] * 1024}).encode())}
 
-        with patch("bulk_load.generate_embeddings_batch", side_effect=generate_side_effect):
-            summary = load_object(
-                sf_client=sf,
-                bedrock_client=MagicMock(),
-                backend=MagicMock(aggregate=MagicMock(return_value={"count": 1})),
-                object_name="ascendix__Lease__c",
-                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
-                namespace="ns",
-                salesforce_org_id="00Dxx",
-                audit_s3_client=audit_s3,
-                audit_bucket="audit-bucket",
-            )
+        bedrock.invoke_model.side_effect = invoke_side_effect
+
+        summary = load_object(
+            sf_client=sf,
+            bedrock_client=bedrock,
+            backend=MagicMock(aggregate=MagicMock(return_value={"count": 1})),
+            object_name="ascendix__Lease__c",
+            object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            namespace="ns",
+            salesforce_org_id="00Dxx",
+            audit_s3_client=audit_s3,
+            audit_bucket="audit-bucket",
+        )
 
         # Both records should have denorm audits (written BEFORE embedding)
         denorm_calls = [
@@ -1122,19 +1322,49 @@ class TestDenormAuditBulkLoad:
         ]
         sf = self._make_sf(records)
 
-        with patch(
-            "bulk_load.generate_embeddings_batch",
-            return_value=[[0.1] * 1024],
-        ):
-            summary = load_object(
-                sf_client=sf,
-                bedrock_client=MagicMock(),
-                backend=MagicMock(aggregate=MagicMock(return_value={"count": 1})),
-                object_name="ascendix__Lease__c",
-                object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
-                namespace="ns",
-                salesforce_org_id="00Dxx",
-                # No audit_s3_client / audit_bucket
-            )
+        summary = load_object(
+            sf_client=sf,
+            bedrock_client=_make_bedrock_mock(),
+            backend=MagicMock(aggregate=MagicMock(return_value={"count": 1})),
+            object_name="ascendix__Lease__c",
+            object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            namespace="ns",
+            salesforce_org_id="00Dxx",
+            # No audit_s3_client / audit_bucket
+        )
 
         assert summary.indexed_count == 1
+
+    def test_denorm_audit_stats_propagate_to_backend(self):
+        records = [
+            {"Id": "r1", "LastModifiedDate": "2025-01-01", "Name": "Good"},
+        ]
+        sf = self._make_sf(records)
+        audit_s3 = MagicMock()
+        inner_backend = MagicMock()
+        inner_backend.aggregate.return_value = {"count": 1}
+        backend = AuditingBackend(
+            inner_backend,
+            audit_s3,
+            "audit-bucket",
+            "00Dxx",
+            audit_concurrency=2,
+        )
+
+        summary = load_object(
+            sf_client=sf,
+            bedrock_client=_make_bedrock_mock(),
+            backend=backend,
+            object_name="ascendix__Lease__c",
+            object_config={"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            namespace="ns",
+            salesforce_org_id="00Dxx",
+            audit_s3_client=audit_s3,
+            audit_bucket="audit-bucket",
+            audit_write_concurrency=2,
+        )
+
+        assert summary.denorm_audit_ok == 1
+        assert summary.denorm_audit_failed == 0
+        assert backend.stats.denorm_audit_ok == 1
+        assert backend.stats.denorm_audit_failed == 0

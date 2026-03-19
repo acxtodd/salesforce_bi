@@ -15,6 +15,7 @@ from lib.denormalize import (
     EMBEDDING_MODEL_ID,
     FULL_TEXT_SEARCH_SCHEMA,
     PINNED_TEXT_FULL_TEXT_SETTINGS,
+    build_tpuf_schema,
     build_document,
     build_soql,
     build_text,
@@ -31,6 +32,21 @@ SAMPLE_REL_MAP = {
     "ascendix__Property__c": "ascendix__Property__r",
     "ascendix__Tenant__c": "ascendix__Tenant__r",
     "ascendix__OwnerLandlord__c": "ascendix__OwnerLandlord__r",
+}
+
+SAMPLE_REL_META = {
+    "ascendix__Property__c": {
+        "relationship_name": "ascendix__Property__r",
+        "relationship_label": "Property",
+        "parent_object_api": "ascendix__Property__c",
+        "parent_object_label": "Property",
+    },
+    "ascendix__Tenant__c": {
+        "relationship_name": "ascendix__Tenant__r",
+        "relationship_label": "Tenant",
+        "parent_object_api": "Account",
+        "parent_object_label": "Account",
+    },
 }
 
 SAMPLE_EMBED_FIELDS = [
@@ -89,9 +105,20 @@ class TestCleanLabel:
     def test_id_field(self):
         assert clean_label("Id") == "Id"
 
+    def test_standard_lookup_suffix_is_trimmed(self):
+        assert clean_label("AccountId") == "Account"
+
     def test_double_underscore_only_namespace(self):
         """Field with only namespace prefix, no __c."""
         assert clean_label("ascendix__Foo") == "Foo"
+
+    def test_geolocation_component_suffixes_cleaned(self):
+        assert (
+            clean_label("ascendix__Geolocation__Latitude__s") == "GeolocationLatitude"
+        )
+        assert (
+            clean_label("ascendix__Geolocation__Longitude__s") == "GeolocationLongitude"
+        )
 
 
 # ===================================================================
@@ -281,6 +308,28 @@ class TestBuildText:
         assert "Tenant Name: ACME Corp" in text
         assert " | Name: One Arts Plaza" not in text
 
+    def test_parent_fields_use_relationship_label_from_metadata(self):
+        direct = {"Name": "Lease-001"}
+        parent = {"ascendix__Tenant__c": {"Name": "CBRE"}}
+        parent_config = {"ascendix__Tenant__c": ["Name"]}
+        rel_map = {
+            "ascendix__Tenant__c": {
+                "relationship_name": "ascendix__Tenant__r",
+                "relationship_label": "Listing Broker Company",
+                "parent_object_api": "Account",
+                "parent_object_label": "Account",
+            }
+        }
+        text = build_text(
+            direct,
+            parent,
+            ["Name"],
+            parent_config,
+            "ascendix__Lease__c",
+            rel_map,
+        )
+        assert "Listing Broker Company Name: CBRE" in text
+
     def test_null_values_skipped(self):
         direct = {"ascendix__LeaseType__c": "Office"}
         text = build_text(
@@ -351,7 +400,12 @@ class TestBuildDocument:
 
     def test_parent_field_keys_prefixed_and_cleaned(self):
         doc = build_document(
-            direct_fields={"Id": "a0x1", "LastModifiedDate": "2025-01-01"},
+            direct_fields={
+                "Id": "a0x1",
+                "LastModifiedDate": "2025-01-01",
+                "ascendix__Property__c": "a0y1",
+                "ascendix__Tenant__c": "0011",
+            },
             parent_fields={
                 "ascendix__Property__c": {
                     "Name": "One Arts Plaza",
@@ -370,7 +424,10 @@ class TestBuildDocument:
                 "ascendix__Property__c": ["Name", "ascendix__City__c"],
                 "ascendix__Tenant__c": ["Industry"],
             },
+            rel_map=SAMPLE_REL_META,
         )
+        assert doc["property_id"] == "a0y1"
+        assert doc["tenant_id"] == "0011"
         assert doc["property_name"] == "One Arts Plaza"
         assert doc["property_city"] == "Dallas"
         assert doc["tenant_industry"] == "Technology"
@@ -480,6 +537,21 @@ class TestSchema:
         ]
         for field in expected:
             assert field in FULL_TEXT_SEARCH_SCHEMA, f"Missing: {field}"
+
+    def test_build_tpuf_schema_promotes_numeric_fields_to_float(self):
+        schema = build_tpuf_schema(
+            [
+                {"id": "1", "text": "one", "vector": [0.0], "foo": 1},
+                {"id": "2", "text": "two", "vector": [0.0], "foo": 2.5},
+            ]
+        )
+        assert schema["foo"] == {"type": "float"}
+
+    def test_build_tpuf_schema_ignores_bool_fields(self):
+        schema = build_tpuf_schema(
+            [{"id": "1", "text": "one", "vector": [0.0], "is_active": True}]
+        )
+        assert "is_active" not in schema
 
 
 # ===================================================================

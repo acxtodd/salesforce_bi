@@ -209,6 +209,49 @@ class TestBuildConfigForObject:
         assert "InternalNote__c" not in embed_names
         assert "InternalNote__c" not in meta_names
 
+    def test_geocoordinate_fields_forced_into_metadata(self):
+        meta = self._make_simple_meta()
+        meta.fields["Geo__c"] = {
+            "name": "Geo__c",
+            "type": "location",
+            "nameField": False,
+            "nillable": True,
+            "createable": True,
+            "filterable": False,
+            "groupable": False,
+            "calculated": False,
+            "referenceTo": [],
+        }
+        meta.fields["Geo__Latitude__s"] = {
+            "name": "Geo__Latitude__s",
+            "type": "double",
+            "nameField": False,
+            "nillable": True,
+            "createable": True,
+            "filterable": False,
+            "groupable": False,
+            "calculated": False,
+            "referenceTo": [],
+            "compoundFieldName": "Geo__c",
+        }
+        meta.fields["Geo__Longitude__s"] = {
+            "name": "Geo__Longitude__s",
+            "type": "double",
+            "nameField": False,
+            "nillable": True,
+            "createable": True,
+            "filterable": False,
+            "groupable": False,
+            "calculated": False,
+            "referenceTo": [],
+            "compoundFieldName": "Geo__c",
+        }
+        cfg = build_config_for_object(meta, None, set(), "")
+        meta_names = [f[0] for f in cfg["metadata_fields"]]
+        assert "Geo__c" not in meta_names
+        assert "Geo__Latitude__s" in meta_names
+        assert "Geo__Longitude__s" in meta_names
+
     def test_embed_fields_sorted_by_score_desc(self):
         meta = self._make_simple_meta()
         # Add another high-score field
@@ -323,7 +366,7 @@ class TestBuildConfigForObject:
         assert "RecordType" not in all_names
         assert "ascendix__OwnerLandlord__c" not in all_names
 
-    def test_filters_parent_refs_for_current_poc_objects(self):
+    def test_includes_all_business_parent_refs_and_excludes_only_system_noise(self):
         meta = ObjectMetadata("ascendix__Lease__c")
         _add_mock_field(meta, "Name", name_field=True)
         _add_mock_field(
@@ -363,18 +406,23 @@ class TestBuildConfigForObject:
             "ascendix__Property__c",
             "ascendix__Tenant__c",
             "ascendix__OwnerLandlord__c",
+            "ascendix__OriginatingDeal__c",
         }
         property_fields = [pf[0] for pf in cfg["parents"]["ascendix__Property__c"]]
         tenant_fields = [pf[0] for pf in cfg["parents"]["ascendix__Tenant__c"]]
         assert "Name" in property_fields
         assert "ascendix__City__c" in property_fields
-        assert "Industry" not in tenant_fields
+        assert "Industry" in tenant_fields
 
-    def test_generic_parent_refs_default_to_name_only_outside_poc_allowlist(self):
+    def test_generic_parent_refs_include_name_and_parent_compact_fields(self):
         meta = self._make_simple_meta()
         cfg = build_config_for_object(meta, MockParentFetcher(), set(), "")
         assert "Parent__c" in cfg["parents"]
-        assert [pf[0] for pf in cfg["parents"]["Parent__c"]] == ["Name"]
+        assert [pf[0] for pf in cfg["parents"]["Parent__c"]] == [
+            "Name",
+            "Industry",
+            "BillingCity",
+        ]
 
 
 # ===================================================================

@@ -134,6 +134,12 @@ class TestCleanLabel:
     def test_does_not_lowercase(self):
         assert _clean_label("ascendix__PropertyClass__c") == "PropertyClass"
 
+    def test_geolocation_component_cleaned(self):
+        assert _clean_label("ascendix__Geolocation__Latitude__s") == "GeolocationLatitude"
+
+    def test_standard_lookup_suffix_is_trimmed(self):
+        assert _clean_label("AccountId") == "Account"
+
 
 # =========================================================================
 # _to_snake_case
@@ -249,6 +255,8 @@ class TestBuildFieldRegistry:
         fs = self.registry["property"]
         assert "property_class" in fs.aliases
         assert fs.aliases["property_class"] == "propertyclass"
+        assert "owner_landlord_name" in fs.aliases
+        assert fs.aliases["owner_landlord_name"] == "ownerlandlord_name"
 
     def test_semantic_aliases_merged(self):
         fs = self.registry["lease"]

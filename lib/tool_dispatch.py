@@ -29,7 +29,16 @@ def _clean_label(field_name: str) -> str:
 
     Mirrors ``scripts/bulk_load.clean_label`` exactly.
     """
-    return field_name.replace("ascendix__", "").replace("__c", "").replace("__r", "")
+    cleaned = (
+        field_name.replace("ascendix__", "")
+        .replace("__Latitude__s", "Latitude")
+        .replace("__Longitude__s", "Longitude")
+        .replace("__c", "")
+        .replace("__r", "")
+    )
+    if cleaned.endswith("Id") and cleaned != "Id":
+        cleaned = cleaned[:-2]
+    return cleaned
 
 
 def _to_snake_case(name: str) -> str:
@@ -204,8 +213,14 @@ def build_field_registry(
                 aliases[snake] = indexed
 
         # --- Parent fields ---
-        for ref_field, parent_fields in obj_cfg.get("parents", {}).items():
+        for ref_field, parent_entry in obj_cfg.get("parents", {}).items():
+            parent_fields = (
+                parent_entry.get("fields", [])
+                if isinstance(parent_entry, dict)
+                else parent_entry
+            )
             prefix = _clean_label(ref_field).lower()
+            prefix_snake = _to_snake_case(_clean_label(ref_field))
             for pf in parent_fields:
                 if isinstance(pf, (list, tuple)):
                     pf = pf[0]
@@ -217,6 +232,9 @@ def build_field_registry(
                 alias_key = f"{prefix}_{pf_snake}"
                 if alias_key != indexed:
                     aliases[alias_key] = indexed
+                snake_prefix_alias_key = f"{prefix_snake}_{pf_snake}"
+                if snake_prefix_alias_key != indexed:
+                    aliases[snake_prefix_alias_key] = indexed
 
         # --- Platform fields ---
         fs.filterable |= _PLATFORM_FILTERABLE

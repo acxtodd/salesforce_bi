@@ -13,7 +13,7 @@ interface DataStackProps extends cdk.StackProps {
 export class DataStack extends cdk.Stack {
   public readonly dataBucket: s3.Bucket;
   public readonly embeddingsBucket: s3.Bucket;
-  public readonly auditBucket: s3.Bucket;
+  public readonly auditBucket: s3.IBucket;
   public readonly logsBucket: s3.Bucket;
   public readonly telemetryTable: dynamodb.Table;
   public readonly sessionsTable: dynamodb.Table;
@@ -124,32 +124,10 @@ export class DataStack extends cdk.Stack {
       ],
     });
 
-    // S3 Bucket for audit trail (document snapshots + config provenance)
-    this.auditBucket = new s3.Bucket(this, 'AuditBucket', {
-      bucketName: `salesforce-ai-search-audit-${this.account}-${this.region}`,
-      encryption: s3.BucketEncryption.KMS,
-      encryptionKey: kmsKey,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      versioned: true,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      serverAccessLogsBucket: this.logsBucket,
-      serverAccessLogsPrefix: 'audit-bucket-access-logs/',
-      lifecycleRules: [
-        {
-          id: 'TransitionNoncurrentToGlacier',
-          noncurrentVersionTransitions: [
-            {
-              storageClass: s3.StorageClass.GLACIER,
-              transitionAfter: cdk.Duration.days(90),
-            },
-          ],
-        },
-        {
-          id: 'ExpireNoncurrentVersions',
-          noncurrentVersionExpiration: cdk.Duration.days(365),
-        },
-      ],
-    });
+    // Audit trail bucket already exists in the shared dev account. Import it so
+    // the stack can reference/export it without trying to create a duplicate.
+    const auditBucketName = `salesforce-ai-search-audit-${this.account}-${this.region}`;
+    this.auditBucket = s3.Bucket.fromBucketName(this, 'AuditBucket', auditBucketName);
 
     // DynamoDB Table for telemetry
     this.telemetryTable = new dynamodb.Table(this, 'TelemetryTable', {
@@ -636,7 +614,7 @@ export class DataStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'AuditBucketName', {
-      value: this.auditBucket.bucketName,
+      value: auditBucketName,
       description: 'S3 bucket for document audit trail',
       exportName: `${this.stackName}-AuditBucketName`,
     });

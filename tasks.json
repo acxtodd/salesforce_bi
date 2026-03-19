@@ -1673,7 +1673,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T13:45:13.359718+00:00",
-          "updatedAt": "2026-03-18T15:19:54.209373+00:00",
+          "updatedAt": "2026-03-19T06:20:17.179745+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -1685,6 +1685,22 @@
             {
               "timestamp": "2026-03-18T15:19:54.209525+00:00",
               "note": "Implemented and pushed in commit 98152d7. AuditingBackend wraps upsert/delete transparently for both CDC and bulk_load paths. Key pattern: documents/{org_id}/{object_type}/{record_id}.json. Replay script supports --dry-run, --as-of (point-in-time via S3 versioning), --require-empty (fail-closed), --validate-config (drift detection). Config snapshots written to _meta/ on bulk_load and CDC cold start. Delete tombstone audit failures are counted in CloudWatch metrics. load_config() kept backwards-compatible (dict return); new load_config_with_raw() for audit callers. 122 tests across 4 test files, 470 total suite passing."
+            },
+            {
+              "timestamp": "2026-03-18T21:58:59.797883+00:00",
+              "note": "Stakeholder review 2026-03-18: 3.4 does not meet the intended auditability requirement because the produced S3 artifact is not practically inspectable for denormalization review; it mirrors raw indexed payloads including full vectors instead of presenting a readable denormalized document."
+            },
+            {
+              "timestamp": "2026-03-18T22:36:55.765167+00:00",
+              "note": "Re-implemented with two-artifact architecture: (1) documents/ prefix for human-readable denorm audit (pre-vector, pretty JSON with direct_fields/parent_fields/text), (2) replay/ prefix for machine-readable Turbopuffer payload (post-vector, compact JSON). Tombstones write to both prefixes. replay_from_audit.py defaults to replay/ prefix with --prefix flag for legacy compat. All 528 tests pass."
+            },
+            {
+              "timestamp": "2026-03-19T06:20:10.097804+00:00",
+              "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-19T06:20:17.179545+00:00",
+              "note": "Completed 2026-03-19. Two-artifact audit trail live in prod: documents/ (human-readable denorm, pre-vector) and replay/ (Turbopuffer payload with vectors). Bulk load verified: Property 2470, Lease 483, Availability 527 — all with 0 failures across both S3 prefixes. Market/SubMarket sparsity (6.6%/1.1%) confirmed as source data, not pipeline issue."
             }
           ],
           "references": [
@@ -1699,7 +1715,8 @@
             "Config snapshot written to _meta/ on every bulk_load and CDC cold start. Contains denorm config hash, source, timestamp, and raw YAML.",
             "replay_from_audit.py can replay documents from S3 into any Turbopuffer namespace without Salesforce or Bedrock credentials. Supports --dry-run, --as-of for point-in-time, --require-empty for authoritative mode, and --validate-config for drift detection."
           ],
-          "completedAt": "2026-03-18T15:19:54.209522+00:00"
+          "completedAt": "2026-03-19T06:20:10.097618+00:00",
+          "startedAt": "2026-03-18T21:58:59.797880+00:00"
         },
         {
           "id": "3.5",
@@ -1752,6 +1769,330 @@
           "description": "The cdc_sync Lambda reads AUDIT_BUCKET from its environment to enable S3 audit trail writes. The env var is not yet set. Set AUDIT_BUCKET=salesforce-ai-search-audit-382211616288-us-west-2 on the salesforce-ai-search-cdc-sync Lambda configuration. This aligns CDC with the bulk_load default (which now audits by default)."
         }
       ]
+    },
+    {
+      "phase": 4,
+      "name": "Full Database Search",
+      "description": "Expand the search index from 3 CRE objects to the entire Salesforce database",
+      "status": "pending",
+      "tasks": [
+        {
+          "id": "4.1",
+          "title": "Audit all target objects via Salesforce describe API",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T06:09:02.305679+00:00",
+          "updatedAt": "2026-03-19T06:09:02.305877+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Introspect every object with >0 records in the org. For each object, catalog all fields (name, type, label, reference/relationship). Classify fields into embed_fields (text, textarea, picklist — good for semantic search), metadata_fields (number, currency, date, percent — good for filtering), and parents (reference fields with relationshipName — for denormalization). Output a field inventory spreadsheet or JSON for review before config generation."
+        },
+        {
+          "id": "4.2",
+          "title": "Fix Deal and Sale denorm configs against live org metadata",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T06:09:09.986493+00:00",
+          "updatedAt": "2026-03-19T06:09:55.023784+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Replace placeholder fields in existing ascendix__Deal__c and ascendix__Sale__c config entries with actual org fields. Deal is missing DealType__c (renamed to TransactionType__c) and Stage__c. Sale is missing SaleType__c, Status__c, Description__c, PricePerSF__c, Size__c, CapRate__c, NOI__c. Validate every field in both configs via describe API before committing.",
+          "depends_on": [
+            "4.1"
+          ]
+        },
+        {
+          "id": "4.3",
+          "title": "Generate denorm configs for all remaining objects",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T06:09:16.902143+00:00",
+          "updatedAt": "2026-03-19T06:09:55.075108+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Build denorm_config.yaml entries for every object not already covered. Target objects: Account (4,756), Contact (6,625), ascendix__Inquiry__c (2,340), ascendix__Listing__c (1,763), ascendix__Preference__c (3,209), ascendix__Unit__c (101), ascendix__Geography__c (57), Opportunity (8), Task (29), Event (23), Meeting_Summary__c (7). For standard objects, map standard Salesforce fields (Account.Name, Account.Industry, Contact.Email, Contact.Title, Task.Subject, Event.Subject, etc.). For Ascendix custom objects, use the field inventory from 4.1. Include parent relationships where they add search value (e.g., Contact -> Account, Listing -> Property).",
+          "depends_on": [
+            "4.1"
+          ]
+        },
+        {
+          "id": "4.3.1",
+          "title": "Generalize direct relationship denorm",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T08:56:02.413930+00:00",
+          "updatedAt": "2026-03-19T09:42:50.063433+00:00",
+          "files_modified": [
+            "lambda/cdc_sync/index.py",
+            "denorm_config.yaml"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-19T08:56:24.215734+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-19T09:05:47.351576+00:00",
+              "note": "Implementation in progress: removed parent allowlists from generator, added relationship label/object metadata to denorm runtime, and expanded tests before live config regeneration."
+            },
+            {
+              "timestamp": "2026-03-19T09:06:44.816036+00:00",
+              "note": "Scope expanded during implementation: include any geocoordinate/location fields in the extracted denormalized record so direct record geography is not lost even when scoring would otherwise omit it."
+            },
+            {
+              "timestamp": "2026-03-19T09:13:47.950906+00:00",
+              "note": "Verification 2026-03-19: generator no longer suppresses direct business relationships; runtime now emits relationship label/object metadata for parent links; active denorm_config.yaml was expanded to match the live-generated parent relationship coverage for Property/Lease/Availability/Deal/Sale; property geolocation compound + latitude/longitude fields were added explicitly. Focused verification passed: 225 unit tests green, YAML parse green, and live compare against results/denorm_config_relationships_live.yaml showed zero missing parent refs across the 5 objects. Remaining follow-up outside this task: bulk reload / CDC refresh is still required for existing indexed documents to pick up the new fields."
+            },
+            {
+              "timestamp": "2026-03-19T09:42:50.063435+00:00",
+              "note": "Task completed"
+            }
+          ],
+          "description": "Replace object-specific parent allowlists with metadata-driven inclusion of direct Salesforce lookup/master-detail relationships. For each included relationship, denormalize the relationship label, parent record id, parent object identity, parent nameField, and compact-layout summary fields. Preserve flat prefixed fields for filtering/search, update text/audit output to use human labels, and regenerate configs so broker/party/company/contact links are indexed without hardcoding per object.",
+          "parent": "4.3",
+          "acceptance_criteria": [
+            "The denorm config generator includes all direct business lookup/master-detail relationships by default and uses a narrow denylist only for system/low-value references.",
+            "Each included parent relationship carries label-aware denormalized output: relationship label, parent id, parent object api/label, parent nameField, and parent compact-layout summary/header fields.",
+            "Search/runtime code continues to expose flat prefixed parent fields for filtering and result synthesis, and tests cover representative broker/party relationships such as Listing Broker Company, Tenant Rep Broker, Buyer, Seller, Client, and contact roles."
+          ],
+          "startedAt": "2026-03-19T08:56:24.215590+00:00",
+          "completedAt": "2026-03-19T09:42:50.063291+00:00"
+        },
+        {
+          "id": "4.4",
+          "title": "Update CDC_ENTITY_MAP for all indexed objects",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T06:09:24.790998+00:00",
+          "updatedAt": "2026-03-19T06:09:55.126560+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Add entries to CDC_ENTITY_MAP in lambda/cdc_sync/index.py for every newly indexed object. Include both ChangeEvent channel names (e.g., Account__ChangeEvent) and SObject names (e.g., Account) as keys, since AppFlow uses SObject names. Standard objects use different CDC channel patterns (e.g., AccountChangeEvent without the double underscore). Test that parse_eventbridge_s3_cdc resolves all new entities correctly.",
+          "depends_on": [
+            "4.3"
+          ]
+        },
+        {
+          "id": "4.5",
+          "title": "Update system prompt for expanded object set",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T06:09:32.078956+00:00",
+          "updatedAt": "2026-03-19T06:09:55.181272+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Revise the Claude system prompt (Phase 1.2) to inform the LLM about all indexed objects, their fields, and their relationships. The prompt must describe what each object represents in CRE context and how they relate (Contact works at Account, Listing is on a Property, Deal involves a Property and Contact, etc.) so Claude can formulate correct multi-object tool-use queries. Add tool descriptions for any new filter dimensions.",
+          "depends_on": [
+            "4.3"
+          ]
+        },
+        {
+          "id": "4.6",
+          "title": "Run bulk load for all objects and verify",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T06:09:37.893947+00:00",
+          "updatedAt": "2026-03-19T06:09:55.348796+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Execute bulk_load.py with the complete denorm_config.yaml covering all objects. Expected: ~24,500 records indexed, ~24,500 denorm audit artifacts in documents/, ~24,500 replay artifacts in replay/. Verify: zero INVALID_FIELD errors, zero skipped records (or documented reasons), Turbopuffer aggregate counts match Salesforce counts per object, audit artifacts present in both S3 prefixes for all object types.",
+          "depends_on": [
+            "4.4"
+          ]
+        },
+        {
+          "id": "4.6.1",
+          "title": "Add Turbopuffer auth fallback for bulk load",
+          "status": "in_progress",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T09:39:00.289746+00:00",
+          "updatedAt": "2026-03-19T10:47:04.946153+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-19T09:43:14.430433+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-19T09:58:32.977595+00:00",
+              "note": "Implemented shared local Turbopuffer auth fallback in lib/turbopuffer_backend.py with resolution order env -> repo .env -> Secrets Manager secret salesforce-ai-search/turbopuffer-api-key. Focused auth tests passed, and a real shell check with TURBOPUFFER_API_KEY unset resolved successfully via local fallback."
+            },
+            {
+              "timestamp": "2026-03-19T10:34:28.838331+00:00",
+              "note": "Live bulk rerun surfaced two additional real-path issues and both were patched: (1) dynamic numeric parent fields caused Turbopuffer int/float inference conflicts, so schema generation now predeclares numeric attrs from the full document batch; (2) namespace attribute count exceeded 256 after adding full relationship metadata, so indexed parent metadata was trimmed to id + relationship label + summary fields while keeping denorm text/audit richness."
+            },
+            {
+              "timestamp": "2026-03-19T10:47:04.946006+00:00",
+              "note": "Further reduced indexed relationship payload after live Turbopuffer limit test: relationship labels remain in denorm text and audit artifacts, but flat per-relationship label/object attrs were removed from indexed documents to stay under the namespace attribute cap."
+            }
+          ],
+          "description": "Make bulk load and related local workflows resolve the Turbopuffer API key from repo env, AWS SSM/Secrets, or explicit environment fallback so exports do not fail when TURBOPUFFER_API_KEY is not already exported in the shell.",
+          "parent": "4.6",
+          "acceptance_criteria": [
+            "Local Turbopuffer-backed workflows succeed without manually exporting TURBOPUFFER_API_KEY when the key is available via the repo env file or AWS secret salesforce-ai-search/turbopuffer-api-key.",
+            "Auth fallback is implemented in shared code used by bulk load and other local Turbopuffer entrypoints, with focused tests covering env-present, secret-present, and secret-missing paths."
+          ],
+          "startedAt": "2026-03-19T09:43:14.430253+00:00"
+        },
+        {
+          "id": "4.6.2",
+          "title": "Optimize bulk load throughput",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T11:53:17.240600+00:00",
+          "updatedAt": "2026-03-19T11:53:43.266470+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Reduce end-to-end bulk load runtime after the current clean rerun completes. Focus on the confirmed bottlenecks in the local loader path: per-record Bedrock embedding calls masquerading as batches, and S3 audit write contention/connection-pool churn during denorm/replay artifact writes. The goal is to preserve audit coverage while materially improving clean rebuild speed.",
+          "parent": "4.6",
+          "acceptance_criteria": [
+            "A before/after runtime comparison is recorded for at least one live object bulk export, with the new path preserving document and audit correctness."
+          ]
+        },
+        {
+          "id": "4.6.3",
+          "title": "Swap CDC scope from Deal/Sale to Account/Contact",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T17:21:52.341385+00:00",
+          "updatedAt": "2026-03-19T17:30:09.674539+00:00",
+          "files_modified": [
+            "lib/denormalize.py",
+            "lib/tool_dispatch.py",
+            "lib/ingestion-stack.ts",
+            "lambda/cdc_sync/index.py",
+            "denorm_config.yaml",
+            "lib/system_prompt.py",
+            "tests/test_denormalize.py",
+            "tests/test_bulk_load.py",
+            "tests/test_tool_dispatch.py",
+            "tests/test_system_prompt.py",
+            "tests/test_cdc_sync.py"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-19T17:23:07.898329+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-19T17:30:09.674542+00:00",
+              "note": "Task completed"
+            }
+          ],
+          "description": "Replace Deal and Sale with Account and Contact in the demo CDC/indexing scope. Update AppFlow/CDC source configuration, denorm config, and prompt/tool scope so the live demo tracks companies and contacts instead of transaction records while preserving the 5-entity CDC limit.",
+          "parent": "4.6",
+          "startedAt": "2026-03-19T17:23:07.898112+00:00",
+          "acceptance_criteria": [
+            "CDC source scope replaces Deal and Sale with Account and Contact while preserving a 5-entity demo configuration.",
+            "CDC entity mapping and prompt/tool scope are updated so Account and Contact are treated as live indexed objects.",
+            "Denorm config replaces Deal and Sale root objects with Account and Contact and preserves direct relationship denorming for the active demo objects.",
+            "Focused tests covering CDC scope, prompt/tool enums, and standard lookup naming pass."
+          ],
+          "completedAt": "2026-03-19T17:30:09.674403+00:00"
+        },
+        {
+          "id": "4.6.4",
+          "title": "Deploy Account/Contact demo CDC scope",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T17:33:18.321461+00:00",
+          "updatedAt": "2026-03-19T19:18:00.900207+00:00",
+          "files_modified": [
+            "lib/ingestion-stack.ts",
+            "lambda/cdc_sync/index.py",
+            "denorm_config.yaml",
+            "lib/system_prompt.py",
+            "lib/denormalize.py",
+            "lib/tool_dispatch.py",
+            "lib/turbopuffer_backend.py",
+            "scripts/bulk_load.py",
+            "scripts/generate_denorm_config.py",
+            "scripts/validate_data.py",
+            "tests/test_bulk_load.py",
+            "tests/test_cdc_sync.py",
+            "tests/test_denorm_generator.py",
+            "tests/test_denormalize.py",
+            "tests/test_search_backend.py",
+            "tests/test_system_prompt.py",
+            "tests/test_tool_dispatch.py",
+            "CLAUDE.md"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-19T17:33:29.592145+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-19T19:17:48.697190+00:00",
+              "note": "Deployed SalesforceAISearch-Data-dev and SalesforceAISearch-Ingestion-dev in us-west-2. Imported the pre-existing audit bucket into DataStack so the audit export exists, then redeployed Ingestion with current cdc_sync bundle. Live AppFlow CDC flows now target Property, Lease, Availability, Account, and Contact; Deal/Sale flows were removed from CDC."
+            },
+            {
+              "timestamp": "2026-03-19T19:17:48.705541+00:00",
+              "note": "Verification: live AppFlow list shows salesforce-ai-search-cdc-account and salesforce-ai-search-cdc-contact with sources AccountChangeEvent and ContactChangeEvent. Authoritative namespace rebuild completed with Property=2470, Lease=483, Availability=527, Account=4756, Contact=6625 (total 14861), audit_ok=14861, audit_failed=0."
+            },
+            {
+              "timestamp": "2026-03-19T19:17:59.924664+00:00",
+              "note": "Task completed"
+            }
+          ],
+          "description": "Deploy the CDC/AppFlow scope swap so Account and Contact replace Deal and Sale in the live 5-entity demo, then rebuild and verify the Turbopuffer namespace on the new root-object set.",
+          "parent": "4.6",
+          "startedAt": "2026-03-19T17:33:29.591979+00:00",
+          "completedAt": "2026-03-19T19:17:59.924528+00:00"
+        },
+        {
+          "id": "4.6.5",
+          "title": "Restore Deal/Sale to bulk-only extract",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T19:13:28.167493+00:00",
+          "updatedAt": "2026-03-19T19:13:28.167631+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Keep Deal and Sale out of the 5-slot CDC scope, but add them back to the active denorm bulk/root extract so the namespace contains Property, Lease, Availability, Deal, Sale, Account, and Contact. Rebuild and verify counts after the current Account/Contact rebuild completes.",
+          "parent": "4.6"
+        },
+        {
+          "id": "4.7",
+          "title": "Validate expanded corpus with acceptance tests",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-19T06:09:43.457686+00:00",
+          "updatedAt": "2026-03-19T06:09:55.457869+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Run validate_data.py across the full corpus. Check: per-object record counts match Salesforce, parent fields populated for objects with parent configs, metadata filters work for numeric/date fields, search returns results for each object type. Add new acceptance test cases for cross-object queries: 'find contacts at properties in Dallas', 'show deals related to ACME Corp', 'what leases are expiring this quarter'. Smoke-test via LWC search interface.",
+          "depends_on": [
+            "4.6"
+          ]
+        }
+      ]
     }
   ],
   "backlog": [],
@@ -1765,7 +2106,10 @@
       "2.5.": 4,
       "3.3.2.": 10,
       "3.2.": 2,
-      "3.": 8
+      "3.": 8,
+      "4.": 8,
+      "4.3.": 2,
+      "4.6.": 6
     }
   }
 }

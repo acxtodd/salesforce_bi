@@ -61,7 +61,36 @@ FULL_TEXT_SEARCH_SCHEMA: dict[str, dict[str, Any]] = {
     "pricepersf": {"type": "float"},
     "caprate": {"type": "float"},
     "noi": {"type": "float"},
+    # Geospatial component fields
+    "geolocationlatitude": {"type": "float"},
+    "geolocationlongitude": {"type": "float"},
 }
+
+
+def build_tpuf_schema(
+    documents: list[dict[str, Any]],
+    *,
+    base_schema: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Build a stable Turbopuffer schema for a batch of denormed documents.
+
+    Turbopuffer infers attribute types from early writes. Parent compact-layout
+    fields can introduce late-arriving numeric attributes or mix ints/floats
+    across batches, so predeclare every numeric attribute as float.
+    """
+    schema = {
+        key: dict(value)
+        for key, value in (base_schema or FULL_TEXT_SEARCH_SCHEMA).items()
+    }
+    for document in documents:
+        for field_name, value in document.items():
+            if field_name in schema:
+                continue
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, (int, float)):
+                schema[field_name] = {"type": "float"}
+    return schema
 
 
 # ===================================================================
@@ -74,7 +103,95 @@ def clean_label(field_name: str) -> str:
 
     ascendix__City__c -> City, ascendix__Property__r -> Property, Name -> Name
     """
-    return field_name.replace("ascendix__", "").replace("__c", "").replace("__r", "")
+    cleaned = (
+        field_name.replace("ascendix__", "")
+        .replace("__Latitude__s", "Latitude")
+        .replace("__Longitude__s", "Longitude")
+        .replace("__c", "")
+        .replace("__r", "")
+    )
+    if cleaned.endswith("Id") and cleaned != "Id":
+        cleaned = cleaned[:-2]
+    return cleaned
+
+
+def _normalize_parent_entry(ref_field: str, entry: Any) -> dict[str, Any]:
+    """Normalize legacy/new parent config entries to one internal shape."""
+    if isinstance(entry, dict):
+        fields = entry.get("fields", [])
+        return {
+            "fields": list(fields),
+            "relationship_label": entry.get("relationship_label", clean_label(ref_field)),
+            "parent_object_api": entry.get("parent_object_api", ""),
+            "parent_object_label": entry.get("parent_object_label", ""),
+            "name_field": entry.get("name_field", "Name"),
+        }
+    return {
+        "fields": list(entry),
+        "relationship_label": clean_label(ref_field),
+        "parent_object_api": "",
+        "parent_object_label": "",
+        "name_field": "Name",
+    }
+
+
+def _relationship_name(rel_entry: Any) -> str:
+    """Extract the SOQL relationship name from a rel-map entry."""
+    if isinstance(rel_entry, dict):
+        return rel_entry["relationship_name"]
+    return rel_entry
+
+
+def _relationship_label(ref_field: str, rel_entry: Any) -> str:
+    """Resolve a human label for the parent relationship."""
+    if isinstance(rel_entry, dict):
+        return rel_entry.get("relationship_label") or clean_label(ref_field)
+    return clean_label(ref_field)
+
+
+def _parent_object_api(rel_entry: Any) -> str:
+    if isinstance(rel_entry, dict):
+        return rel_entry.get("parent_object_api", "")
+    return ""
+
+
+def _parent_object_label(ref_field: str, rel_entry: Any) -> str:
+    if isinstance(rel_entry, dict):
+        return rel_entry.get("parent_object_label") or clean_label(
+            rel_entry.get("parent_object_api", "")
+        )
+    return ""
+
+
+def build_relationship_map(sf_client: Any, object_name: str) -> dict[str, dict[str, str]]:
+    """Return lookup metadata keyed by reference field API name.
+
+    Each entry contains the SOQL relationship name plus human/object labels
+    so denormalized records can preserve business role context.
+    """
+    desc = sf_client.describe(object_name)
+    parent_labels: dict[str, str] = {}
+    rel_map: dict[str, dict[str, str]] = {}
+    for field in desc["fields"]:
+        if field["type"] != "reference" or not field.get("relationshipName"):
+            continue
+        parent_object_api = (field.get("referenceTo") or [""])[0]
+        if parent_object_api and parent_object_api not in parent_labels:
+            try:
+                parent_labels[parent_object_api] = sf_client.describe(parent_object_api).get(
+                    "label", clean_label(parent_object_api)
+                )
+            except Exception:
+                parent_labels[parent_object_api] = clean_label(parent_object_api)
+        rel_map[field["name"]] = {
+            "relationship_name": field["relationshipName"],
+            "relationship_label": field.get("label", clean_label(field["name"])),
+            "parent_object_api": parent_object_api,
+            "parent_object_label": parent_labels.get(
+                parent_object_api, clean_label(parent_object_api)
+            ),
+        }
+    return rel_map
 
 
 # ===================================================================
@@ -86,8 +203,8 @@ def build_soql(
     object_name: str,
     embed_fields: list[str],
     metadata_fields: list[str],
-    parent_config: dict[str, list[str]],
-    rel_map: dict[str, str],
+    parent_config: dict[str, Any],
+    rel_map: dict[str, Any],
 ) -> str:
     """Build SELECT SOQL with direct fields + parent relationship fields."""
     select_parts: list[str] = ["Id", "LastModifiedDate"]
@@ -100,8 +217,9 @@ def build_soql(
             seen.add(f)
 
     # Parent relationship fields
-    for ref_field, parent_fields in parent_config.items():
-        rel_name = rel_map[ref_field]  # already validated
+    for ref_field, entry in parent_config.items():
+        rel_name = _relationship_name(rel_map[ref_field])  # already validated
+        parent_fields = _normalize_parent_entry(ref_field, entry)["fields"]
         # Include the FK field itself if not already present
         if ref_field not in seen:
             select_parts.append(ref_field)
@@ -124,8 +242,8 @@ def flatten(
     record: dict,
     embed_fields: list[str],
     metadata_fields: list[str],
-    parent_config: dict[str, list[str]],
-    rel_map: dict[str, str],
+    parent_config: dict[str, Any],
+    rel_map: dict[str, Any],
 ) -> tuple[dict, dict]:
     """Extract direct_fields and parent_fields from a raw SF record.
 
@@ -144,8 +262,10 @@ def flatten(
     direct_fields["LastModifiedDate"] = record.get("LastModifiedDate")
 
     parent_fields: dict[str, dict] = {}
-    for ref_field, pfield_names in parent_config.items():
-        rel_name = rel_map[ref_field]
+    for ref_field, entry in parent_config.items():
+        rel_name = _relationship_name(rel_map[ref_field])
+        pfield_names = _normalize_parent_entry(ref_field, entry)["fields"]
+        direct_fields[ref_field] = record.get(ref_field)
         parent_record = record.get(rel_name) or {}
         pvals: dict[str, Any] = {}
         for pf in pfield_names:
@@ -168,6 +288,7 @@ def build_text(
     embed_field_names: list[str],
     parent_config: dict,
     object_type: str,
+    rel_map: dict[str, Any] | None = None,
 ) -> str:
     """Build embedding text from direct + parent fields.
 
@@ -182,12 +303,18 @@ def build_text(
             parts.append(f"{clean_label(field)}: {val}")
 
     # Parent denormalized fields
-    for ref_field, pfield_names in parent_config.items():
+    for ref_field, entry in parent_config.items():
+        pfield_names = _normalize_parent_entry(ref_field, entry)["fields"]
         parent_vals = parent_fields.get(ref_field, {})
+        rel_label = (
+            _relationship_label(ref_field, rel_map.get(ref_field))
+            if rel_map is not None and ref_field in rel_map
+            else clean_label(ref_field)
+        )
         for pf in pfield_names:
             val = parent_vals.get(pf)
             if val is not None:
-                parts.append(f"{clean_label(ref_field)} {clean_label(pf)}: {val}")
+                parts.append(f"{rel_label} {clean_label(pf)}: {val}")
 
     return " | ".join(parts)
 
@@ -208,6 +335,7 @@ def build_document(
     embed_field_names: list[str],
     metadata_field_names: list[str],
     parent_config: dict,
+    rel_map: dict[str, Any] | None = None,
 ) -> dict:
     """Build final Turbopuffer document with cleaned attribute keys."""
     doc: dict[str, Any] = {
@@ -226,9 +354,13 @@ def build_document(
             doc[clean_label(f).lower()] = val
 
     # Parent fields with prefixed cleaned keys
-    for ref_field, pfield_names in parent_config.items():
+    for ref_field, entry in parent_config.items():
+        pfield_names = _normalize_parent_entry(ref_field, entry)["fields"]
         prefix = clean_label(ref_field).lower()
         parent_vals = parent_fields.get(ref_field, {})
+        parent_id = direct_fields.get(ref_field)
+        if parent_id is not None:
+            doc[f"{prefix}_id"] = parent_id
         for pf in pfield_names:
             val = parent_vals.get(pf)
             if val is not None:

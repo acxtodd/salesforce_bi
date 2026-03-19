@@ -8,6 +8,9 @@ SDK.  All other application code talks to ``SearchBackend`` from
 from __future__ import annotations
 
 from collections import defaultdict
+import json
+import os
+from pathlib import Path
 from typing import Any
 
 from turbopuffer import Turbopuffer
@@ -25,6 +28,101 @@ _SUFFIX_TO_OP: list[tuple[str, str]] = [
     ("_in", "In"),
     ("_ne", "NotEq"),
 ]
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_TURBOPUFFER_API_KEY_ENV = "TURBOPUFFER_API_KEY"
+_TURBOPUFFER_API_KEY_SECRET = "salesforce-ai-search/turbopuffer-api-key"
+_DEFAULT_AWS_REGION = "us-west-2"
+
+
+def _parse_env_assignment(line: str) -> tuple[str, str] | None:
+    """Parse a simple .env-style KEY=VALUE assignment."""
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#") or "=" not in stripped:
+        return None
+    if stripped.startswith("export "):
+        stripped = stripped[len("export ") :].strip()
+    key, value = stripped.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if not key:
+        return None
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+    return key, value
+
+
+def _load_dotenv_value(env_path: Path, key: str) -> str | None:
+    """Read a single key from a repo-local .env file if present."""
+    if not env_path.exists():
+        return None
+    for line in env_path.read_text().splitlines():
+        parsed = _parse_env_assignment(line)
+        if parsed and parsed[0] == key and parsed[1]:
+            return parsed[1]
+    return None
+
+
+def _secret_string_value(secret_string: str) -> str | None:
+    """Return the API key from a plain-text or JSON Secrets Manager payload."""
+    stripped = secret_string.strip()
+    if not stripped:
+        return None
+    if stripped.startswith("{"):
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError:
+            return stripped
+        for candidate in ("TURBOPUFFER_API_KEY", "api_key", "value", "token"):
+            value = payload.get(candidate)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+    return stripped
+
+
+def _aws_region() -> str:
+    """Resolve AWS region for local Secrets Manager reads."""
+    return (
+        os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or _DEFAULT_AWS_REGION
+    )
+
+
+def _resolve_turbopuffer_api_key(
+    *,
+    project_root: Path | None = None,
+    secrets_client: Any | None = None,
+) -> str | None:
+    """Resolve the API key from env, repo .env, or AWS Secrets Manager."""
+    api_key = os.environ.get(_TURBOPUFFER_API_KEY_ENV)
+    if api_key:
+        return api_key
+
+    env_path = (project_root or _PROJECT_ROOT) / ".env"
+    api_key = _load_dotenv_value(env_path, _TURBOPUFFER_API_KEY_ENV)
+    if api_key:
+        return api_key
+
+    try:
+        if secrets_client is None:
+            import boto3
+
+            secrets_client = boto3.client(
+                "secretsmanager",
+                region_name=_aws_region(),
+            )
+        response = secrets_client.get_secret_value(
+            SecretId=_TURBOPUFFER_API_KEY_SECRET
+        )
+    except Exception:
+        return None
+
+    secret_string = response.get("SecretString")
+    if not isinstance(secret_string, str):
+        return None
+    return _secret_string_value(secret_string)
 
 
 def _parse_filter_key(key: str) -> tuple[str, str]:
@@ -68,12 +166,13 @@ def translate_filters(filters: dict | None) -> tuple | None:
 class TurbopufferBackend(SearchBackend):
     """SearchBackend backed by the Turbopuffer vector database.
 
-    The API key is read automatically by the SDK from the
-    ``TURBOPUFFER_API_KEY`` environment variable.
+    Local workflows resolve the API key from process env, repo ``.env``,
+    or AWS Secrets Manager before constructing the SDK client.
     """
 
     def __init__(self, region: str = "gcp-us-central1") -> None:
-        self._client = Turbopuffer(region=region)
+        api_key = _resolve_turbopuffer_api_key()
+        self._client = Turbopuffer(api_key=api_key, region=region)
         self._telemetry_events: list[dict[str, Any]] = []
 
     # -- helpers -------------------------------------------------------------

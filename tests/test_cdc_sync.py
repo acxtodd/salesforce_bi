@@ -569,17 +569,27 @@ class TestCDCEntityMap:
         assert "ascendix__Property__ChangeEvent" in CDC_ENTITY_MAP
         assert "ascendix__Lease__ChangeEvent" in CDC_ENTITY_MAP
         assert "ascendix__Availability__ChangeEvent" in CDC_ENTITY_MAP
+        assert "AccountChangeEvent" in CDC_ENTITY_MAP
+        assert "ContactChangeEvent" in CDC_ENTITY_MAP
 
     def test_non_namespaced_entities_present(self):
         assert "Property__ChangeEvent" in CDC_ENTITY_MAP
         assert "Lease__ChangeEvent" in CDC_ENTITY_MAP
         assert "Availability__ChangeEvent" in CDC_ENTITY_MAP
+        assert "Account" in CDC_ENTITY_MAP
+        assert "Contact" in CDC_ENTITY_MAP
 
     def test_mapping_values(self):
         assert CDC_ENTITY_MAP["ascendix__Property__ChangeEvent"] == "ascendix__Property__c"
         assert CDC_ENTITY_MAP["Property__ChangeEvent"] == "ascendix__Property__c"
         assert CDC_ENTITY_MAP["ascendix__Lease__ChangeEvent"] == "ascendix__Lease__c"
         assert CDC_ENTITY_MAP["Lease__ChangeEvent"] == "ascendix__Lease__c"
+        assert CDC_ENTITY_MAP["AccountChangeEvent"] == "Account"
+        assert CDC_ENTITY_MAP["ContactChangeEvent"] == "Contact"
+
+    def test_deal_and_sale_removed_from_live_cdc_scope(self):
+        assert "ascendix__Deal__ChangeEvent" not in CDC_ENTITY_MAP
+        assert "ascendix__Sale__ChangeEvent" not in CDC_ENTITY_MAP
 
 
 # ===================================================================

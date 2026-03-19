@@ -101,44 +101,6 @@ EXCLUDED_PARENT_COMPACT_FIELDS = {
     "OwnerId",
 }
 
-POC_PARENT_REF_ALLOWLIST: Dict[str, Set[str]] = {
-    "ascendix__Property__c": {
-        "ascendix__OwnerLandlord__c",
-        "ascendix__Market__c",
-        "ascendix__SubMarket__c",
-    },
-    "ascendix__Lease__c": {
-        "ascendix__Property__c",
-        "ascendix__Tenant__c",
-        "ascendix__OwnerLandlord__c",
-    },
-    "ascendix__Availability__c": {
-        "ascendix__Property__c",
-    },
-}
-
-POC_PARENT_EXTRA_FIELD_ALLOWLIST: Dict[str, Dict[str, Set[str]]] = {
-    "ascendix__Lease__c": {
-        "ascendix__Property__c": {
-            "ascendix__City__c",
-            "ascendix__State__c",
-            "ascendix__PropertyClass__c",
-            "ascendix__PropertySubType__c",
-            "ascendix__TotalBuildingArea__c",
-        },
-    },
-    "ascendix__Availability__c": {
-        "ascendix__Property__c": {
-            "ascendix__City__c",
-            "ascendix__State__c",
-            "ascendix__PropertyClass__c",
-            "ascendix__PropertySubType__c",
-            "ascendix__TotalBuildingArea__c",
-        },
-    },
-}
-
-
 def _as_dict(value: Any) -> Dict[str, Any]:
     """Normalize null-shaped API payloads to an empty dict."""
     return value if isinstance(value, dict) else {}
@@ -159,20 +121,26 @@ def _is_excluded_direct_field(meta: "ObjectMetadata", field_name: str) -> bool:
     return finfo.get("type") == "boolean"
 
 
+def _is_geocoordinate_field(field_info: Dict[str, Any]) -> bool:
+    """Return True for Salesforce geospatial fields and their components."""
+    name = field_info.get("name", "")
+    if name.endswith("__Latitude__s") or name.endswith("__Longitude__s"):
+        return True
+    compound_name = field_info.get("compoundFieldName") or ""
+    return compound_name.endswith("__c")
+
+
 def _should_include_parent_ref(
     object_name: str,
     ref_field: str,
     parent_obj: str,
 ) -> bool:
-    """Return True when a parent reference is useful for current POC configs."""
+    """Return True when a direct parent reference should be denormalized."""
     if ref_field in EXCLUDED_PARENT_REF_FIELDS:
         return False
     if parent_obj in EXCLUDED_PARENT_OBJECTS:
         return False
     if parent_obj == object_name:
-        return False
-    allowed_refs = POC_PARENT_REF_ALLOWLIST.get(object_name)
-    if allowed_refs is not None and ref_field not in allowed_refs:
         return False
     return True
 
@@ -185,21 +153,14 @@ def _should_include_parent_field(
     is_name_field: bool = False,
     is_dot_notation: bool = False,
 ) -> bool:
-    """Return True when a parent-derived field is worth keeping."""
+    """Return True when a parent-derived summary field is worth keeping."""
     if not field_name:
         return False
     if field_name in EXCLUDED_PARENT_COMPACT_FIELDS:
         return False
     if field_name.startswith("toLabel("):
         return False
-    if is_name_field:
-        return True
-    if is_dot_notation:
-        return True
-    allowed_fields = POC_PARENT_EXTRA_FIELD_ALLOWLIST.get(object_name, {}).get(
-        ref_field, set()
-    )
-    return field_name in allowed_fields
+    return True
 
 
 # ===================================================================
@@ -609,6 +570,13 @@ def build_config_for_object(
             embed_fields.append((fname, sc, fs.provenance_str))
         elif sc >= THRESHOLD_METADATA:
             metadata_fields.append((fname, sc, fs.provenance_str))
+
+    emitted_direct_fields = {name for name, _, _ in embed_fields + metadata_fields}
+    for fname, finfo in sorted(meta.fields.items()):
+        if fname in emitted_direct_fields or _is_excluded_direct_field(meta, fname):
+            continue
+        if _is_geocoordinate_field(finfo):
+            metadata_fields.append((fname, THRESHOLD_METADATA, "geocoordinate"))
 
     # --- Parent denormalization ---
     parents: Dict[str, List[Tuple[str, str]]] = {}  # ref_field → [(field, comment)]
@@ -1081,6 +1049,8 @@ def main() -> None:
             "ascendix__Property__c",
             "ascendix__Lease__c",
             "ascendix__Availability__c",
+            "ascendix__Deal__c",
+            "ascendix__Sale__c",
         ],
         help="Salesforce object API names to process.",
     )

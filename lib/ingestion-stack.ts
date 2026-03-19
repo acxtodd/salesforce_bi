@@ -34,7 +34,7 @@ interface IngestionStackProps extends cdk.StackProps {
   // Zero-Config Schema Discovery table
   schemaCacheTable?: dynamodb.Table;
   // Audit trail bucket
-  auditBucket?: s3.Bucket;
+  auditBucket?: s3.IBucket;
 }
 
 // Shared exclude patterns for Lambda asset bundling
@@ -145,21 +145,33 @@ export class IngestionStack extends cdk.Stack {
         },
       );
 
-      // Define CDC objects to sync (POC scope: 5 Ascendix CRE objects)
+      // Define CDC objects to sync (demo scope: 3 CRE objects + Account/Contact)
       const cdcObjects = [
-        "ascendix__Property__ChangeEvent",
-        "ascendix__Lease__ChangeEvent",
-        "ascendix__Availability__ChangeEvent",
-        "ascendix__Deal__ChangeEvent",
-        "ascendix__Sale__ChangeEvent",
+        {
+          changeEventObject: "ascendix__Property__ChangeEvent",
+          sobjectName: "ascendix__Property__c",
+        },
+        {
+          changeEventObject: "ascendix__Lease__ChangeEvent",
+          sobjectName: "ascendix__Lease__c",
+        },
+        {
+          changeEventObject: "ascendix__Availability__ChangeEvent",
+          sobjectName: "ascendix__Availability__c",
+        },
+        {
+          changeEventObject: "AccountChangeEvent",
+          sobjectName: "Account",
+        },
+        {
+          changeEventObject: "ContactChangeEvent",
+          sobjectName: "Contact",
+        },
       ];
 
       // Create AppFlow flow for each CDC object
-      cdcObjects.forEach((objectName) => {
-        // ascendix__Property__ChangeEvent → ascendix__Property__c
-        const sobjectName = objectName.replace("ChangeEvent", "c");
-
-        const flow = new appflow.CfnFlow(this, `CDCFlow${objectName}`, {
+      cdcObjects.forEach(({ changeEventObject, sobjectName }) => {
+        const flow = new appflow.CfnFlow(this, `CDCFlow${changeEventObject}`, {
           flowName: `salesforce-ai-search-cdc-${sobjectName.toLowerCase()}`,
           triggerConfig: {
             triggerType: "Event",
@@ -169,7 +181,7 @@ export class IngestionStack extends cdk.Stack {
             connectorProfileName: connectorProfile.connectorProfileName,
             sourceConnectorProperties: {
               salesforce: {
-                object: objectName,
+                object: changeEventObject,
                 enableDynamicFieldUpdate: false,
               },
             },

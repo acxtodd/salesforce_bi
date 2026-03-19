@@ -38,7 +38,9 @@ from lib.denormalize import (
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL_ID,
     FULL_TEXT_SEARCH_SCHEMA,
+    build_tpuf_schema,
     build_document,
+    build_relationship_map as build_relationship_spec_map,
     build_soql,
     build_text,
     clean_label,
@@ -144,14 +146,9 @@ def get_sf_client(args) -> SalesforceClient:
 
 def build_relationship_map(
     sf_client: SalesforceClient, object_name: str
-) -> dict[str, str]:
-    """Return {field_api_name: relationshipName} for all reference fields."""
-    desc = sf_client.describe(object_name)
-    rel_map = {}
-    for field in desc["fields"]:
-        if field["type"] == "reference" and field.get("relationshipName"):
-            rel_map[field["name"]] = field["relationshipName"]
-    return rel_map
+) -> dict[str, dict[str, str]]:
+    """Return lookup metadata for all reference fields on an object."""
+    return build_relationship_spec_map(sf_client, object_name)
 
 
 def validate_parents(
@@ -249,15 +246,19 @@ def upsert_documents(
     """Upsert documents in batches of 100. Schema on first batch only."""
     if not documents:
         return
+    schema = build_tpuf_schema(documents, base_schema=FULL_TEXT_SEARCH_SCHEMA)
     for i in range(0, len(documents), UPSERT_BATCH_SIZE):
         batch = documents[i : i + UPSERT_BATCH_SIZE]
-        schema = FULL_TEXT_SEARCH_SCHEMA if i == 0 else None
         LOG.info(
             "  Upserting batch %d (%d docs)",
             i // UPSERT_BATCH_SIZE + 1,
             len(batch),
         )
-        backend.upsert(namespace, documents=batch, schema=schema)
+        backend.upsert(
+            namespace,
+            documents=batch,
+            schema=schema if i == 0 else None,
+        )
 
 
 def _embed_batch_with_retry(
@@ -410,7 +411,12 @@ def load_object(
                 record, embed_fields, metadata_fields, parent_config, rel_map
             )
             text = build_text(
-                direct_fields, parent_fields, embed_fields, parent_config, object_name
+                direct_fields,
+                parent_fields,
+                embed_fields,
+                parent_config,
+                object_name,
+                rel_map,
             )
         except Exception as exc:
             LOG.warning(
@@ -483,6 +489,7 @@ def load_object(
                 embed_field_names=embed_fields,
                 metadata_field_names=metadata_fields,
                 parent_config=parent_config,
+                rel_map=rel_map,
             )
             for k, v in sample_doc.items():
                 if k == "vector":
@@ -521,6 +528,7 @@ def load_object(
                 embed_field_names=embed_fields,
                 metadata_field_names=metadata_fields,
                 parent_config=parent_config,
+                rel_map=rel_map,
             )
         except Exception as exc:
             LOG.warning("  Skipping record %s during document build: %s", record_id, exc)

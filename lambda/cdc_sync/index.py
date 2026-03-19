@@ -40,7 +40,9 @@ from lib.denormalize import (  # noqa: E402
     EMBEDDING_DIMENSIONS,
     EMBEDDING_MODEL_ID,
     FULL_TEXT_SEARCH_SCHEMA,
+    build_tpuf_schema,
     build_document,
+    build_relationship_map as build_relationship_spec_map,
     build_soql,
     build_text,
     flatten,
@@ -64,20 +66,18 @@ CDC_ENTITY_MAP: dict[str, str] = {
     "ascendix__Property__ChangeEvent": "ascendix__Property__c",
     "ascendix__Lease__ChangeEvent": "ascendix__Lease__c",
     "ascendix__Availability__ChangeEvent": "ascendix__Availability__c",
-    "ascendix__Deal__ChangeEvent": "ascendix__Deal__c",
-    "ascendix__Sale__ChangeEvent": "ascendix__Sale__c",
+    "AccountChangeEvent": "Account",
+    "ContactChangeEvent": "Contact",
     # Non-namespaced fallbacks
     "Property__ChangeEvent": "ascendix__Property__c",
     "Lease__ChangeEvent": "ascendix__Lease__c",
     "Availability__ChangeEvent": "ascendix__Availability__c",
-    "Deal__ChangeEvent": "ascendix__Deal__c",
-    "Sale__ChangeEvent": "ascendix__Sale__c",
     # AppFlow CDC uses SObject names (not ChangeEvent channel names) as entityName
     "ascendix__Property__c": "ascendix__Property__c",
     "ascendix__Lease__c": "ascendix__Lease__c",
     "ascendix__Availability__c": "ascendix__Availability__c",
-    "ascendix__Deal__c": "ascendix__Deal__c",
-    "ascendix__Sale__c": "ascendix__Sale__c",
+    "Account": "Account",
+    "Contact": "Contact",
 }
 
 # ---------------------------------------------------------------------------
@@ -286,15 +286,12 @@ def _get_s3_client() -> Any:
 
 def _get_relationship_map(
     sf_client: SalesforceClient, object_name: str
-) -> dict[str, str]:
+) -> dict[str, dict[str, str]]:
     """Get or build relationship map for an object (cached per object)."""
     if object_name not in _relationship_maps:
-        desc = sf_client.describe(object_name)
-        rel_map: dict[str, str] = {}
-        for fld in desc["fields"]:
-            if fld["type"] == "reference" and fld.get("relationshipName"):
-                rel_map[fld["name"]] = fld["relationshipName"]
-        _relationship_maps[object_name] = rel_map
+        _relationship_maps[object_name] = build_relationship_spec_map(
+            sf_client, object_name
+        )
     return _relationship_maps[object_name]
 
 
@@ -478,6 +475,7 @@ def _process_cdc_event(
                     embed_fields,
                     parent_config,
                     object_name,
+                    rel_map,
                 )
 
                 # Write denorm audit artifact (pre-vector, human-readable)
@@ -512,11 +510,15 @@ def _process_cdc_event(
                     embed_field_names=embed_fields,
                     metadata_field_names=metadata_fields,
                     parent_config=parent_config,
+                    rel_map=rel_map,
                 )
                 backend.upsert(
                     namespace,
                     documents=[doc],
-                    schema=FULL_TEXT_SEARCH_SCHEMA,
+                    schema=build_tpuf_schema(
+                        [doc],
+                        base_schema=FULL_TEXT_SEARCH_SCHEMA,
+                    ),
                 )
                 LOG.info("Upserted %s %s", object_name, record_id)
 

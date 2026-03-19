@@ -47,6 +47,27 @@ SAMPLE_REL_MAP = {
     "ascendix__OwnerLandlord__c": "ascendix__OwnerLandlord__r",
 }
 
+SAMPLE_REL_META = {
+    "ascendix__Property__c": {
+        "relationship_name": "ascendix__Property__r",
+        "relationship_label": "Property",
+        "parent_object_api": "ascendix__Property__c",
+        "parent_object_label": "Property",
+    },
+    "ascendix__Tenant__c": {
+        "relationship_name": "ascendix__Tenant__r",
+        "relationship_label": "Tenant",
+        "parent_object_api": "Account",
+        "parent_object_label": "Account",
+    },
+    "ascendix__OwnerLandlord__c": {
+        "relationship_name": "ascendix__OwnerLandlord__r",
+        "relationship_label": "Owner/Landlord",
+        "parent_object_api": "Account",
+        "parent_object_label": "Account",
+    },
+}
+
 SAMPLE_EMBED_FIELDS = [
     "ascendix__LeaseType__c",
     "Name",
@@ -102,6 +123,9 @@ class TestCleanLabel:
 
     def test_id_field(self):
         assert clean_label("Id") == "Id"
+
+    def test_standard_lookup_suffix_is_trimmed(self):
+        assert clean_label("AccountId") == "Account"
 
 
 # ===================================================================
@@ -394,7 +418,12 @@ class TestBuildDocument:
 
     def test_parent_field_keys_prefixed_and_cleaned(self):
         doc = build_document(
-            direct_fields={"Id": "a0x1", "LastModifiedDate": "2025-01-01"},
+            direct_fields={
+                "Id": "a0x1",
+                "LastModifiedDate": "2025-01-01",
+                "ascendix__Property__c": "a0y1",
+                "ascendix__Tenant__c": "0011",
+            },
             parent_fields={
                 "ascendix__Property__c": {
                     "Name": "One Arts Plaza",
@@ -413,7 +442,10 @@ class TestBuildDocument:
                 "ascendix__Property__c": ["Name", "ascendix__City__c"],
                 "ascendix__Tenant__c": ["Industry"],
             },
+            rel_map=SAMPLE_REL_META,
         )
+        assert doc["property_id"] == "a0y1"
+        assert doc["tenant_id"] == "0011"
         assert doc["property_name"] == "One Arts Plaza"
         assert doc["property_city"] == "Dallas"
         assert doc["tenant_industry"] == "Technology"
@@ -483,36 +515,51 @@ class TestRelationshipMap:
 
     def test_reference_fields_included(self):
         sf = MagicMock()
-        sf.describe.return_value = self._make_describe_response(
-            [
-                {
-                    "name": "ascendix__Property__c",
-                    "type": "reference",
-                    "relationshipName": "ascendix__Property__r",
-                },
-                {
-                    "name": "ascendix__Tenant__c",
-                    "type": "reference",
-                    "relationshipName": "ascendix__Tenant__r",
-                },
-            ]
-        )
+        sf.describe.side_effect = [
+            self._make_describe_response(
+                [
+                    {
+                        "name": "ascendix__Property__c",
+                        "type": "reference",
+                        "relationshipName": "ascendix__Property__r",
+                        "referenceTo": ["ascendix__Property__c"],
+                        "label": "Property",
+                    },
+                    {
+                        "name": "ascendix__Tenant__c",
+                        "type": "reference",
+                        "relationshipName": "ascendix__Tenant__r",
+                        "referenceTo": ["Account"],
+                        "label": "Tenant",
+                    },
+                ]
+            ),
+            {"label": "Property"},
+            {"label": "Account"},
+        ]
         rel_map = build_relationship_map(sf, "ascendix__Lease__c")
-        assert rel_map["ascendix__Property__c"] == "ascendix__Property__r"
-        assert rel_map["ascendix__Tenant__c"] == "ascendix__Tenant__r"
+        assert rel_map["ascendix__Property__c"]["relationship_name"] == "ascendix__Property__r"
+        assert rel_map["ascendix__Property__c"]["relationship_label"] == "Property"
+        assert rel_map["ascendix__Tenant__c"]["relationship_name"] == "ascendix__Tenant__r"
+        assert rel_map["ascendix__Tenant__c"]["parent_object_label"] == "Account"
 
     def test_non_reference_fields_excluded(self):
         sf = MagicMock()
-        sf.describe.return_value = self._make_describe_response(
+        sf.describe.side_effect = [
+            self._make_describe_response(
             [
                 {"name": "Name", "type": "string"},
                 {
                     "name": "ascendix__Property__c",
                     "type": "reference",
                     "relationshipName": "ascendix__Property__r",
+                    "referenceTo": ["ascendix__Property__c"],
+                    "label": "Property",
                 },
             ]
-        )
+            ),
+            {"label": "Property"},
+        ]
         rel_map = build_relationship_map(sf, "ascendix__Lease__c")
         assert "Name" not in rel_map
 
@@ -682,6 +729,26 @@ class TestUpsertBatching:
         assert calls[0].kwargs["schema"] == FULL_TEXT_SEARCH_SCHEMA
         assert calls[1].kwargs["schema"] is None
         assert calls[2].kwargs["schema"] is None
+
+    def test_schema_scans_all_documents_for_late_numeric_fields(self):
+        backend = MagicMock()
+        docs = [
+            {"id": f"doc_{i}", "vector": [0.0], "text": f"doc {i}"}
+            for i in range(100)
+        ]
+        docs.append(
+            {
+                "id": "doc_late",
+                "vector": [0.0],
+                "text": "late",
+                "ownerlandlord_annualrevenue": 10000000.0,
+            }
+        )
+
+        upsert_documents(backend, "ns", docs)
+
+        schema = backend.upsert.call_args_list[0].kwargs["schema"]
+        assert schema["ownerlandlord_annualrevenue"] == {"type": "float"}
 
     def test_empty_documents_no_calls(self):
         backend = MagicMock()

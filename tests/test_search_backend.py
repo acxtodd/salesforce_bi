@@ -14,6 +14,7 @@ import pytest
 from lib.denormalize import FULL_TEXT_SEARCH_SCHEMA
 from lib.search_backend import SearchBackend
 from lib.turbopuffer_backend import (
+    _resolve_turbopuffer_api_key,
     TurbopufferBackend,
     translate_filters,
     _parse_filter_key,
@@ -75,6 +76,74 @@ class TestTurbopufferBackendImplementsABC:
         for method_name in required:
             assert hasattr(TurbopufferBackend, method_name)
             assert callable(getattr(TurbopufferBackend, method_name))
+
+
+class TestTurbopufferAuthFallback:
+    """Local Turbopuffer auth should resolve without manual shell export."""
+
+    def test_resolve_prefers_process_env(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("TURBOPUFFER_API_KEY", "env-key")
+        (tmp_path / ".env").write_text("TURBOPUFFER_API_KEY=dotenv-key\n")
+
+        assert _resolve_turbopuffer_api_key(project_root=tmp_path) == "env-key"
+
+    def test_resolve_uses_repo_dotenv(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("TURBOPUFFER_API_KEY", raising=False)
+        (tmp_path / ".env").write_text("TURBOPUFFER_API_KEY=dotenv-key\n")
+
+        assert _resolve_turbopuffer_api_key(project_root=tmp_path) == "dotenv-key"
+
+    def test_resolve_uses_secret_when_env_missing(self, monkeypatch, tmp_path):
+        from unittest.mock import MagicMock
+
+        monkeypatch.delenv("TURBOPUFFER_API_KEY", raising=False)
+        secrets_client = MagicMock()
+        secrets_client.get_secret_value.return_value = {
+            "SecretString": "secret-key"
+        }
+
+        assert (
+            _resolve_turbopuffer_api_key(
+                project_root=tmp_path,
+                secrets_client=secrets_client,
+            )
+            == "secret-key"
+        )
+        secrets_client.get_secret_value.assert_called_once_with(
+            SecretId="salesforce-ai-search/turbopuffer-api-key"
+        )
+
+    def test_resolve_returns_none_when_secret_missing(self, monkeypatch, tmp_path):
+        from unittest.mock import MagicMock
+
+        monkeypatch.delenv("TURBOPUFFER_API_KEY", raising=False)
+        secrets_client = MagicMock()
+        secrets_client.get_secret_value.side_effect = RuntimeError("missing")
+
+        assert (
+            _resolve_turbopuffer_api_key(
+                project_root=tmp_path,
+                secrets_client=secrets_client,
+            )
+            is None
+        )
+
+    def test_constructor_passes_resolved_api_key_to_sdk(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        sdk_ctor = MagicMock()
+        monkeypatch.setattr("lib.turbopuffer_backend.Turbopuffer", sdk_ctor)
+        monkeypatch.setattr(
+            "lib.turbopuffer_backend._resolve_turbopuffer_api_key",
+            lambda: "resolved-key",
+        )
+
+        TurbopufferBackend(region="test-region")
+
+        sdk_ctor.assert_called_once_with(
+            api_key="resolved-key",
+            region="test-region",
+        )
 
 
 class TestParseFilterKey:

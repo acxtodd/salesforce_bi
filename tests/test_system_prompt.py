@@ -231,7 +231,7 @@ class TestToolDefinitions:
             assert "required" in schema
 
     def test_search_records_object_types(self):
-        """search_records must list all 3 POC object types."""
+        """search_records must list all active demo object types."""
         search_tool = next(
             d for d in TOOL_DEFINITIONS if d["toolSpec"]["name"] == "search_records"
         )
@@ -240,6 +240,8 @@ class TestToolDefinitions:
         assert "Property" in enum
         assert "Lease" in enum
         assert "Availability" in enum
+        assert "Account" in enum
+        assert "Contact" in enum
 
     def test_search_records_has_filters(self):
         search_tool = next(
@@ -263,7 +265,7 @@ class TestToolDefinitions:
         assert "limit" in schema["properties"]
 
     def test_aggregate_records_object_types(self):
-        """aggregate_records must list all 3 POC object types."""
+        """aggregate_records must list all active demo object types."""
         agg_tool = next(
             d for d in TOOL_DEFINITIONS if d["toolSpec"]["name"] == "aggregate_records"
         )
@@ -272,6 +274,8 @@ class TestToolDefinitions:
         assert "Property" in enum
         assert "Lease" in enum
         assert "Availability" in enum
+        assert "Account" in enum
+        assert "Contact" in enum
 
     def test_aggregate_records_valid_aggregates(self):
         """aggregate_records must list count, sum, avg."""
@@ -350,6 +354,11 @@ class TestBuildSystemPrompt:
         assert "available_sf" in result or "availablearea" in result
         assert "rent_low" in result
         assert "rent_high" in result
+
+    def test_mentions_account_and_contact_scope(self):
+        result = build_system_prompt(SAMPLE_CONFIG)
+        assert "Account" in result
+        assert "Contact" in result
 
     def test_does_not_mention_asking_rate_psf(self):
         result = build_system_prompt(SAMPLE_CONFIG)

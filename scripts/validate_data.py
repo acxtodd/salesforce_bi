@@ -60,7 +60,7 @@ class CheckResult:
 # Helpers
 # ===================================================================
 
-def expected_parent_keys(ref_field: str, parent_fields: list[str]) -> list[str]:
+def expected_parent_keys(ref_field: str, parent_fields: Any) -> list[str]:
     """Derive expected Turbopuffer attribute keys from denorm config parent entry.
 
     Must exactly mirror build_document() logic from bulk_load.py.
@@ -68,6 +68,8 @@ def expected_parent_keys(ref_field: str, parent_fields: list[str]) -> list[str]:
     Example: ref_field="ascendix__Property__c", parent_fields=["Name", "ascendix__City__c"]
     Returns: ["property_name", "property_city"]
     """
+    if isinstance(parent_fields, dict):
+        parent_fields = parent_fields.get("fields", [])
     prefix = clean_label(ref_field).lower()
     return [f"{prefix}_{clean_label(pf).lower()}" for pf in parent_fields]
 

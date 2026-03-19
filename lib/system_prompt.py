@@ -96,6 +96,26 @@ _AVAILABILITY_FIELDS = """\
   - property_type: parent property subtype (denormalized) — subtypes, not primary type
   - property_total_sf: parent property total building area (denormalized)"""
 
+_ACCOUNT_FIELDS = """\
+  - name: company/account name
+  - type: account type
+  - industry: industry classification
+  - phone, website: primary company contact info
+  - billing_city, billing_state, billing_postal_code: billing geography
+  - annual_revenue, number_of_employees: company scale fields
+  - parent_name: parent account name (denormalized)
+  - billing_latitude, billing_longitude, shipping_latitude, shipping_longitude: geocoordinates"""
+
+_CONTACT_FIELDS = """\
+  - name: contact name
+  - title: contact title
+  - email, phone, mobile_phone: primary contact info
+  - department: contact department
+  - mailing_city, mailing_state, mailing_postal_code: mailing geography
+  - account_name: parent account name (denormalized)
+  - reports_to_name: manager/contact hierarchy name (denormalized)
+  - mailing_latitude, mailing_longitude, other_latitude, other_longitude: geocoordinates"""
+
 # ---------------------------------------------------------------------------
 # Few-shot examples
 # ---------------------------------------------------------------------------
@@ -222,8 +242,9 @@ _GUIDELINES = """\
    use the live_salesforce_query tool. All queries must go through
    search_records or aggregate_records.
 
-10. **Object types for POC.** Only Property, Lease, and Availability are
-   available. Sale, Deal, Account, and Contact are out of scope.
+10. **Object types for current demo scope.** Property, Lease, Availability,
+   Account, and Contact are available. Deal and Sale are out of scope for
+   now.
 
 11. **Geography scope is object-specific.** Property supports market and
    submarket. Availability supports native market, submarket, and region when
@@ -251,7 +272,7 @@ You understand the following commercial real estate terminology: {_CRE_VOCABULAR
 
 You have access to two tools:
 
-- **search_records**: Search indexed CRE data (Property, Lease, Availability). \
+- **search_records**: Search indexed CRE and CRM data (Property, Lease, Availability, Account, Contact). \
 Use metadata filters for precise queries. Call multiple times in parallel for \
 cross-object questions. Returns matching documents with relevance scores.
 
@@ -272,6 +293,12 @@ Note: live_salesforce_query is NOT available in this POC.
 ### Availability fields (includes denormalized Property fields)
 {_AVAILABILITY_FIELDS}
 
+### Account fields
+{_ACCOUNT_FIELDS}
+
+### Contact fields
+{_CONTACT_FIELDS}
+
 {_FEW_SHOT_EXAMPLES}
 
 {_GUIDELINES}
@@ -289,7 +316,7 @@ TOOL_DEFINITIONS: list[dict] = [
                 "Search AscendixIQ for CRE records. Returns matching documents "
                 "with relevance scores. Supports full-text BM25, and metadata "
                 "filtering. Use multiple calls in parallel for cross-object queries.\n\n"
-                "Object types: Property, Lease, Availability.\n\n"
+                "Object types: Property, Lease, Availability, Account, Contact.\n\n"
                 "Filter field names (use semantic aliases):\n"
                 "  Property: city, state, property_class, property_type, total_sf, "
                 "year_built, floors, building_status, market, submarket, county, "
@@ -303,7 +330,13 @@ TOOL_DEFINITIONS: list[dict] = [
                 "asking_price, available_date, max_contiguous, min_divisible, "
                 "lease_type, lease_term_min, lease_term_max, market, submarket, "
                 "region, property_name, property_city, property_state, "
-                "property_class, property_type, property_total_sf\n\n"
+                "property_class, property_type, property_total_sf\n"
+                "  Account: name, type, industry, phone, website, billing_city, "
+                "billing_state, billing_postal_code, annual_revenue, "
+                "number_of_employees, parent_name\n"
+                "  Contact: name, title, email, phone, mobile_phone, department, "
+                "mailing_city, mailing_state, mailing_postal_code, account_name, "
+                "reports_to_name\n\n"
                 "Filter operators: append _gte, _lte, _gt, _lt, _in, _ne to field names."
             ),
             "inputSchema": {
@@ -312,8 +345,8 @@ TOOL_DEFINITIONS: list[dict] = [
                     "properties": {
                         "object_type": {
                             "type": "string",
-                            "enum": ["Property", "Lease", "Availability"],
-                            "description": "The CRE object type to search.",
+                            "enum": ["Property", "Lease", "Availability", "Account", "Contact"],
+                            "description": "The indexed object type to search.",
                         },
                         "filters": {
                             "type": "object",
@@ -349,7 +382,7 @@ TOOL_DEFINITIONS: list[dict] = [
                 "Count, sum, or average CRE records matching criteria, optionally "
                 "grouped by a field. Use for 'how many,' 'total,' 'average,' "
                 "'breakdown' questions.\n\n"
-                "Object types: Property, Lease, Availability.\n\n"
+                "Object types: Property, Lease, Availability, Account, Contact.\n\n"
                 "Supported aggregates: count, sum, avg.\n"
                 "For sum/avg, aggregate_field is required."
             ),
@@ -359,8 +392,8 @@ TOOL_DEFINITIONS: list[dict] = [
                     "properties": {
                         "object_type": {
                             "type": "string",
-                            "enum": ["Property", "Lease", "Availability"],
-                            "description": "The CRE object type to aggregate.",
+                            "enum": ["Property", "Lease", "Availability", "Account", "Contact"],
+                            "description": "The indexed object type to aggregate.",
                         },
                         "filters": {
                             "type": "object",
@@ -448,7 +481,7 @@ def build_system_prompt(config: dict) -> str:
     field_map = _collect_field_names(config)
 
     field_sections: list[str] = []
-    for obj_type in ("property", "lease", "availability"):
+    for obj_type in ("property", "lease", "availability", "account", "contact"):
         if obj_type not in field_map:
             continue
         fields = field_map[obj_type]
@@ -473,7 +506,7 @@ You understand the following commercial real estate terminology: {_CRE_VOCABULAR
 
 You have access to two tools:
 
-- **search_records**: Search indexed CRE data (Property, Lease, Availability). \
+- **search_records**: Search indexed CRE and CRM data (Property, Lease, Availability, Account, Contact). \
 Use metadata filters for precise queries. Call multiple times in parallel for \
 cross-object questions. Returns matching documents with relevance scores.
 

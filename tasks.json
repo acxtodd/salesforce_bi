@@ -1091,7 +1091,7 @@
       "phase": 3,
       "name": "Validation Gate",
       "description": "Full acceptance test suite, side-by-side comparison, cost measurement, go/no-go decision.",
-      "status": "pending",
+      "status": "completed",
       "tasks": [
         {
           "id": "3.1",
@@ -1227,12 +1227,12 @@
           "id": "3.3",
           "title": "Analyze regressions and make go/no-go decision",
           "description": "Orchestrator task — split into subtasks 3.3.1 through 3.3.3.",
-          "status": "pending",
+          "status": "completed",
           "owner": "",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-14T22:28:02.830123+00:00",
+          "updatedAt": "2026-03-20T12:01:37.490849+00:00",
           "startedAt": null,
-          "completedAt": null,
+          "completedAt": "2026-03-20T12:01:37.490992+00:00",
           "depends_on": [
             "3.1",
             "3.2"
@@ -1241,7 +1241,12 @@
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": []
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T12:01:37.490994+00:00",
+              "note": "All subtasks done: 3.3.1 root-cause analysis, 3.3.2 regression fixes, 3.3.3 go/no-go doc (CONDITIONAL GO). Commit e5b1c40."
+            }
+          ]
         },
         {
           "id": "3.3.1",
@@ -1649,14 +1654,19 @@
         {
           "id": "3.3.3",
           "title": "Go/no-go decision document",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T22:28:03.433180+00:00",
-          "updatedAt": "2026-03-14T22:28:03.613905+00:00",
+          "updatedAt": "2026-03-20T12:01:37.437623+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T12:01:37.437808+00:00",
+              "note": "Go/no-go decision document written at docs/go_no_go_decision.md. Recommendation: CONDITIONAL GO. 652/652 tests pass, cost /mo within  target, 5 unresolved items with mitigations. Commit e5b1c40."
+            }
+          ],
           "parent": "3.3",
           "description": "Write the go/no-go decision document. Inputs: acceptance test results (3.1), cost comparison (3.2), regression analysis (3.3.1-2). Document: final pass rate, final cost, remaining gaps, risk assessment, recommendation (go / conditional go / no-go). If go: outline Phase 5 production cutover plan.",
           "acceptance_criteria": [
@@ -1669,7 +1679,8 @@
           "depends_on": [
             "3.3.2",
             "3.2"
-          ]
+          ],
+          "completedAt": "2026-03-20T12:01:37.437805+00:00"
         },
         {
           "id": "3.4",
@@ -1749,21 +1760,27 @@
         {
           "id": "3.6",
           "title": "Pass record context from LWC to query Lambda",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T21:11:02.572059+00:00",
-          "updatedAt": "2026-03-18T21:11:18.850551+00:00",
+          "updatedAt": "2026-03-20T12:01:37.541583+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T12:01:37.541739+00:00",
+              "note": "LWC sends recordId in request body, Apex forwards as record_id, Lambda prepends record context to question. Commit e5b1c40."
+            }
+          ],
           "description": "When ascendixAiSearch is placed on a record page (e.g. Account), the @api recordId is available but never sent in the request payload. The Apex controller sends only question, org_id, and session_id. Claude cannot resolve which record the user is viewing, so record-context queries like 'any leases for this account?' get a generic 'which account?' response. Fix: include recordId in the LWC request body, pass through Apex to the query Lambda, and provide it as context so Claude can use live_salesforce_query to resolve the record.",
           "acceptance_criteria": [
             "LWC includes recordId in the request body when on a record page",
             "Apex controller forwards recordId to the query Lambda",
             "Query Lambda provides record context to Claude so it can resolve the current record",
             "Record-context query on an Account page returns results scoped to that account"
-          ]
+          ],
+          "completedAt": "2026-03-20T12:01:37.541737+00:00"
         },
         {
           "id": "3.7",

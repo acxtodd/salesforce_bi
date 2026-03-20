@@ -479,7 +479,8 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
 
             const requestBody = {
                 query: this.queryText,
-                sessionId: this.sessionId
+                sessionId: this.sessionId,
+                ...(this.recordId ? { recordId: this.recordId } : {})
             };
 
             // Store for retry

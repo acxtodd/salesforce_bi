@@ -177,6 +177,7 @@ def handler(event: dict, context: Any) -> dict:
     question = body.get("question")
     org_id = body.get("org_id")
     session_id = body.get("session_id", "")
+    record_id = body.get("record_id", "")
 
     errors: list[str] = []
     if not question or not isinstance(question, str) or not question.strip():
@@ -231,7 +232,14 @@ def handler(event: dict, context: Any) -> dict:
             system_prompt=_SYSTEM_PROMPT,
             tool_definitions=_TOOL_DEFINITIONS,
         )
-        result: QueryResult = qh.query(question)
+        # Prepend record context so Claude knows which record the user is viewing.
+        effective_question = question
+        if record_id:
+            effective_question = (
+                f"[The user is currently viewing Salesforce record {record_id}.] "
+                f"{question}"
+            )
+        result: QueryResult = qh.query(effective_question)
     except Exception as exc:
         logger.exception("QueryHandler failed")
         return {

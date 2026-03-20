@@ -1150,12 +1150,12 @@
           "id": "3.2",
           "title": "Measure actual cost",
           "description": "Collect actual billing from Turbopuffer and AWS for the POC period. Compare against current system's cost baseline.",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-14T00:00:00Z",
-          "updatedAt": "2026-03-18T14:40:26.705242+00:00",
+          "updatedAt": "2026-03-20T11:56:42.305255+00:00",
           "startedAt": "2026-03-18T14:39:40.635229+00:00",
-          "completedAt": null,
+          "completedAt": "2026-03-20T11:56:42.305419+00:00",
           "depends_on": [
             "2.3"
           ],
@@ -1181,6 +1181,10 @@
             {
               "timestamp": "2026-03-18T14:40:26.705397+00:00",
               "note": "Deferred on 2026-03-18 to prioritize product/UAT stability over premature cost modeling."
+            },
+            {
+              "timestamp": "2026-03-20T11:56:42.305422+00:00",
+              "note": "Cost analysis done 2026-03-20. AI Search projected at 176.88/mo — within 200/mo target. Bedrock LLM 127/mo, Lambda 37/mo, Turbopuffer ~5/mo. Legacy graph system at 1204/mo is the decommission savings target. Steady-state (no bulk loads) estimated at 80-90/mo."
             }
           ]
         },
@@ -1721,20 +1725,26 @@
         {
           "id": "3.5",
           "title": "Fix citation click navigation in LWC",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T21:10:55.507911+00:00",
-          "updatedAt": "2026-03-18T21:11:16.855685+00:00",
+          "updatedAt": "2026-03-20T11:58:51.453291+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T11:58:51.453473+00:00",
+              "note": "Already fixed by task 4.11 (commit 2ce4f98) which switched navigateToRecord to direct window.open URLs. Further improved by 7b03577 (all search results as citations for complete hyperlink map). All 3 ACs verified in current code."
+            }
+          ],
           "description": "Clicking a citation in the ascendixAiSearch LWC citations drawer does not navigate to the Salesforce record. Pre-existing bug discovered during LWC first smoke test on 2026-03-18. The handleCitationClick handler calls openCitationPreview which should call navigateToRecord via NavigationMixin, but navigation does not occur. Classify as ui rendering issue.",
           "acceptance_criteria": [
             "Citation click in the drawer navigates to the correct Salesforce record page",
             "Ctrl/Cmd+click opens the record in a new tab",
             "Inline answer hyperlinks also navigate correctly"
-          ]
+          ],
+          "completedAt": "2026-03-20T11:58:51.453470+00:00"
         },
         {
           "id": "3.6",
@@ -1758,15 +1768,21 @@
         {
           "id": "3.7",
           "title": "Set AUDIT_BUCKET env var on CDC Lambda",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-18T21:14:07.964126+00:00",
-          "updatedAt": "2026-03-18T21:14:07.964330+00:00",
+          "updatedAt": "2026-03-20T11:58:53.080551+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
-          "description": "The cdc_sync Lambda reads AUDIT_BUCKET from its environment to enable S3 audit trail writes. The env var is not yet set. Set AUDIT_BUCKET=salesforce-ai-search-audit-382211616288-us-west-2 on the salesforce-ai-search-cdc-sync Lambda configuration. This aligns CDC with the bulk_load default (which now audits by default)."
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T11:58:53.080703+00:00",
+              "note": "Set AUDIT_BUCKET=salesforce-ai-search-audit-382211616288-us-west-2 on salesforce-ai-search-cdc-sync Lambda via update-function-configuration. CDK code in ingestion-stack.ts already passes props.auditBucket — will persist on next Ingestion stack deploy."
+            }
+          ],
+          "description": "The cdc_sync Lambda reads AUDIT_BUCKET from its environment to enable S3 audit trail writes. The env var is not yet set. Set AUDIT_BUCKET=salesforce-ai-search-audit-382211616288-us-west-2 on the salesforce-ai-search-cdc-sync Lambda configuration. This aligns CDC with the bulk_load default (which now audits by default).",
+          "completedAt": "2026-03-20T11:58:53.080700+00:00"
         }
       ]
     },

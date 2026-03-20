@@ -12,11 +12,14 @@ public with sharing class AscendixAISearchController {
         try {
             Map<String, Object> requestBody = (Map<String, Object>) JSON.deserializeUntyped(requestBodyJson);
 
-            // Build payload for /query endpoint: question, org_id, session_id
+            // Build payload for /query endpoint: question, org_id, session_id, record_id
             Map<String, Object> newPayload = new Map<String, Object>();
             newPayload.put('question', (String) requestBody.get('query'));
             newPayload.put('org_id', UserInfo.getOrganizationId());
             newPayload.put('session_id', (String) requestBody.get('sessionId'));
+            if (requestBody.containsKey('recordId') && requestBody.get('recordId') != null) {
+                newPayload.put('record_id', (String) requestBody.get('recordId'));
+            }
 
             HttpRequest req = new HttpRequest();
             req.setEndpoint(QUERY_CREDENTIAL + '/query');

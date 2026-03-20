@@ -2805,7 +2805,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:29:39.860463+00:00",
-          "updatedAt": "2026-03-20T10:39:31.319669+00:00",
+          "updatedAt": "2026-03-20T10:55:40.193620+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2813,6 +2813,10 @@
             {
               "timestamp": "2026-03-20T10:39:31.319834+00:00",
               "note": "All subtasks done: prompt shaping (4.12.1), renderer cleanup (4.12.2), table rendering (4.12.5), styling (4.12.3), regression tests (4.12.4)"
+            },
+            {
+              "timestamp": "2026-03-20T10:55:40.193781+00:00",
+              "note": "Committed in d18605f"
             }
           ],
           "description": "Address the current help/onboarding failure mode where broad capability questions render as dense wall-of-text answers in the Ascendix AI Search LWC. Coordinate prompt-output shaping, answer rendering cleanup, readability improvements, and regression coverage so broad help queries are concise and scannable without regressing normal search behavior.",
@@ -2828,7 +2832,7 @@
             "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html",
             "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.css"
           ],
-          "completedAt": "2026-03-20T10:39:31.319832+00:00"
+          "completedAt": "2026-03-20T10:55:40.193778+00:00"
         },
         {
           "id": "4.12.1",
@@ -2836,7 +2840,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:29:46.210527+00:00",
-          "updatedAt": "2026-03-20T10:39:27.056919+00:00",
+          "updatedAt": "2026-03-20T10:55:40.244908+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2844,6 +2848,10 @@
             {
               "timestamp": "2026-03-20T10:39:27.057929+00:00",
               "note": "Added guideline 17 to _build_guidelines() in lib/system_prompt.py for help/onboarding response shaping"
+            },
+            {
+              "timestamp": "2026-03-20T10:55:40.245086+00:00",
+              "note": "Committed in d18605f"
             }
           ],
           "description": "Update the query-agent prompt behavior for broad help requests such as 'what can you do?' or 'what kinds of searches can you do?' so the agent returns a short onboarding answer instead of a long capability dump. Keep normal search questions on the existing tool-use path.",
@@ -2863,7 +2871,7 @@
             "4.10"
           ],
           "gate_criteria": "Use the current 11-object prompt improvements as the baseline; refine output shape without regressing object coverage or current QA fixes.",
-          "completedAt": "2026-03-20T10:39:27.057927+00:00"
+          "completedAt": "2026-03-20T10:55:40.245083+00:00"
         },
         {
           "id": "4.12.2",
@@ -2871,7 +2879,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:29:52.351207+00:00",
-          "updatedAt": "2026-03-20T10:39:27.107577+00:00",
+          "updatedAt": "2026-03-20T10:55:40.294889+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2879,6 +2887,10 @@
             {
               "timestamp": "2026-03-20T10:39:27.107713+00:00",
               "note": "Replaced two-pass list processing with unified state machine in ascendixAiSearch.js formattedAnswer getter"
+            },
+            {
+              "timestamp": "2026-03-20T10:55:40.295032+00:00",
+              "note": "Committed in d18605f"
             }
           ],
           "description": "Reduce formatting fragility in the Ascendix AI Search LWC answer renderer so broad help responses and normal search answers render consistently as readable headings, paragraphs, bullets, and numbered lists without malformed wrappers or accidental wall-of-text output.",
@@ -2897,7 +2909,7 @@
             "4.12.1"
           ],
           "gate_criteria": "Align supported rendering behavior with the tightened help/onboarding response shape before broadening formatter changes.",
-          "completedAt": "2026-03-20T10:39:27.107711+00:00"
+          "completedAt": "2026-03-20T10:55:40.295029+00:00"
         },
         {
           "id": "4.12.3",
@@ -2905,7 +2917,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:29:59.580036+00:00",
-          "updatedAt": "2026-03-20T10:39:27.208193+00:00",
+          "updatedAt": "2026-03-20T10:55:40.346908+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2913,6 +2925,10 @@
             {
               "timestamp": "2026-03-20T10:39:27.208352+00:00",
               "note": "Updated answer-text CSS: white bg, border, larger font, better spacing for headings/paragraphs/lists"
+            },
+            {
+              "timestamp": "2026-03-20T10:55:40.347074+00:00",
+              "note": "Committed in d18605f"
             }
           ],
           "description": "Clean up the answer panel presentation in the Ascendix AI Search LWC so long answers are easier to scan and no longer read as a dense gray text slab. Improve typography, spacing, section separation, and hierarchy while preserving the existing Salesforce visual language.",
@@ -2931,7 +2947,7 @@
             "4.12.5"
           ],
           "gate_criteria": "Apply final readability styling after table-aware and structured rendering determine the final content shapes.",
-          "completedAt": "2026-03-20T10:39:27.208349+00:00"
+          "completedAt": "2026-03-20T10:55:40.347072+00:00"
         },
         {
           "id": "4.12.4",
@@ -2939,7 +2955,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:30:05.644727+00:00",
-          "updatedAt": "2026-03-20T10:39:27.257871+00:00",
+          "updatedAt": "2026-03-20T10:55:40.397782+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2947,6 +2963,10 @@
             {
               "timestamp": "2026-03-20T10:39:27.258036+00:00",
               "note": "Added TestHelpResponseGuideline (3 tests) and Answer Formatting Jest describe block (~10 tests)"
+            },
+            {
+              "timestamp": "2026-03-20T10:55:40.397939+00:00",
+              "note": "Committed in d18605f"
             }
           ],
           "description": "Add focused regression coverage for the specific failure mode shown in QA: broad help/onboarding questions producing overlong, hard-to-scan output in the LWC. Capture both prompt guidance and renderer behavior so future prompt tuning does not reintroduce the same wall-of-text result.",
@@ -2965,7 +2985,7 @@
             "4.12.3"
           ],
           "gate_criteria": "Lock regression coverage after both structured rendering and final readability cleanup are in place.",
-          "completedAt": "2026-03-20T10:39:27.258033+00:00"
+          "completedAt": "2026-03-20T10:55:40.397936+00:00"
         },
         {
           "id": "4.12.5",
@@ -2973,7 +2993,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:54:00.583289+00:00",
-          "updatedAt": "2026-03-20T10:39:27.156539+00:00",
+          "updatedAt": "2026-03-20T10:55:40.449474+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2981,6 +3001,10 @@
             {
               "timestamp": "2026-03-20T10:39:27.156688+00:00",
               "note": "Added _convertMarkdownTables() and _parseTableRow() helpers with CSS table styles"
+            },
+            {
+              "timestamp": "2026-03-20T10:55:40.449644+00:00",
+              "note": "Committed in d18605f"
             }
           ],
           "description": "Extend the Ascendix AI Search LWC answer rendering path to support richer structured outputs such as markdown-style tables, ranked result rows, and compact stat/group layouts where the answer shape benefits from more than plain paragraphs and bullets. This specifically targets outputs like top-N market or deal summaries that currently degrade into pipe-delimited text blobs.",
@@ -3000,7 +3024,7 @@
             "4.12.2"
           ],
           "gate_criteria": "Add richer structured layouts only after the base supported formatting model is simplified and stable.",
-          "completedAt": "2026-03-20T10:39:27.156686+00:00"
+          "completedAt": "2026-03-20T10:55:40.449641+00:00"
         },
         {
           "id": "4.13",
@@ -3008,7 +3032,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T10:04:37.137913+00:00",
-          "updatedAt": "2026-03-20T10:39:37.336818+00:00",
+          "updatedAt": "2026-03-20T10:55:40.502464+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -3016,6 +3040,10 @@
             {
               "timestamp": "2026-03-20T10:39:37.336973+00:00",
               "note": "4.13a: sort+annotate grouped aggregates in tool_dispatch.py. 4.13b: sort_order/top_n in tool defs + updated few-shot + guideline 6 addendum. 4.13c/d: already done (prompt guardrails). 4.13e: 6 tests in test_leaderboard_guard.py + extended test_tool_dispatch.py and test_system_prompt.py. All 168 python tests pass."
+            },
+            {
+              "timestamp": "2026-03-20T10:55:40.502622+00:00",
+              "note": "Committed in d18605f"
             }
           ],
           "description": "Prevent the /query agent from presenting best-effort search samples as authoritative ranked leaderboards when the user asks for grouped top-N queries that require a clear metric and a single valid grouping dimension. This task covers queries like 'top brokers by deal size' where the current indexed schema has multiple broker role fields and the agent currently fabricates a ranking from individual search hits instead of clarifying or declining.",
@@ -3038,7 +3066,7 @@
             "4.10"
           ],
           "gate_criteria": "Use the current prompt/tool surface as the baseline and tighten behavior for leaderboard queries without regressing existing 11-object query support.",
-          "completedAt": "2026-03-20T10:39:37.336970+00:00"
+          "completedAt": "2026-03-20T10:55:40.502620+00:00"
         },
         {
           "id": "4.13.1",
@@ -3046,7 +3074,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T10:11:29.625103+00:00",
-          "updatedAt": "2026-03-20T10:39:50.445100+00:00",
+          "updatedAt": "2026-03-20T10:55:40.552420+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -3054,6 +3082,10 @@
             {
               "timestamp": "2026-03-20T10:39:50.445284+00:00",
               "note": "4.13.1a: clarification_options field on QueryResult. 4.13.1b: extract_clarifications() with CLARIFY marker parsing. 4.13.1c: clarification SSE event in lambda/query/index.py. 4.13.1d: Apex SSE parser handles clarification event. 4.13.1e: LWC pills with handleClarificationClick + hasClarificationOptions. 4.13.1f: 7 tests in test_clarification_flow.py + 3 Jest tests."
+            },
+            {
+              "timestamp": "2026-03-20T10:55:40.552570+00:00",
+              "note": "Committed in d18605f"
             }
           ],
           "description": "Support the class of /query requests that are not directly answerable as written but become answerable with one or two constrained clarifications. Replace unsupported freeform follow-up expectations with an explicit clarification UX so users can choose the intended metric, grouping dimension, or role without requiring full chat memory.",
@@ -3076,7 +3108,7 @@
             "4.13"
           ],
           "gate_criteria": "Use the leaderboard/aggregation guard design before adding clarification UX so the UI is solving the right ambiguity classes.",
-          "completedAt": "2026-03-20T10:39:50.445281+00:00"
+          "completedAt": "2026-03-20T10:55:40.552567+00:00"
         }
       ]
     }

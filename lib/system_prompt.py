@@ -5,6 +5,8 @@ Provides:
 - ``TOOL_DEFINITIONS`` — Bedrock Converse API tool definition dicts.
 - ``build_system_prompt(config)`` — generates a system prompt with actual field
   names derived from the parsed denorm_config.yaml.
+- ``build_tool_definitions(config)`` — generates TOOL_DEFINITIONS dynamically
+  from the parsed denorm_config.yaml.
 
 The field names referenced in the prompt and tool descriptions are the alias
 names accepted by ``lib.tool_dispatch.ToolDispatcher`` — i.e. the curated
@@ -116,6 +118,16 @@ _CONTACT_FIELDS = """\
   - reports_to_name: manager/contact hierarchy name (denormalized)
   - mailing_latitude, mailing_longitude, other_latitude, other_longitude: geocoordinates"""
 
+# Map of object type (lowercase) -> curated field description override.
+# Objects not in this map get auto-generated field descriptions from the config.
+_CURATED_FIELD_DESCRIPTIONS: dict[str, str] = {
+    "property": _PROPERTY_FIELDS,
+    "lease": _LEASE_FIELDS,
+    "availability": _AVAILABILITY_FIELDS,
+    "account": _ACCOUNT_FIELDS,
+    "contact": _CONTACT_FIELDS,
+}
+
 # ---------------------------------------------------------------------------
 # Few-shot examples
 # ---------------------------------------------------------------------------
@@ -187,14 +199,45 @@ Tool calls (parallel):
     aggregate="avg",
     aggregate_field="rent_high"
   )
-Note: For comparison queries, always use parallel tool calls to minimize latency.\
+Note: For comparison queries, always use parallel tool calls to minimize latency.
+
+**6. Deal search**
+User: "Show me deals closed this year with fee over $50,000"
+Tool call:
+  search_records(
+    object_type="Deal",
+    filters={"close_date_gte": "2026-01-01", "deal_value_gte": 50000},
+    text_query="deal closed"
+  )
+
+**7. Inquiry search with cross-object filter**
+User: "Find inquiries for properties in Houston"
+Tool call:
+  search_records(
+    object_type="Inquiry",
+    filters={"property_city": "Houston"}
+  )\
 """
 
 # ---------------------------------------------------------------------------
 # Guidelines
 # ---------------------------------------------------------------------------
 
-_GUIDELINES = """\
+def _build_guidelines(object_names: list[str] | None = None) -> str:
+    """Build guidelines text, optionally with a dynamic object list.
+
+    *object_names* is a list of capitalized object names (e.g. ["Property",
+    "Lease", ...]). If *None*, defaults to the original 5 objects.
+    """
+    if object_names is None:
+        obj_text = (
+            "Property, Lease, Availability,\n"
+            "   Account, and Contact are available."
+        )
+    else:
+        obj_text = ", ".join(object_names) + " are available."
+
+    return f"""\
 ### Guidelines
 
 1. **Search first, clarify later.** When the user's question is answerable with
@@ -242,9 +285,7 @@ _GUIDELINES = """\
    use the live_salesforce_query tool. All queries must go through
    search_records or aggregate_records.
 
-10. **Object types for current demo scope.** Property, Lease, Availability,
-   Account, and Contact are available. Deal and Sale are out of scope for
-   now.
+10. **Object types for current scope.** {obj_text}
 
 11. **Geography scope is object-specific.** Property supports market and
    submarket. Availability supports native market, submarket, and region when
@@ -252,6 +293,9 @@ _GUIDELINES = """\
    support market or submarket filters; use property_city and property_state
    for lease geography.\
 """
+
+# Static guidelines used by the static SYSTEM_PROMPT (5-object fallback).
+_GUIDELINES = _build_guidelines()
 
 # ---------------------------------------------------------------------------
 # Static SYSTEM_PROMPT
@@ -476,20 +520,32 @@ def build_system_prompt(config: dict) -> str:
     *config* is the dict returned by ``yaml.safe_load(open("denorm_config.yaml"))``.
     The generated prompt includes the same structure as :data:`SYSTEM_PROMPT`
     but with a field reference section derived from the config rather than
-    hard-coded.
+    hard-coded.  Objects with curated field descriptions (Property, Lease,
+    Availability, Account, Contact) use those; all other objects get
+    auto-generated field descriptions from the field map.
     """
     field_map = _collect_field_names(config)
 
+    # Build object name list for dynamic sections
+    object_names = [k.capitalize() for k in sorted(field_map.keys())]
+    object_list_str = ", ".join(object_names)
+
     field_sections: list[str] = []
-    for obj_type in ("property", "lease", "availability", "account", "contact"):
-        if obj_type not in field_map:
-            continue
-        fields = field_map[obj_type]
+    for obj_type in sorted(field_map.keys()):
         title = obj_type.capitalize()
-        field_list = ", ".join(fields)
-        field_sections.append(f"### {title} fields\n  {field_list}")
+        if obj_type in _CURATED_FIELD_DESCRIPTIONS:
+            # Use the curated human-written description
+            field_sections.append(f"### {title} fields\n{_CURATED_FIELD_DESCRIPTIONS[obj_type]}")
+        else:
+            # Auto-generate from field map
+            fields = field_map[obj_type]
+            field_list = ", ".join(fields)
+            field_sections.append(f"### {title} fields\n  {field_list}")
 
     field_reference = "\n\n".join(field_sections)
+
+    # Build dynamic guidelines with actual object list
+    guidelines = _build_guidelines(object_names)
 
     return f"""\
 You are AscendixIQ, a CRE intelligence assistant answering questions about \
@@ -506,7 +562,7 @@ You understand the following commercial real estate terminology: {_CRE_VOCABULAR
 
 You have access to two tools:
 
-- **search_records**: Search indexed CRE and CRM data (Property, Lease, Availability, Account, Contact). \
+- **search_records**: Search indexed CRE and CRM data ({object_list_str}). \
 Use metadata filters for precise queries. Call multiple times in parallel for \
 cross-object questions. Returns matching documents with relevance scores.
 
@@ -522,5 +578,137 @@ Note: live_salesforce_query is NOT available in this POC.
 
 {_FEW_SHOT_EXAMPLES}
 
-{_GUIDELINES}
+{guidelines}
 """
+
+
+def build_tool_definitions(config: dict) -> list[dict]:
+    """Build TOOL_DEFINITIONS dynamically from *config*.
+
+    *config* is the dict returned by ``yaml.safe_load(open("denorm_config.yaml"))``.
+    Returns the same Bedrock Converse API tool definition structure as
+    :data:`TOOL_DEFINITIONS`, but with the ``object_type`` enum and filter
+    field descriptions derived from the config.
+
+    Falls back to :data:`TOOL_DEFINITIONS` if *config* is empty.
+    """
+    field_map = _collect_field_names(config)
+    if not field_map:
+        return TOOL_DEFINITIONS
+
+    # Build enum: capitalized, sorted
+    object_enum = [k.capitalize() for k in sorted(field_map.keys())]
+
+    # Build filter field description lines per object type
+    filter_lines: list[str] = []
+    for obj_type in sorted(field_map.keys()):
+        title = obj_type.capitalize()
+        fields = field_map[obj_type]
+        filter_lines.append(f"  {title}: {', '.join(fields)}")
+    filter_desc = "\n".join(filter_lines)
+
+    object_list_str = ", ".join(object_enum)
+
+    return [
+        {
+            "toolSpec": {
+                "name": "search_records",
+                "description": (
+                    "Search AscendixIQ for CRE records. Returns matching documents "
+                    "with relevance scores. Supports full-text BM25, and metadata "
+                    "filtering. Use multiple calls in parallel for cross-object queries.\n\n"
+                    f"Object types: {object_list_str}.\n\n"
+                    "Filter field names (use semantic aliases):\n"
+                    f"{filter_desc}\n\n"
+                    "Filter operators: append _gte, _lte, _gt, _lt, _in, _ne to field names."
+                ),
+                "inputSchema": {
+                    "json": {
+                        "type": "object",
+                        "properties": {
+                            "object_type": {
+                                "type": "string",
+                                "enum": object_enum,
+                                "description": "The indexed object type to search.",
+                            },
+                            "filters": {
+                                "type": "object",
+                                "description": (
+                                    "Field-value filter pairs. Supports exact match, "
+                                    "comparison (field_gte, field_lte), and set membership "
+                                    "(field_in). Examples: "
+                                    '{"city": "Dallas", "property_class": "A", '
+                                    '"total_sf_gte": 100000}'
+                                ),
+                            },
+                            "text_query": {
+                                "type": "string",
+                                "description": (
+                                    "Natural language search text for BM25 ranking. "
+                                    "Optional — omit for pure filter queries."
+                                ),
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of results to return (default 10, max 50).",
+                            },
+                        },
+                        "required": ["object_type"],
+                    }
+                },
+            }
+        },
+        {
+            "toolSpec": {
+                "name": "aggregate_records",
+                "description": (
+                    "Count, sum, or average CRE records matching criteria, optionally "
+                    "grouped by a field. Use for 'how many,' 'total,' 'average,' "
+                    "'breakdown' questions.\n\n"
+                    f"Object types: {object_list_str}.\n\n"
+                    "Supported aggregates: count, sum, avg.\n"
+                    "For sum/avg, aggregate_field is required."
+                ),
+                "inputSchema": {
+                    "json": {
+                        "type": "object",
+                        "properties": {
+                            "object_type": {
+                                "type": "string",
+                                "enum": object_enum,
+                                "description": "The indexed object type to aggregate.",
+                            },
+                            "filters": {
+                                "type": "object",
+                                "description": (
+                                    "Field-value filter pairs to narrow the aggregation. "
+                                    "Same syntax as search_records filters."
+                                ),
+                            },
+                            "aggregate": {
+                                "type": "string",
+                                "enum": ["count", "sum", "avg"],
+                                "description": "Aggregation function to apply (default: count).",
+                            },
+                            "aggregate_field": {
+                                "type": "string",
+                                "description": (
+                                    "Field to sum or average. Required when aggregate "
+                                    "is 'sum' or 'avg'. Examples: total_sf, leased_sf, "
+                                    "rate_psf, rent_low, rent_high."
+                                ),
+                            },
+                            "group_by": {
+                                "type": "string",
+                                "description": (
+                                    "Field to group results by. Examples: property_class, "
+                                    "city, lease_type, use_type."
+                                ),
+                            },
+                        },
+                        "required": ["object_type"],
+                    }
+                },
+            }
+        },
+    ]

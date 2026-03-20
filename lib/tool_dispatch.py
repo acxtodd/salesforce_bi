@@ -150,6 +150,52 @@ SEMANTIC_ALIASES: dict[str, dict[str, str]] = {
         "submarket": "submarket_name",
         "region": "region_name",
     },
+    "deal": {
+        "transaction_type": "transactiontype",
+        "deal_stage": "salesstage",
+        "deal_value": "grossfeeamount",
+        "close_date": "closedateestimated",
+        "client_name": "client_name",
+        "buyer_name": "buyer_name",
+        "seller_name": "seller_name",
+        "tenant_name": "tenant_name",
+        "property_name": "property_name",
+        "property_city": "property_city",
+        "property_state": "property_state",
+    },
+    "sale": {
+        "sale_price": "saleprice",
+        "price_psf": "salepriceperuom",
+        "cap_rate": "capratepercent",
+        "listing_price": "listingprice",
+        "listing_date": "listingdate",
+        "total_area": "totalarea",
+        "noi": "netincome",
+        "property_name": "property_name",
+        "property_city": "property_city",
+    },
+    "inquiry": {
+        "property_name": "property_name",
+        "property_city": "property_city",
+        "property_state": "property_state",
+        "broker_name": "brokercompany_name",
+        "listing_name": "listing_name",
+    },
+    "listing": {
+        "property_name": "property_name",
+        "property_city": "property_city",
+        "listing_broker": "listingbrokercompany_name",
+        "owner_name": "ownerlandlord_name",
+    },
+    "preference": {
+        "account_name": "account_name",
+        "contact_name": "contact_name",
+    },
+    "task": {
+        "subject": "subject",
+        "who_name": "who_name",
+        "what_name": "what_name",
+    },
 }
 # NOTE: asking_rate_psf is intentionally absent from SEMANTIC_ALIASES.
 # The spec uses it as a single field, but the index stores a low/high range

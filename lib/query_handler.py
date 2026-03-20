@@ -293,7 +293,8 @@ class QueryHandler:
 
         for record in search_results:
             record_id = record.get("id", "")
-            record_name = record.get("name", "")
+            # Some objects (e.g. Task) use "subject" instead of "name"
+            record_name = record.get("name", "") or record.get("subject", "")
 
             if record_id in seen_ids:
                 continue

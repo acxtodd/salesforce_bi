@@ -69,6 +69,10 @@ def _load_config() -> dict:
 _DENORM_CONFIG: dict = _load_config()
 _FIELD_REGISTRY: dict = build_field_registry(_DENORM_CONFIG)
 
+from lib.system_prompt import build_system_prompt, build_tool_definitions
+_SYSTEM_PROMPT = build_system_prompt(_DENORM_CONFIG)
+_TOOL_DEFINITIONS = build_tool_definitions(_DENORM_CONFIG)
+
 # Session warm-cache: tracks session_ids that have already been warmed.
 # Resets on Lambda cold start, which is acceptable for POC.
 _warmed_sessions: set[str] = set()
@@ -224,6 +228,8 @@ def handler(event: dict, context: Any) -> dict:
             namespace=namespace,
             field_registry=_FIELD_REGISTRY,
             model_id=_MODEL_ID,
+            system_prompt=_SYSTEM_PROMPT,
+            tool_definitions=_TOOL_DEFINITIONS,
         )
         result: QueryResult = qh.query(question)
     except Exception as exc:

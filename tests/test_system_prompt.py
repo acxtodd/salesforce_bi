@@ -1,7 +1,8 @@
-"""Tests for the system prompt module (Task 1.2).
+"""Tests for the system prompt module (Task 1.2 / Task 4.6.5.3).
 
-Validates that SYSTEM_PROMPT, TOOL_DEFINITIONS, and build_system_prompt()
-produce correct content for the AscendixIQ query pipeline.
+Validates that SYSTEM_PROMPT, TOOL_DEFINITIONS, build_system_prompt(), and
+build_tool_definitions() produce correct content for the AscendixIQ query
+pipeline.
 """
 
 from __future__ import annotations
@@ -15,13 +16,18 @@ import yaml
 # Ensure project root is on the path.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from lib.system_prompt import SYSTEM_PROMPT, TOOL_DEFINITIONS, build_system_prompt
+from lib.system_prompt import (
+    SYSTEM_PROMPT,
+    TOOL_DEFINITIONS,
+    build_system_prompt,
+    build_tool_definitions,
+)
 
 # =========================================================================
 # Test fixtures
 # =========================================================================
 
-# Minimal config that mirrors the structure of denorm_config.yaml
+# Minimal 3-object config (original test fixture)
 SAMPLE_CONFIG = {
     "ascendix__Property__c": {
         "embed_fields": [
@@ -115,6 +121,88 @@ SAMPLE_CONFIG = {
 }
 
 
+# 11-object config for dynamic builder tests
+SAMPLE_CONFIG_11 = {
+    **SAMPLE_CONFIG,
+    "Account": {
+        "embed_fields": ["Name", "Type", "Industry", "Phone"],
+        "metadata_fields": ["AnnualRevenue", "NumberOfEmployees", "BillingCity", "BillingState"],
+        "parents": {"ParentId": ["Name"]},
+    },
+    "Contact": {
+        "embed_fields": ["Name", "Title", "Email", "Phone", "Department"],
+        "metadata_fields": ["MailingCity", "MailingState", "MailingPostalCode"],
+        "parents": {
+            "AccountId": ["Name"],
+            "ReportsToId": ["Name"],
+        },
+    },
+    "ascendix__Deal__c": {
+        "embed_fields": ["Name", "ascendix__TransactionType__c", "ascendix__SalesStage__c"],
+        "metadata_fields": [
+            "ascendix__GrossFeeAmount__c",
+            "ascendix__CloseDateEstimated__c",
+        ],
+        "parents": {
+            "ascendix__Client__c": ["Name"],
+            "ascendix__Buyer__c": ["Name"],
+            "ascendix__Seller__c": ["Name"],
+            "ascendix__Tenant__c": ["Name"],
+            "ascendix__Property__c": ["Name", "ascendix__City__c", "ascendix__State__c"],
+        },
+    },
+    "ascendix__Sale__c": {
+        "embed_fields": ["Name"],
+        "metadata_fields": [
+            "ascendix__SalePrice__c",
+            "ascendix__SalePricePerUOM__c",
+            "ascendix__CapRatePercent__c",
+            "ascendix__ListingPrice__c",
+            "ascendix__ListingDate__c",
+            "ascendix__TotalArea__c",
+            "ascendix__NetIncome__c",
+        ],
+        "parents": {
+            "ascendix__Property__c": ["Name", "ascendix__City__c"],
+        },
+    },
+    "ascendix__Inquiry__c": {
+        "embed_fields": ["Name"],
+        "metadata_fields": [],
+        "parents": {
+            "ascendix__Property__c": ["Name", "ascendix__City__c", "ascendix__State__c"],
+            "ascendix__BrokerCompany__c": ["Name"],
+            "ascendix__Listing__c": ["Name"],
+        },
+    },
+    "ascendix__Listing__c": {
+        "embed_fields": ["Name"],
+        "metadata_fields": [],
+        "parents": {
+            "ascendix__Property__c": ["Name", "ascendix__City__c"],
+            "ascendix__ListingBrokerCompany__c": ["Name"],
+            "ascendix__OwnerLandlord__c": ["Name"],
+        },
+    },
+    "ascendix__Preference__c": {
+        "embed_fields": ["Name"],
+        "metadata_fields": [],
+        "parents": {
+            "ascendix__Account__c": ["Name"],
+            "ascendix__Contact__c": ["Name"],
+        },
+    },
+    "Task": {
+        "embed_fields": ["Subject"],
+        "metadata_fields": [],
+        "parents": {
+            "WhoId": ["Name"],
+            "WhatId": ["Name"],
+        },
+    },
+}
+
+
 # =========================================================================
 # 1. SYSTEM_PROMPT basic content checks
 # =========================================================================
@@ -199,6 +287,15 @@ class TestSystemPrompt:
         assert "Lease does not currently" in SYSTEM_PROMPT
         assert "support market or submarket filters" in SYSTEM_PROMPT
 
+    def test_has_deal_few_shot_example(self):
+        """Static prompt includes the Deal few-shot example."""
+        assert "Deal" in SYSTEM_PROMPT
+        assert "deal_value_gte" in SYSTEM_PROMPT or "deal closed" in SYSTEM_PROMPT
+
+    def test_has_inquiry_few_shot_example(self):
+        """Static prompt includes the Inquiry few-shot example."""
+        assert "Inquiry" in SYSTEM_PROMPT
+
 
 # =========================================================================
 # 2. TOOL_DEFINITIONS structure
@@ -231,7 +328,7 @@ class TestToolDefinitions:
             assert "required" in schema
 
     def test_search_records_object_types(self):
-        """search_records must list all active demo object types."""
+        """search_records must list the original 5 demo object types."""
         search_tool = next(
             d for d in TOOL_DEFINITIONS if d["toolSpec"]["name"] == "search_records"
         )
@@ -265,7 +362,7 @@ class TestToolDefinitions:
         assert "limit" in schema["properties"]
 
     def test_aggregate_records_object_types(self):
-        """aggregate_records must list all active demo object types."""
+        """aggregate_records must list the original 5 demo object types."""
         agg_tool = next(
             d for d in TOOL_DEFINITIONS if d["toolSpec"]["name"] == "aggregate_records"
         )
@@ -356,7 +453,8 @@ class TestBuildSystemPrompt:
         assert "rent_high" in result
 
     def test_mentions_account_and_contact_scope(self):
-        result = build_system_prompt(SAMPLE_CONFIG)
+        """Account and Contact appear when config includes them."""
+        result = build_system_prompt(SAMPLE_CONFIG_11)
         assert "Account" in result
         assert "Contact" in result
 
@@ -401,3 +499,115 @@ class TestBuildSystemPrompt:
         assert "property_class" in result
         assert "rent_low" in result
         assert "rent_high" in result
+
+    def test_dynamic_builder_includes_all_objects(self):
+        """build_system_prompt with 11-object config includes all object types."""
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        # All 11 object types should appear in the field reference
+        for obj_type in (
+            "Account", "Availability", "Contact", "Deal", "Inquiry",
+            "Lease", "Listing", "Preference", "Property", "Sale", "Task",
+        ):
+            assert f"### {obj_type} fields" in result, (
+                f"Missing field section for {obj_type}"
+            )
+        # The Available Tools section should list all objects
+        assert "Deal" in result
+        assert "Sale" in result
+        assert "Inquiry" in result
+        assert "Listing" in result
+        assert "Preference" in result
+        assert "Task" in result
+
+    def test_dynamic_guideline_10_lists_all_objects(self):
+        """Guideline 10 in the dynamic prompt lists all 11 object types."""
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        # Guideline 10 should mention all object types as available
+        assert "Deal" in result
+        assert "Inquiry" in result
+        assert "are available" in result
+
+    def test_curated_descriptions_used_for_original_objects(self):
+        """Property/Lease/Availability/Account/Contact use curated field descriptions."""
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        # Check that a curated description phrase is present (from _PROPERTY_FIELDS)
+        assert "record name / building name" in result
+        # Check that a curated lease description is present
+        assert "lease rate per square foot" in result
+
+
+# =========================================================================
+# 4. build_tool_definitions()
+# =========================================================================
+
+
+class TestBuildToolDefinitions:
+    """Verify the dynamic tool definition builder."""
+
+    def test_build_tool_definitions_enum(self):
+        """build_tool_definitions returns correct object_type enum for 11-object config."""
+        tools = build_tool_definitions(SAMPLE_CONFIG_11)
+        search_tool = next(t for t in tools if t["toolSpec"]["name"] == "search_records")
+        enum = search_tool["toolSpec"]["inputSchema"]["json"]["properties"]["object_type"]["enum"]
+        expected = sorted([
+            "Account", "Availability", "Contact", "Deal", "Inquiry",
+            "Lease", "Listing", "Preference", "Property", "Sale", "Task",
+        ])
+        assert enum == expected
+
+    def test_build_tool_definitions_aggregate_enum(self):
+        """aggregate_records also gets the full enum."""
+        tools = build_tool_definitions(SAMPLE_CONFIG_11)
+        agg_tool = next(t for t in tools if t["toolSpec"]["name"] == "aggregate_records")
+        enum = agg_tool["toolSpec"]["inputSchema"]["json"]["properties"]["object_type"]["enum"]
+        assert "Deal" in enum
+        assert "Sale" in enum
+        assert "Inquiry" in enum
+
+    def test_build_tool_definitions_structure(self):
+        """Dynamic tool definitions follow Bedrock Converse API format."""
+        tools = build_tool_definitions(SAMPLE_CONFIG_11)
+        assert isinstance(tools, list)
+        assert len(tools) == 2
+        for tool in tools:
+            assert "toolSpec" in tool
+            spec = tool["toolSpec"]
+            assert "name" in spec
+            assert "description" in spec
+            assert "inputSchema" in spec
+            schema = spec["inputSchema"]["json"]
+            assert schema["type"] == "object"
+            assert "properties" in schema
+            assert "required" in schema
+            assert "object_type" in schema["required"]
+
+    def test_build_tool_definitions_description_includes_all_objects(self):
+        """Tool descriptions mention all 11 object types."""
+        tools = build_tool_definitions(SAMPLE_CONFIG_11)
+        search_desc = next(
+            t for t in tools if t["toolSpec"]["name"] == "search_records"
+        )["toolSpec"]["description"]
+        for obj in ("Deal", "Sale", "Inquiry", "Listing", "Preference", "Task"):
+            assert obj in search_desc, f"Missing {obj} in search description"
+
+    def test_build_tool_definitions_filter_fields_per_object(self):
+        """Dynamic tool descriptions include filter fields for each object type."""
+        tools = build_tool_definitions(SAMPLE_CONFIG_11)
+        search_desc = next(
+            t for t in tools if t["toolSpec"]["name"] == "search_records"
+        )["toolSpec"]["description"]
+        # Deal should have its semantic alias fields listed
+        assert "Deal:" in search_desc
+        assert "Sale:" in search_desc
+
+    def test_build_tool_definitions_empty_config_fallback(self):
+        """Empty config falls back to static TOOL_DEFINITIONS."""
+        tools = build_tool_definitions({})
+        assert tools is TOOL_DEFINITIONS
+
+    def test_build_tool_definitions_3_object_config(self):
+        """3-object config produces correct enum."""
+        tools = build_tool_definitions(SAMPLE_CONFIG)
+        search_tool = next(t for t in tools if t["toolSpec"]["name"] == "search_records")
+        enum = search_tool["toolSpec"]["inputSchema"]["json"]["properties"]["object_type"]["enum"]
+        assert enum == ["Availability", "Lease", "Property"]

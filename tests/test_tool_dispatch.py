@@ -739,3 +739,213 @@ class TestEndToEnd:
         assert result["result"]["groups"]["A"]["count"] == 10
         call_kwargs = backend.aggregate.call_args[1]
         assert call_kwargs["group_by"] == "propertyclass"
+
+
+# =========================================================================
+# New object semantic aliases (Task 4.6.5.3)
+# =========================================================================
+
+# Minimal configs for the new object types
+_DEAL_CONFIG = {
+    "ascendix__Deal__c": {
+        "embed_fields": ["Name", "ascendix__TransactionType__c", "ascendix__SalesStage__c"],
+        "metadata_fields": [
+            "ascendix__GrossFeeAmount__c",
+            "ascendix__CloseDateEstimated__c",
+        ],
+        "parents": {
+            "ascendix__Client__c": ["Name"],
+            "ascendix__Buyer__c": ["Name"],
+            "ascendix__Seller__c": ["Name"],
+            "ascendix__Tenant__c": ["Name"],
+            "ascendix__Property__c": ["Name", "ascendix__City__c", "ascendix__State__c"],
+        },
+    },
+}
+
+_SALE_CONFIG = {
+    "ascendix__Sale__c": {
+        "embed_fields": ["Name"],
+        "metadata_fields": [
+            "ascendix__SalePrice__c",
+            "ascendix__SalePricePerUOM__c",
+            "ascendix__CapRatePercent__c",
+            "ascendix__ListingPrice__c",
+            "ascendix__ListingDate__c",
+            "ascendix__TotalArea__c",
+            "ascendix__NetIncome__c",
+        ],
+        "parents": {
+            "ascendix__Property__c": ["Name", "ascendix__City__c"],
+        },
+    },
+}
+
+_INQUIRY_CONFIG = {
+    "ascendix__Inquiry__c": {
+        "embed_fields": ["Name"],
+        "metadata_fields": [],
+        "parents": {
+            "ascendix__Property__c": ["Name", "ascendix__City__c", "ascendix__State__c"],
+            "ascendix__BrokerCompany__c": ["Name"],
+            "ascendix__Listing__c": ["Name"],
+        },
+    },
+}
+
+_ALL_11_CONFIG = {
+    **SAMPLE_CONFIG,
+    "Account": {
+        "embed_fields": ["Name", "Type", "Industry", "Phone"],
+        "metadata_fields": ["AnnualRevenue", "NumberOfEmployees", "BillingCity", "BillingState"],
+        "parents": {"ParentId": ["Name"]},
+    },
+    "Contact": {
+        "embed_fields": ["Name", "Title", "Email", "Phone", "Department"],
+        "metadata_fields": ["MailingCity", "MailingState"],
+        "parents": {"AccountId": ["Name"], "ReportsToId": ["Name"]},
+    },
+    **_DEAL_CONFIG,
+    **_SALE_CONFIG,
+    **_INQUIRY_CONFIG,
+    "ascendix__Listing__c": {
+        "embed_fields": ["Name"],
+        "metadata_fields": [],
+        "parents": {
+            "ascendix__Property__c": ["Name", "ascendix__City__c"],
+            "ascendix__ListingBrokerCompany__c": ["Name"],
+            "ascendix__OwnerLandlord__c": ["Name"],
+        },
+    },
+    "ascendix__Preference__c": {
+        "embed_fields": ["Name"],
+        "metadata_fields": [],
+        "parents": {
+            "ascendix__Account__c": ["Name"],
+            "ascendix__Contact__c": ["Name"],
+        },
+    },
+    "Task": {
+        "embed_fields": ["Subject"],
+        "metadata_fields": [],
+        "parents": {"WhoId": ["Name"], "WhatId": ["Name"]},
+    },
+}
+
+
+class TestDealSemanticAliases:
+    """Verify deal semantic aliases resolve correctly."""
+
+    def test_deal_value_alias(self):
+        registry = build_field_registry(_DEAL_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["deal"]
+        assert "deal_value" in fs.aliases
+        assert fs.aliases["deal_value"] == "grossfeeamount"
+
+    def test_deal_stage_alias(self):
+        registry = build_field_registry(_DEAL_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["deal"]
+        assert "deal_stage" in fs.aliases
+        assert fs.aliases["deal_stage"] == "salesstage"
+
+    def test_close_date_alias(self):
+        registry = build_field_registry(_DEAL_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["deal"]
+        assert "close_date" in fs.aliases
+        assert fs.aliases["close_date"] == "closedateestimated"
+
+    def test_deal_property_parent_fields(self):
+        registry = build_field_registry(_DEAL_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["deal"]
+        assert "property_name" in fs.filterable
+        assert "property_city" in fs.filterable
+        assert "property_state" in fs.filterable
+
+    def test_deal_dispatch_resolves_aliases(self):
+        d, backend = _make_dispatcher(config=_DEAL_CONFIG)
+        d.dispatch({
+            "name": "search_records",
+            "parameters": {
+                "object_type": "Deal",
+                "filters": {"deal_value_gte": 50000, "close_date_gte": "2026-01-01"},
+                "text_query": "deal closed",
+            },
+        })
+        call_kwargs = backend.search.call_args[1]
+        assert "grossfeeamount_gte" in call_kwargs["filters"]
+        assert "closedateestimated_gte" in call_kwargs["filters"]
+
+
+class TestSaleSemanticAliases:
+    """Verify sale semantic aliases resolve correctly."""
+
+    def test_sale_price_alias(self):
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        assert "sale_price" in fs.aliases
+        assert fs.aliases["sale_price"] == "saleprice"
+
+    def test_cap_rate_alias(self):
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        assert "cap_rate" in fs.aliases
+        assert fs.aliases["cap_rate"] == "capratepercent"
+
+    def test_noi_alias(self):
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        assert "noi" in fs.aliases
+        assert fs.aliases["noi"] == "netincome"
+
+    def test_sale_property_parent_fields(self):
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        assert "property_name" in fs.filterable
+        assert "property_city" in fs.filterable
+
+
+class TestNewObjectTypesInRegistry:
+    """Verify build_field_registry handles all 11 objects."""
+
+    def test_all_11_object_types_present(self):
+        registry = build_field_registry(_ALL_11_CONFIG, SEMANTIC_ALIASES)
+        expected = {
+            "property", "lease", "availability", "account", "contact",
+            "deal", "sale", "inquiry", "listing", "preference", "task",
+        }
+        assert set(registry.keys()) == expected
+
+    def test_inquiry_aliases(self):
+        registry = build_field_registry(_INQUIRY_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["inquiry"]
+        assert "property_name" in fs.aliases or "property_name" in fs.filterable
+        assert "broker_name" in fs.aliases
+        assert fs.aliases["broker_name"] == "brokercompany_name"
+
+    def test_task_aliases(self):
+        registry = build_field_registry(
+            {"Task": _ALL_11_CONFIG["Task"]},
+            SEMANTIC_ALIASES,
+        )
+        fs = registry["task"]
+        assert "subject" in fs.aliases or "subject" in fs.filterable
+        assert "who_name" in fs.aliases or "who_name" in fs.filterable
+        assert "what_name" in fs.aliases or "what_name" in fs.filterable
+
+    def test_preference_aliases(self):
+        registry = build_field_registry(
+            {"ascendix__Preference__c": _ALL_11_CONFIG["ascendix__Preference__c"]},
+            SEMANTIC_ALIASES,
+        )
+        fs = registry["preference"]
+        assert "account_name" in fs.aliases or "account_name" in fs.filterable
+        assert "contact_name" in fs.aliases or "contact_name" in fs.filterable
+
+    def test_listing_aliases(self):
+        registry = build_field_registry(
+            {"ascendix__Listing__c": _ALL_11_CONFIG["ascendix__Listing__c"]},
+            SEMANTIC_ALIASES,
+        )
+        fs = registry["listing"]
+        assert "listing_broker" in fs.aliases
+        assert fs.aliases["listing_broker"] == "listingbrokercompany_name"

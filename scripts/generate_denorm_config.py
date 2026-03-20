@@ -57,6 +57,9 @@ WEIGHT_IS_REQUIRED = 20
 WEIGHT_IS_NAME_FIELD = 15
 WEIGHT_IS_FILTERABLE = 2
 WEIGHT_IS_FORMULA = 3
+# T5: Ascendix Search signals (supplementary)
+WEIGHT_ASCENDIX_RESULT_COL = 12   # Between T1 compact (15) and T2 search (10)
+WEIGHT_ASCENDIX_FILTER = 10       # Same as T2 search layout
 
 THRESHOLD_METADATA = 10   # score >= 10 → metadata_fields
 THRESHOLD_EMBED = 20      # score >= 20 → embed_fields
@@ -109,6 +112,39 @@ def _as_dict(value: Any) -> Dict[str, Any]:
 def _as_list(value: Any) -> List[Any]:
     """Normalize null-shaped API payloads to an empty list."""
     return value if isinstance(value, list) else []
+
+
+def _resolve_relationship_to_ref_field(
+    name: str, reference_fields: Dict[str, str]
+) -> Optional[str]:
+    """Resolve a relationship name or ref-field name to the canonical ref field.
+
+    Ascendix Search templates use SOQL relationship names (``__r`` suffix)
+    while ``reference_fields`` is keyed by the FK API name (``__c`` or
+    ``Id`` suffix).  This function normalises both formats::
+
+        ascendix__Property__r  →  ascendix__Property__c  (if in reference_fields)
+        ascendix__Property__c  →  ascendix__Property__c  (direct match)
+        Account                →  AccountId              (standard relation)
+
+    Returns ``None`` when no matching ref field is found.
+    """
+    # Direct match (already a ref-field API name)
+    if name in reference_fields:
+        return name
+
+    # Custom relationship: __r → __c
+    if name.endswith("__r"):
+        candidate = name[:-3] + "__c"
+        if candidate in reference_fields:
+            return candidate
+
+    # Standard relationship: e.g. "Account" → "AccountId"
+    candidate_id = name + "Id"
+    if candidate_id in reference_fields:
+        return candidate_id
+
+    return None
 
 
 def _is_excluded_direct_field(meta: "ObjectMetadata", field_name: str) -> bool:
@@ -176,6 +212,8 @@ class FieldScore:
         self.search_layout_appearances = 0
         self.list_view_column_appearances = 0
         self.list_view_filter_appearances = 0
+        self.ascendix_result_appearances = 0
+        self.ascendix_filter_appearances = 0
         self.is_required = False
         self.is_name_field = False
         self.is_filterable = False
@@ -189,6 +227,8 @@ class FieldScore:
             + self.search_layout_appearances * WEIGHT_SEARCH_LAYOUT
             + self.list_view_column_appearances * WEIGHT_LIST_VIEW_COLUMN
             + self.list_view_filter_appearances * WEIGHT_LIST_VIEW_FILTER
+            + self.ascendix_result_appearances * WEIGHT_ASCENDIX_RESULT_COL
+            + self.ascendix_filter_appearances * WEIGHT_ASCENDIX_FILTER
             + int(self.is_required) * WEIGHT_IS_REQUIRED
             + int(self.is_name_field) * WEIGHT_IS_NAME_FIELD
             + int(self.is_filterable) * WEIGHT_IS_FILTERABLE
@@ -212,6 +252,10 @@ class FieldScore:
             parts.append(f"list_view({self.list_view_column_appearances})")
         if self.list_view_filter_appearances:
             parts.append(f"filter({self.list_view_filter_appearances})")
+        if self.ascendix_result_appearances:
+            parts.append(f"ax_result({self.ascendix_result_appearances})")
+        if self.ascendix_filter_appearances:
+            parts.append(f"ax_filter({self.ascendix_filter_appearances})")
         if self.is_filterable and not any(p.startswith("filter") for p in parts):
             parts.append("filterable")
         return ", ".join(parts) if parts else "intrinsic"
@@ -247,14 +291,17 @@ class ObjectMetadata:
 class SalesforceHarvester:
     """Connects to Salesforce and harvests layout/describe metadata."""
 
-    def __init__(self, sf):
+    # ----- Top-level entry point -----
+
+    def __init__(self, sf, *, ascendix_search: bool = True):
         """
         Args:
             sf: simple_salesforce.Salesforce instance
+            ascendix_search: Enable T5 Ascendix Search signals (default True)
         """
         self.sf = sf
-
-    # ----- Top-level entry point -----
+        self._ascendix_search = ascendix_search
+        self._template_parser = None  # lazy-loaded
 
     def harvest_object(self, obj_api_name: str) -> ObjectMetadata:
         """Harvest all metadata signals for one object."""
@@ -274,6 +321,10 @@ class SalesforceHarvester:
 
         # T4 — List views (columns + filters)
         self._harvest_list_views(meta)
+
+        # T5 — Ascendix Search saved searches and settings
+        if self._ascendix_search:
+            self._harvest_ascendix_search(meta)
 
         return meta
 
@@ -534,6 +585,260 @@ class SalesforceHarvester:
             if isinstance(sub, dict):
                 self._extract_filter_fields(sub, meta)
 
+    # ----- T5: Ascendix Search -----
+
+    def _get_template_parser(self):
+        """Lazy-import and cache TemplateParser from signal_harvester."""
+        if self._template_parser is None:
+            try:
+                # Add lambda/schema_discovery to path for import
+                _sd_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "lambda", "schema_discovery",
+                )
+                if _sd_path not in sys.path:
+                    sys.path.insert(0, _sd_path)
+                from signal_harvester import TemplateParser, DEFAULT_PRIMARY_RELATIONSHIPS
+                self._template_parser = TemplateParser()
+                self._default_primary_relationships = DEFAULT_PRIMARY_RELATIONSHIPS
+            except ImportError as e:
+                print(f"  Warning: could not import TemplateParser: {e}")
+                self._template_parser = None
+                self._default_primary_relationships = {}
+        return self._template_parser
+
+    def _harvest_ascendix_search(self, meta: ObjectMetadata) -> None:
+        """Harvest T5 signals from Ascendix Search saved searches.
+
+        Queries ascendix_search__Search__c for saved searches targeting
+        this object, and ascendix_search__SearchSetting__c for result
+        column configuration.  Uses the existing TemplateParser from
+        lambda/schema_discovery/signal_harvester.py.
+
+        Cross-object join sections found in templates are recorded in
+        ``meta.ascendix_parent_refs`` so ``build_config_for_object``
+        can supplement the parent config with relationships that only
+        appear in saved-search filters (not in layouts or list views).
+        """
+        import json as _json
+        parser = self._get_template_parser()
+
+        # Accumulate cross-object relationship refs from templates
+        if not hasattr(meta, "ascendix_parent_refs"):
+            meta.ascendix_parent_refs: Dict[str, Set[str]] = {}  # ref_field → {parent_fields}
+
+        # Query saved searches for this object
+        try:
+            soql = (
+                "SELECT Id, Name, ascendix_search__Template__c, "
+                "ascendix_search__ObjectName__c "
+                "FROM ascendix_search__Search__c "
+                f"WHERE ascendix_search__ObjectName__c = '{meta.api_name}' "
+                "LIMIT 100"
+            )
+            result = _as_dict(self.sf.query(soql))
+            records = _as_list(result.get("records"))
+        except Exception as e:
+            if "INVALID_TYPE" in str(e) or "doesn't exist" in str(e):
+                print(f"  Info: Ascendix Search package not installed — skipping T5")
+                return
+            print(f"  Warning: Ascendix Search query failed for {meta.api_name}: {e}")
+            records = []
+
+        # Process saved search templates
+        if parser and records:
+            for rec in records:
+                template_json = rec.get("ascendix_search__Template__c")
+                search_name = rec.get("Name", "Unknown")
+                if not template_json:
+                    continue
+
+                try:
+                    signals = parser.parse_saved_search(
+                        template_json, search_name, meta.api_name
+                    )
+                    for signal in signals:
+                        fs = meta.ensure_field_score(signal.field)
+                        if signal.context == "filter":
+                            fs.ascendix_filter_appearances += 1
+                        elif signal.context in ("result_column", "sort"):
+                            fs.ascendix_result_appearances += 1
+                        elif signal.context == "relationship":
+                            ref_field = _resolve_relationship_to_ref_field(
+                                signal.field, meta.reference_fields
+                            )
+                            if ref_field:
+                                meta.ascendix_parent_refs.setdefault(ref_field, set())
+                except Exception as e:
+                    print(f"  Warning: failed to parse saved search '{search_name}': {e}")
+
+                # Also walk cross-object sections (sections targeting a
+                # different object) to pick up the relationship path.
+                try:
+                    tpl = _json.loads(template_json) if template_json else {}
+                    for section in tpl.get("sectionsList", []):
+                        section_obj = section.get("objectName", "")
+                        relationship = section.get("relationship", "")
+                        if section_obj and section_obj != meta.api_name and relationship:
+                            ref_field = _resolve_relationship_to_ref_field(
+                                relationship, meta.reference_fields
+                            )
+                            if ref_field:
+                                parent_fields_from_section: Set[str] = set()
+                                for fld in section.get("fieldsList", []):
+                                    ln = fld.get("logicalName", "")
+                                    if ln:
+                                        parent_fields_from_section.add(ln)
+                                existing = meta.ascendix_parent_refs.setdefault(
+                                    ref_field, set()
+                                )
+                                existing |= parent_fields_from_section
+                except Exception:
+                    pass
+
+        # Query SearchSetting for result columns scoped to this object.
+        # SearchSetting__c stores one row per (LayoutName, ObjectKeyPrefix).
+        # We use the 3-char key prefix to match settings to this object.
+        try:
+            key_prefix = ""
+            try:
+                describe = _as_dict(
+                    self.sf.restful(f"sobjects/{meta.api_name}/describe")
+                )
+                key_prefix = describe.get("keyPrefix", "")
+            except Exception:
+                pass
+
+            if key_prefix:
+                soql_settings = (
+                    "SELECT Id, ascendix_search__ResultColumns__c "
+                    "FROM ascendix_search__SearchSetting__c "
+                    "WHERE ascendix_search__LayoutName__c = 'Default Layout' "
+                    f"AND ascendix_search__ObjectKeyPrefix__c = '{key_prefix}' "
+                    "LIMIT 5"
+                )
+            else:
+                # Fallback: fetch all Default Layout rows and filter client-side
+                soql_settings = (
+                    "SELECT Id, ascendix_search__ResultColumns__c, "
+                    "ascendix_search__ObjectKeyPrefix__c "
+                    "FROM ascendix_search__SearchSetting__c "
+                    "WHERE ascendix_search__LayoutName__c = 'Default Layout' "
+                    "LIMIT 50"
+                )
+
+            setting_result = _as_dict(self.sf.query(soql_settings))
+            for setting_rec in _as_list(setting_result.get("records")):
+                result_cols_json = setting_rec.get("ascendix_search__ResultColumns__c")
+                if not result_cols_json:
+                    continue
+                try:
+                    cols = _json.loads(result_cols_json)
+                    if isinstance(cols, list):
+                        for col_entry in cols:
+                            col_name = (
+                                col_entry
+                                if isinstance(col_entry, str)
+                                else col_entry.get("fieldName", "")
+                            )
+                            if col_name and col_name in meta.fields:
+                                fs = meta.ensure_field_score(col_name)
+                                fs.ascendix_result_appearances += 1
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"  Warning: SearchSetting query failed: {e}")
+
+        # Apply DEFAULT_PRIMARY_RELATIONSHIPS — ensures key relationships
+        # are included even when no saved-search signals mention them.
+        if hasattr(self, '_default_primary_relationships'):
+            default_rels = self._default_primary_relationships.get(meta.api_name, [])
+            for rel_field in default_rels:
+                if rel_field in meta.reference_fields:
+                    meta.ascendix_parent_refs.setdefault(rel_field, set())
+                    fs = meta.ensure_field_score(rel_field)
+                    if not fs.provenance or "ax_relationship" not in fs.provenance:
+                        fs.provenance.append("ax_relationship")
+
+        ax_count = sum(
+            1 for fs in meta.field_scores.values()
+            if fs.ascendix_result_appearances or fs.ascendix_filter_appearances
+        )
+        if ax_count:
+            print(f"  T5: {ax_count} fields boosted from Ascendix Search")
+        if meta.ascendix_parent_refs:
+            print(f"  T5: {len(meta.ascendix_parent_refs)} cross-object joins from saved searches")
+
+    def discover_objects(self) -> List[str]:
+        """Read object list from Ascendix Search SearchSetting__c.
+
+        Returns a list of object API names configured in Ascendix Search
+        that have at least 1 record in the org.
+
+        The "Selected Objects" config may be spread across multiple
+        SearchSetting rows (each row covers one or more objects), so we
+        query all Default Layout rows and merge their SelectedObjects.
+        """
+        import json as _json
+        try:
+            soql = (
+                "SELECT ascendix_search__SelectedObjects__c "
+                "FROM ascendix_search__SearchSetting__c "
+                "WHERE ascendix_search__LayoutName__c = 'Default Layout' "
+                "LIMIT 100"
+            )
+            result = _as_dict(self.sf.query(soql))
+            records = _as_list(result.get("records"))
+            if not records:
+                print("Warning: No Default Layout SearchSetting found")
+                return []
+
+            # Merge SelectedObjects from all rows (handles chunking)
+            all_selected: Set[str] = set()
+            for rec in records:
+                selected_json = rec.get("ascendix_search__SelectedObjects__c", "")
+                if not selected_json:
+                    continue
+                try:
+                    selected = _json.loads(selected_json)
+                    if isinstance(selected, list):
+                        for obj in selected:
+                            if isinstance(obj, str):
+                                all_selected.add(obj)
+                except (ValueError, TypeError):
+                    pass
+
+            if not all_selected:
+                print("Warning: No objects found in SelectedObjects across SearchSetting rows")
+                return []
+
+            print(f"  Found {len(all_selected)} distinct objects in SearchSetting config")
+
+            # Filter to objects with records
+            objects_with_data: List[str] = []
+            for obj_name in sorted(all_selected):
+                try:
+                    count_result = _as_dict(
+                        self.sf.query(f"SELECT COUNT() FROM {obj_name}")
+                    )
+                    count = count_result.get("totalSize", 0)
+                    if count > 0:
+                        objects_with_data.append(obj_name)
+                        print(f"  {obj_name}: {count} records")
+                    else:
+                        print(f"  {obj_name}: 0 records (deferred)")
+                except Exception as e:
+                    print(f"  {obj_name}: query failed ({e})")
+
+            return objects_with_data
+
+        except Exception as e:
+            if "INVALID_TYPE" in str(e) or "doesn't exist" in str(e):
+                print("Info: Ascendix Search package not installed — cannot discover objects")
+            else:
+                print(f"Warning: object discovery failed: {e}")
+            return []
+
 
 # ===================================================================
 # Config generation logic (no Salesforce connection needed)
@@ -640,6 +945,35 @@ def build_config_for_object(
                         (parent_field, f"child list_view dot notation ({dot_col})")
                     )
                     seen.add(parent_field)
+
+        # T5: Supplement parents from Ascendix Search cross-object join sections.
+        # ascendix_parent_refs maps ref_field → set of parent field names found
+        # in saved-search sectionsList joins.
+        ax_refs = getattr(meta, "ascendix_parent_refs", {})
+        if ref_field in ax_refs:
+            ax_parent_fields = ax_refs[ref_field]
+            if not parent_fields and not ax_parent_fields:
+                # Relationship flagged but no specific parent fields —
+                # ensure at least the nameField is included.
+                if harvester is not None:
+                    nf = harvester.fetch_parent_name_field(parent_obj)
+                    if nf not in seen and _should_include_parent_field(
+                        meta.api_name, ref_field, nf, is_name_field=True
+                    ):
+                        parent_fields.append((nf, "ax_relationship default"))
+                        seen.add(nf)
+                elif "Name" not in seen:
+                    parent_fields.append(("Name", "ax_relationship default"))
+                    seen.add("Name")
+            for ax_pf in sorted(ax_parent_fields):
+                if (
+                    ax_pf not in seen
+                    and _should_include_parent_field(
+                        meta.api_name, ref_field, ax_pf
+                    )
+                ):
+                    parent_fields.append((ax_pf, "ax_search cross-object join"))
+                    seen.add(ax_pf)
 
         if parent_fields:
             parents[ref_field] = parent_fields
@@ -1066,6 +1400,14 @@ def main() -> None:
         "--mock", action="store_true",
         help="Use hardcoded mock metadata instead of live Salesforce.",
     )
+    parser.add_argument(
+        "--discover-objects", action="store_true",
+        help="Read object list from Ascendix Search SearchSetting__c instead of --objects.",
+    )
+    parser.add_argument(
+        "--no-ascendix-search", action="store_true",
+        help="Disable T5 Ascendix Search signal harvesting.",
+    )
     parser.add_argument("--instance-url", default="")
     parser.add_argument("--username", default="")
     parser.add_argument("--password", default="")
@@ -1101,7 +1443,20 @@ def main() -> None:
                   f"{n_parents} parent denorm fields, {len(cfg['children'])} child aggs")
     else:
         sf = connect_salesforce(args)
-        harvester = SalesforceHarvester(sf)
+        ascendix_search = not args.no_ascendix_search
+        harvester = SalesforceHarvester(sf, ascendix_search=ascendix_search)
+
+        # Discover objects from Ascendix Search if requested
+        if args.discover_objects:
+            print("\nDiscovering objects from Ascendix Search settings...")
+            discovered = harvester.discover_objects()
+            if discovered:
+                args.objects = discovered
+                target_set = set(discovered)
+                print(f"\nDiscovered {len(discovered)} objects with data")
+            else:
+                print("Warning: discovery returned no objects, falling back to --objects")
+
         configs = {}
         for obj_name in args.objects:
             print(f"\nHarvesting metadata for {obj_name}...")

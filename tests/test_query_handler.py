@@ -635,6 +635,39 @@ class TestCitationExtraction:
 
         assert result.citations == []
 
+    def test_citations_by_subject_fallback(self):
+        """Task records have subject instead of name — should still produce citations.
+
+        Uses _extract_citations directly to avoid needing Task in the field registry.
+        """
+        from lib.query_handler import QueryHandler
+
+        search_results = [
+            {"id": "00T001", "subject": "Follow up with tenant", "dist": 0.1},
+            {"id": "00T002", "subject": "Send proposal", "dist": 0.2},
+        ]
+        answer = "You have a task: Follow up with tenant."
+
+        citations = QueryHandler._extract_citations(answer, search_results)
+
+        assert len(citations) == 1
+        assert citations[0]["id"] == "00T001"
+        assert citations[0]["name"] == "Follow up with tenant"
+
+    def test_citations_prefer_name_over_subject(self):
+        """When both name and subject exist, name should be used."""
+        from lib.query_handler import QueryHandler
+
+        search_results = [
+            {"id": "a0x001", "name": "Tower One", "subject": "Task subject", "dist": 0.1},
+        ]
+        answer = "Tower One is a great property."
+
+        citations = QueryHandler._extract_citations(answer, search_results)
+
+        assert len(citations) == 1
+        assert citations[0]["name"] == "Tower One"
+
 
 # =========================================================================
 # 8. QueryResult structure

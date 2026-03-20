@@ -402,6 +402,124 @@ export class IngestionStack extends cdk.Stack {
       props.auditBucket.grantWrite(cdcSyncLambda);
     }
 
+    // =========================================================================
+    // Poll Sync Lambda — incremental sync for non-CDC objects
+    // =========================================================================
+
+    const pollSyncSchedule = this.node.tryGetContext("pollSyncSchedule") as
+      | string
+      | undefined;
+
+    // Dedicated role for Poll Sync Lambda
+    const pollSyncRole = new iam.Role(this, "PollSyncLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "service-role/AWSLambdaVPCAccessExecutionRole",
+        ),
+      ],
+    });
+
+    // Bedrock Titan Embed v2
+    pollSyncRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["bedrock:InvokeModel"],
+        resources: [
+          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+        ],
+      }),
+    );
+
+    // SSM for Salesforce credentials + poll watermarks
+    pollSyncRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:PutParameter",
+        ],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/salesforce/*`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/salesforce-ai-search/poll-watermark/*`,
+        ],
+      }),
+    );
+
+    // CloudWatch for sync metrics
+    pollSyncRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["cloudwatch:PutMetricData"],
+        resources: ["*"],
+        conditions: {
+          StringEquals: {
+            "cloudwatch:namespace": "SalesforceAISearch/PollSync",
+          },
+        },
+      }),
+    );
+
+    // SQS for DLQ
+    this.dlq.grantSendMessages(pollSyncRole);
+
+    // KMS
+    kmsKey.grantEncryptDecrypt(pollSyncRole);
+
+    // Turbopuffer API key
+    turbopufferApiKeySecret.grantRead(pollSyncRole);
+
+    const pollSyncLambda = new lambda.Function(this, "PollSyncLambda", {
+      functionName: "salesforce-ai-search-poll-sync",
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: "index.lambda_handler",
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "../lambda/poll_sync/.bundle"),
+        { exclude: LAMBDA_ASSET_EXCLUDES },
+      ),
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 1024,
+      role: pollSyncRole,
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [lambdaSecurityGroup],
+      environment: {
+        SALESFORCE_ORG_ID: "00Ddl000003yx57EAA",
+        POLL_OBJECTS:
+          "ascendix__Deal__c,ascendix__Sale__c,ascendix__Inquiry__c," +
+          "ascendix__Listing__c,ascendix__Preference__c,Task",
+        DENORM_CONFIG_PATH: "denorm_config.yaml",
+        POLL_BATCH_SIZE: "200",
+        TURBOPUFFER_API_KEY:
+          turbopufferApiKeySecret.secretValue.unsafeUnwrap(),
+        LOG_LEVEL: "INFO",
+        ...(props.auditBucket
+          ? { AUDIT_BUCKET: props.auditBucket.bucketName }
+          : {}),
+      },
+    });
+
+    // Grant poll sync write access to audit bucket
+    if (props.auditBucket) {
+      props.auditBucket.grantWrite(pollSyncLambda);
+    }
+
+    // Optional EventBridge scheduled rule for poll sync
+    if (pollSyncSchedule) {
+      const pollSyncRule = new events.Rule(this, "PollSyncScheduleRule", {
+        ruleName: "salesforce-ai-search-poll-sync-schedule",
+        description: "Scheduled poll sync for non-CDC objects",
+        schedule: events.Schedule.expression(pollSyncSchedule),
+      });
+
+      pollSyncRule.addTarget(
+        new targets.LambdaFunction(pollSyncLambda, {
+          retryAttempts: 2,
+        }),
+      );
+    }
+
     // Ingest Lambda (for batch export fallback)
     this.ingestLambda = new lambda.Function(this, "IngestLambda", {
       functionName: "salesforce-ai-search-ingest",
@@ -1242,6 +1360,12 @@ export class IngestionStack extends cdk.Stack {
       value: cdcSyncLambda.functionArn,
       description: "CDC Sync Lambda Function ARN (Phase 2: Turbopuffer sync)",
       exportName: `${this.stackName}-CDCSyncLambdaArn`,
+    });
+
+    new cdk.CfnOutput(this, "PollSyncLambdaArn", {
+      value: pollSyncLambda.functionArn,
+      description: "Poll Sync Lambda Function ARN (incremental sync for non-CDC objects)",
+      exportName: `${this.stackName}-PollSyncLambdaArn`,
     });
 
     // Zero-Config Schema Discovery Lambda output

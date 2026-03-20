@@ -58,9 +58,26 @@ FULL_TEXT_SEARCH_SCHEMA: dict[str, dict[str, Any]] = {
     "leaserate": {"type": "float"},
     # Sale numeric fields
     "saleprice": {"type": "float"},
+    "salepriceperuom": {"type": "float"},
+    "capratepercent": {"type": "float"},
+    "netincome": {"type": "float"},
+    "listingprice": {"type": "float"},
+    "totalarea": {"type": "float"},
     "pricepersf": {"type": "float"},
     "caprate": {"type": "float"},
     "noi": {"type": "float"},
+    # Deal numeric fields (expanded)
+    "grossfeeamount": {"type": "float"},
+    # Inquiry numeric fields
+    "desiredsize": {"type": "float"},
+    "desiredrent": {"type": "float"},
+    # Listing numeric fields
+    "askingrate": {"type": "float"},
+    # Preference numeric fields
+    "minsize": {"type": "float"},
+    "maxsize": {"type": "float"},
+    "minrate": {"type": "float"},
+    "maxrate": {"type": "float"},
     # Geospatial component fields
     "geolocationlatitude": {"type": "float"},
     "geolocationlongitude": {"type": "float"},
@@ -205,8 +222,16 @@ def build_soql(
     metadata_fields: list[str],
     parent_config: dict[str, Any],
     rel_map: dict[str, Any],
+    where_clause: str | None = None,
 ) -> str:
-    """Build SELECT SOQL with direct fields + parent relationship fields."""
+    """Build SELECT SOQL with direct fields + parent relationship fields.
+
+    Parameters
+    ----------
+    where_clause:
+        Optional WHERE/ORDER/LIMIT clause to append (e.g. for poll sync).
+        Should include the ``WHERE`` keyword if filtering is needed.
+    """
     select_parts: list[str] = ["Id", "LastModifiedDate"]
     seen: set[str] = set(select_parts)
 
@@ -230,7 +255,10 @@ def build_soql(
                 select_parts.append(dotted)
                 seen.add(dotted)
 
-    return f"SELECT {', '.join(select_parts)} FROM {object_name}"
+    soql = f"SELECT {', '.join(select_parts)} FROM {object_name}"
+    if where_clause:
+        soql += f" {where_clause}"
+    return soql
 
 
 # ===================================================================

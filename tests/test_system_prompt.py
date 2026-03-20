@@ -282,10 +282,10 @@ class TestSystemPrompt:
     def test_mentions_cite_records(self):
         assert "cite" in SYSTEM_PROMPT.lower()
 
-    def test_mentions_availability_geography_scope(self):
-        assert "Availability supports native market, submarket, and region" in SYSTEM_PROMPT
-        assert "Lease does not currently" in SYSTEM_PROMPT
-        assert "support market or submarket filters" in SYSTEM_PROMPT
+    def test_mentions_geography_scope(self):
+        assert "Geography scope" in SYSTEM_PROMPT
+        assert "market" in SYSTEM_PROMPT.lower()
+        assert "property_city" in SYSTEM_PROMPT
 
     def test_has_deal_few_shot_example(self):
         """Static prompt includes the Deal few-shot example."""

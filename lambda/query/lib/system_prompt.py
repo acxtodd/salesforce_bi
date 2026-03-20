@@ -118,6 +118,109 @@ _CONTACT_FIELDS = """\
   - reports_to_name: manager/contact hierarchy name (denormalized)
   - mailing_latitude, mailing_longitude, other_latitude, other_longitude: geocoordinates"""
 
+# ---------------------------------------------------------------------------
+# Field reference tables for new objects (curated, task 4.10)
+# ---------------------------------------------------------------------------
+
+_DEAL_FIELDS = """\
+  - name: deal record name / deal number
+  - deal_stage (sales_stage): pipeline stage (Prospect, Proposal, Closed Won, etc.)
+  - status: deal status
+  - transaction_type: lease, sale, sublease, or combination (multipicklist)
+  - lease_type: NNN, Gross, Modified Gross, etc.
+  - property_type: property type associated with the deal
+  - deal_value (gross_fee): gross fee amount in dollars
+  - gross_deal_value: total gross deal value
+  - close_date: estimated close date
+  - actual_close_date: actual close date (when deal closed)
+  - probability: win probability percentage
+  - deal_size (size): square footage of the deal
+  - lease_rate: lease rate per unit of measure (PSF)
+  - lease_term: lease term in months
+  - company_gross_fee: company's portion of the gross fee
+  - client_name: client account (denormalized)
+  - buyer_name, seller_name, tenant_name: party names (denormalized)
+  - owner_landlord_name: owner/landlord (denormalized)
+  - tenant_rep_broker_name, listing_broker_company_name, buyer_rep_name, lead_broker_company_name: broker names (denormalized)
+  - property_name, property_city, property_state, property_class: parent property fields (denormalized)"""
+
+_SALE_FIELDS = """\
+  - name: sale comp record name
+  - property_class: building class of the sold property
+  - sale_price: total sale price
+  - price_psf (sale_price_per_uom): sale price per square foot (formula)
+  - total_area: total area sold in square feet
+  - cap_rate (cap_rate_percent): capitalization rate percentage
+  - noi (net_income): net operating income
+  - listing_price: original listing price
+  - listing_date: date the property was listed
+  - sale_date: date the sale closed
+  - date_on_market: when the property went on market
+  - gross_income: gross income of the property
+  - number_units_rooms: number of units or rooms
+  - buyer_name, seller_name: party names (denormalized)
+  - selling_broker_name: selling broker (denormalized)
+  - property_name, property_city, property_state: parent property fields (denormalized)"""
+
+_INQUIRY_FIELDS = """\
+  - name: inquiry record name
+  - description: free-text inquiry details
+  - property_type: desired property type (Office, Industrial, Retail, etc.)
+  - property_class: desired building class (A, B, C)
+  - inquiry_source: how the inquiry originated
+  - active: whether the inquiry is currently active
+  - min_size (area_minimum), max_size (area_maximum): desired size range in SF
+  - min_rent (rent_minimum), max_rent (rent_maximum): desired rent range
+  - min_price (price_minimum), max_price (price_maximum): desired price range
+  - move_in_date (required_move_in_date): when the prospect needs to move in
+  - property_name, property_city, property_state: linked property (denormalized)
+  - broker_name (broker_company_name): broker handling the inquiry (denormalized)
+  - listing_name, availability_name: linked listing/availability (denormalized)
+  - market, submarket: geography (denormalized)"""
+
+_LISTING_FIELDS = """\
+  - name: listing record name
+  - description: listing description text
+  - use_type: space use type (Office, Retail, Industrial, etc.)
+  - property_type: property type
+  - status: listing status (Active, Expired, Under Contract, etc.)
+  - sale_type: sale type classification
+  - listing_date: when the listing was created
+  - expiration_date (listing_expiration): when the listing expires
+  - asking_price: asking sale price
+  - sale_price, sale_price_per_uom: sale pricing
+  - vacant_area: vacant square footage available
+  - listing_broker (listing_broker_company_name): listing broker (denormalized)
+  - listing_broker_contact_name: broker contact (denormalized)
+  - owner_name (owner_landlord_name): owner/landlord (denormalized)
+  - property_name, property_city, property_state, property_class: parent property (denormalized)
+  - market, submarket: geography (denormalized)"""
+
+_PREFERENCE_FIELDS = """\
+  - name: preference record name
+  - sale_or_lease: whether the prospect wants to buy or lease
+  - property_type: desired property type
+  - property_class: desired building class
+  - min_size (area_minimum), max_size (area_maximum): desired size range in SF
+  - min_rent (rent_minimum), max_rent (rent_maximum): desired rent range
+  - min_price (price_minimum), max_price (price_maximum): desired price range
+  - move_in_date (required_move_in_date): desired move-in date
+  - lease_expiration (current_lease_expiration_date): current lease expiration
+  - account_name: parent account (denormalized)
+  - contact_name: parent contact (denormalized)
+  - market, submarket: desired geography (denormalized)"""
+
+_TASK_FIELDS = """\
+  - subject: task title / description line (this is the name-equivalent field)
+  - description: detailed task notes
+  - status: task status (Not Started, In Progress, Completed, etc.)
+  - priority: task priority (High, Normal, Low)
+  - due_date (activity_date): when the task is due
+  - task_subtype: task subtype classification
+  - who_name: related contact/lead name (denormalized)
+  - what_name: related account/opportunity/record name (denormalized)
+  - account_name: parent account (denormalized)"""
+
 # Map of object type (lowercase) -> curated field description override.
 # Objects not in this map get auto-generated field descriptions from the config.
 _CURATED_FIELD_DESCRIPTIONS: dict[str, str] = {
@@ -126,6 +229,12 @@ _CURATED_FIELD_DESCRIPTIONS: dict[str, str] = {
     "availability": _AVAILABILITY_FIELDS,
     "account": _ACCOUNT_FIELDS,
     "contact": _CONTACT_FIELDS,
+    "deal": _DEAL_FIELDS,
+    "sale": _SALE_FIELDS,
+    "inquiry": _INQUIRY_FIELDS,
+    "listing": _LISTING_FIELDS,
+    "preference": _PREFERENCE_FIELDS,
+    "task": _TASK_FIELDS,
 }
 
 # ---------------------------------------------------------------------------
@@ -135,7 +244,7 @@ _CURATED_FIELD_DESCRIPTIONS: dict[str, str] = {
 _FEW_SHOT_EXAMPLES = """\
 ### Example queries and tool calls
 
-**1. Simple property search with filters**
+**1. Property search — filters + text_query**
 User: "Show me Class A office buildings in Dallas over 100,000 SF"
 Tool call:
   search_records(
@@ -143,8 +252,9 @@ Tool call:
     filters={"city": "Dallas", "property_class": "A", "total_sf_gte": 100000},
     text_query="office"
   )
+Note: "office" is qualitative → text_query. "Dallas", "A", and 100000 are structured → filters.
 
-**2. Lease comp search (cross-object with property filters)**
+**2. Lease comp search — cross-object denormalized fields**
 User: "What lease comps exist in Dallas CBD for office space in the last 12 months over 10,000 SF?"
 Tool call:
   search_records(
@@ -157,10 +267,9 @@ Tool call:
     text_query="lease comp CBD",
     limit=20
   )
-Note: Use denormalized fields (property_city, property_type) on the Lease object
-to avoid a separate Property search.
+Note: Use denormalized property_city/property_type on Lease directly — no separate Property search needed.
 
-**3. Availability search**
+**3. Availability search — rent range fields**
 User: "Find available office spaces in Houston with rent under $30 PSF"
 Tool call:
   search_records(
@@ -172,9 +281,49 @@ Tool call:
       "status": "Active"
     }
   )
-Note: Use rent_low and rent_high for asking rate filters. There is no single asking-rate field.
+Note: Asking rates use rent_low/rent_high range fields. There is no single asking-rate field.
 
-**4. Aggregation (count by property class)**
+**4. Deal pipeline search — broker and party filters**
+User: "Show me Transwestern's closed deals this year over $50,000 in fees"
+Tool call:
+  search_records(
+    object_type="Deal",
+    filters={"close_date_gte": "2026-01-01", "deal_value_gte": 50000, "status": "Closed Won"},
+    text_query="Transwestern"
+  )
+Note: Broker names are in text (BM25 match). Structured values go in filters.
+
+**5. Sale comp search**
+User: "Find sale comps in Dallas with cap rate above 6%"
+Tool call:
+  search_records(
+    object_type="Sale",
+    filters={"property_city": "Dallas", "cap_rate_gte": 6}
+  )
+
+**6. Multi-object: inquiries matching a market**
+User: "Find active inquiries for office space in the Houston market"
+Tool call:
+  search_records(
+    object_type="Inquiry",
+    filters={"market": "Houston", "property_type": "Office", "active": true}
+  )
+
+**7. Multi-object: client preferences vs available listings**
+User: "What listings match preferences for Class A office over 5,000 SF?"
+Tool calls (parallel):
+  search_records(
+    object_type="Preference",
+    filters={"property_class": "A", "min_size_lte": 5000, "sale_or_lease": "Lease"},
+    text_query="office"
+  )
+  search_records(
+    object_type="Listing",
+    filters={"property_class": "A", "use_type": "Office", "vacant_area_gte": 5000, "status": "Active"}
+  )
+Note: For cross-object matching, search both object types in parallel and synthesize.
+
+**8. Aggregation with grouping**
 User: "How many properties do we have by class in Dallas?"
 Tool call:
   aggregate_records(
@@ -184,7 +333,7 @@ Tool call:
     group_by="property_class"
   )
 
-**5. Comparison (parallel aggregate calls)**
+**9. Comparison — parallel aggregates**
 User: "Compare average asking rates for Class A properties in Dallas vs Houston"
 Tool calls (parallel):
   aggregate_records(
@@ -199,24 +348,7 @@ Tool calls (parallel):
     aggregate="avg",
     aggregate_field="rent_high"
   )
-Note: For comparison queries, always use parallel tool calls to minimize latency.
-
-**6. Deal search**
-User: "Show me deals closed this year with fee over $50,000"
-Tool call:
-  search_records(
-    object_type="Deal",
-    filters={"close_date_gte": "2026-01-01", "deal_value_gte": 50000},
-    text_query="deal closed"
-  )
-
-**7. Inquiry search with cross-object filter**
-User: "Find inquiries for properties in Houston"
-Tool call:
-  search_records(
-    object_type="Inquiry",
-    filters={"property_city": "Houston"}
-  )\
+Note: For comparison queries, always use parallel tool calls to minimize latency.\
 """
 
 # ---------------------------------------------------------------------------
@@ -251,29 +383,48 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    question. Present what you have rather than making additional calls for
    marginal detail.
 
-3. **Use denormalized fields to avoid multi-step queries.** Lease and Availability
-   records include parent Property fields (property_city, property_class,
-   property_type, property_state, property_total_sf). Use these directly
-   instead of first searching Property, then searching Lease.
+3. **Use text_query for qualitative concepts, filters for structured values.**
+   Put subjective or descriptive terms in text_query (BM25 semantic match):
+   "office", "medical", "CBD", "Class A", broker/company names.
+   Put exact values in filters: city names, numeric ranges, dates, picklist
+   values. Combine both when the question has both types.
 
-4. **For comparison queries, use parallel tool calls.** When the user asks to
-   compare two cities, two time periods, or two property classes, emit
-   multiple tool calls simultaneously rather than sequentially.
+4. **Use denormalized parent fields to avoid multi-step queries.** Many objects
+   include parent fields so you can filter without a separate search:
+   - Lease, Availability → property_name, property_city, property_state,
+     property_class, property_type, property_total_sf
+   - Deal → property_name/city/state/class, client_name, buyer_name,
+     seller_name, tenant_name, broker names
+   - Sale → property_name/city/state/class, buyer_name, seller_name
+   - Inquiry → property_name/city/state, broker_name, listing_name,
+     market, submarket
+   - Listing → property_name/city/state/class, listing_broker, owner_name,
+     market, submarket
+   - Preference → account_name, contact_name, market, submarket
+   - Task → who_name, what_name, account_name
+   Always use these directly instead of first searching the parent object.
 
-5. **Always cite source records by name and ID.** When presenting results,
+5. **For comparison or cross-object queries, use parallel tool calls.** When the
+   user asks to compare two cities, match preferences to listings, or combine
+   data from multiple object types, emit all tool calls in a single turn.
+
+6. **Always cite source records by name and ID.** When presenting results,
    reference the record name and Salesforce ID so the user can navigate to
-   the source record.
+   the source record. For Task records, use the subject field as the name.
 
-6. **If no results found, say so clearly.** Do not fabricate or hallucinate
+7. **Format answers for quick scanning.** Lead with a concise summary sentence,
+   then present details in a table or bullet list. For aggregations, state the
+   number prominently. Do not restate the question or describe your methodology.
+
+8. **If no results found, say so clearly.** Do not fabricate or hallucinate
    data. If a search returns zero results, tell the user and suggest
-   broadening their filters.
+   broadening their filters or trying a different object type.
 
-7. **Asking rates use rent_low and rent_high.** The index stores asking rent
+9. **Asking rates use rent_low and rent_high.** The index stores asking rent
    as a low/high range on Availability records. There is no single
    asking-rate field; always use rent_low and/or rent_high.
-   Use rent_low and rent_high for filtering and aggregation.
 
-8. **Filter operators.** Append a suffix to the field name for comparisons:
+10. **Filter operators.** Append a suffix to the field name for comparisons:
    - ``_gte``: greater than or equal
    - ``_lte``: less than or equal
    - ``_gt``: greater than
@@ -281,17 +432,22 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    - ``_in``: set membership (value is a list)
    - ``_ne``: not equal
 
-9. **live_salesforce_query is NOT available in this POC.** Do not attempt to
+11. **live_salesforce_query is NOT available in this POC.** Do not attempt to
    use the live_salesforce_query tool. All queries must go through
    search_records or aggregate_records.
 
-10. **Object types for current scope.** {obj_text}
+12. **Object types for current scope.** {obj_text}
 
-11. **Geography scope is object-specific.** Property supports market and
-   submarket. Availability supports native market, submarket, and region when
-   those relationships are populated in Salesforce. Lease does not currently
-   support market or submarket filters; use property_city and property_state
-   for lease geography.\
+13. **Geography scope is object-specific.** Property, Inquiry, Listing, and
+   Preference support market and submarket filters. Availability supports
+   market, submarket, and region. Lease and Deal do not have native
+   market/submarket — use property_city and property_state instead.
+   Account and Contact use billing/mailing city and state.
+
+14. **For complex questions, reason about object selection.** When the question
+   could apply to multiple object types (e.g. "what's happening in Dallas"),
+   consider which object best answers the intent before calling tools. If
+   uncertain, search the most specific object type first.\
 """
 
 # Static guidelines used by the static SYSTEM_PROMPT (5-object fallback).

@@ -2126,7 +2126,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T06:16:18.910761+00:00",
-          "updatedAt": "2026-03-20T06:59:30.028318+00:00",
+          "updatedAt": "2026-03-20T08:43:30.348656+00:00",
           "files_modified": [
             "denorm_config.yaml",
             "lib/denormalize.py"
@@ -2145,6 +2145,10 @@
             {
               "timestamp": "2026-03-20T06:59:30.028320+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-20T08:43:30.348491+00:00",
+              "note": "Post-completion fix: initial configs used assumed field names (Description__c, DealType__c, etc.) that don't exist. Corrected all 6 new object configs against live describe API output during bulk load (4.6.5.4). Committed as separate fix."
             }
           ],
           "description": "Run the Ascendix Search-driven config generator for all 10 objects with data. Review output for correctness — embed_fields should include text/semantic fields, metadata_fields should include numeric/date/picklist filterable fields, parents should reflect the cross-object joins from Search__c templates. Commit updated denorm_config.yaml with all objects. Update header comment.",
@@ -2166,7 +2170,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T06:16:34.367642+00:00",
-          "updatedAt": "2026-03-20T06:59:30.076267+00:00",
+          "updatedAt": "2026-03-20T08:43:30.695697+00:00",
           "files_modified": [
             "lib/system_prompt.py",
             "lib/tool_dispatch.py",
@@ -2186,6 +2190,10 @@
             {
               "timestamp": "2026-03-20T06:59:30.076269+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-20T08:43:30.695542+00:00",
+              "note": "Note: lambda/query/lib/ contains its own copies of lib/*.py (Docker image build). These must be synced manually after any lib/ change and redeployed via CDK. Added copies during 4.6.5.4 deploy."
             }
           ],
           "description": "Update system_prompt.py and tool_dispatch.py to cover all indexed objects. Remove 'Deal and Sale are out of scope' instruction. Add field reference tables for Deal, Sale, Inquiry, Listing, Preference, Task. Update object_type enum in search_records/aggregate_records. Use Search__c template resultColumns labels as the human-readable field names in the prompt. Update tests.",
@@ -2205,14 +2213,37 @@
         {
           "id": "4.6.5.4",
           "title": "Bulk load all new objects and verify index",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T06:16:45.620424+00:00",
-          "updatedAt": "2026-03-20T06:28:23.730575+00:00",
-          "files_modified": [],
+          "updatedAt": "2026-03-20T08:43:30.644607+00:00",
+          "files_modified": [
+            "lambda/query/denorm_config.yaml",
+            "lambda/query/lib/system_prompt.py",
+            "lambda/query/lib/tool_dispatch.py",
+            "lambda/query/lib/query_handler.py",
+            "lambda/query/lib/denormalize.py"
+          ],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T07:20:22.353982+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-20T07:47:42.149577+00:00",
+              "note": "Bulk load complete: 9,787 records across 6 objects (Deal=2391, Sale=55, Inquiry=2340, Listing=1763, Preference=3209, Task=29). All counts match SF. 0 skips. Audit: 9787 replay_ok, 9787 denorm_ok. SSM watermarks seeded for all 6 objects. Initial config had wrong field names (assumed Description__c etc.); fixed against describe API."
+            },
+            {
+              "timestamp": "2026-03-20T07:47:42.197659+00:00",
+              "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-20T08:43:30.397223+00:00",
+              "note": "Also deployed query Lambda with updated denorm_config.yaml and lib copies (system_prompt.py, tool_dispatch.py, query_handler.py, denormalize.py) to SalesforceAISearch-Api-dev so the LWC agent sees all 11 object types."
+            }
+          ],
           "description": "Run bulk_load.py for all newly-added objects (Deal, Sale, Inquiry, Listing, Preference, Task). Verify record counts in Turbopuffer match Salesforce. Run sample search queries across object types. Existing 5 objects (Property, Lease, Availability, Account, Contact) should not need reload unless config changed materially.",
           "parent": "4.6.5",
           "depends_on": [
@@ -2221,7 +2252,9 @@
           "acceptance_criteria": [
             "All new objects present in Turbopuffer with record counts matching Salesforce",
             "Sample cross-object queries return results (e.g. deals for a client, listings in a market, preferences matching an availability)"
-          ]
+          ],
+          "startedAt": "2026-03-20T07:20:22.353700+00:00",
+          "completedAt": "2026-03-20T07:47:42.197520+00:00"
         },
         {
           "id": "4.7",
@@ -2367,7 +2400,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:13:40.870049+00:00",
-          "updatedAt": "2026-03-20T07:42:13.833419+00:00",
+          "updatedAt": "2026-03-20T07:39:26.024059+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2395,7 +2428,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:18.385687+00:00",
-          "updatedAt": "2026-03-20T07:42:46.344725+00:00",
+          "updatedAt": "2026-03-20T07:32:24.455472+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2468,7 +2501,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:42.535179+00:00",
-          "updatedAt": "2026-03-20T07:43:14.141156+00:00",
+          "updatedAt": "2026-03-20T07:32:57.506123+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2595,7 +2628,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:15:03.232121+00:00",
-          "updatedAt": "2026-03-20T07:44:42.461794+00:00",
+          "updatedAt": "2026-03-20T07:39:44.213948+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2622,14 +2655,14 @@
           "title": "Add Ascendix Search structural validation harness",
           "status": "pending",
           "owner": "Todd Terry",
-          "createdAt": "2026-03-20T07:44:08.465636+00:00",
-          "updatedAt": "2026-03-20T07:44:37.941127+00:00",
+          "createdAt": "2026-03-20T07:33:07.264459+00:00",
+          "updatedAt": "2026-03-20T07:40:03.251332+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [],
           "description": "Build fixture extraction and parity assertions from live Ascendix Search config so the control-plane flow can be validated against object scope, field allowlists, default columns, and relationship paths without requiring identical ranking or answer wording. This harness is for structural validation and config-refresh evidence, not for constraining the natural language product to Ascendix Search behavior. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
-          "technical_context": "Use normalized fixtures derived from SearchSetting Name plus Value__c and Search__c Template__c. Treat Ascendix Search as a structural reference for object set, filtered fields, default columns, and saved-search relationship paths. Do not compare semantic ranking or LLM phrasing, and do not use this harness to limit valid NL behaviors that go beyond Ascendix's query-builder surface.",
+          "technical_context": "Use normalized fixtures derived from SearchSetting Name plus Value__c and Search__c Template__c. Treat Ascendix Search as a structural oracle: object set, filtered fields, default columns, and saved-search relationship paths. Do not compare semantic ranking or LLM phrasing.",
           "parent": "4.9",
           "acceptance_criteria": [
             "Validation fixtures can be extracted from normalized Ascendix Search config, including Selected Objects*, filtered field lists, Default Layout rows, and Search__c templates.",
@@ -2643,6 +2676,47 @@
           "references": [
             "docs/architecture/ascendix_search_signal_priority_and_validation.md"
           ]
+        },
+        {
+          "id": "4.10",
+          "title": "Improve query agent system prompt for 11-object scope",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T08:09:46.797861+00:00",
+          "updatedAt": "2026-03-20T08:43:15.694862+00:00",
+          "files_modified": [
+            "lib/system_prompt.py",
+            "lib/api-stack.ts",
+            "lambda/query/lib/system_prompt.py",
+            "scripts/bench_query.py",
+            "docs/agent_prompt_export.md"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T08:09:57.410309+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-20T08:17:42.077080+00:00",
+              "note": "All 7 prompt improvements implemented and deployed. Curated field descriptions for all 11 objects, 9 few-shot examples (added sale comp, multi-object matching, deal pipeline), 14 guidelines (added text_query/filter guidance, cross-object denorm map, answer formatting, object selection reasoning, updated geography). Deployed to SalesforceAISearch-Api-dev."
+            },
+            {
+              "timestamp": "2026-03-20T08:17:42.182539+00:00",
+              "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-20T08:43:15.492955+00:00",
+              "note": "Post-completion additions: (1) Benchmarked Haiku 4.5 vs Sonnet 4.6 — Haiku 3x faster (6.4s avg vs 19.9s), 8/8 pass vs 7/8, same answer quality. Locked in Haiku 4.5 as production model (lib/api-stack.ts). (2) Removed record IDs from agent responses — guideline 6 now says cite by name only, no SF IDs. (3) Suppressed emojis and sparse table columns in guideline 7. (4) Exported full agent prompt to docs/agent_prompt_export.md. All deployed to SalesforceAISearch-Api-dev."
+            }
+          ],
+          "description": "Curate field descriptions for 6 new objects, add cross-object relationship guidance, multi-object few-shot examples, text_query vs filter guidance, thinking instruction, answer formatting, and updated geography guideline.",
+          "depends_on": [
+            "4.6.5.3"
+          ],
+          "startedAt": "2026-03-20T08:09:57.410164+00:00",
+          "completedAt": "2026-03-20T08:17:42.182390+00:00"
         }
       ]
     }
@@ -2659,7 +2733,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 10,
+      "4.": 11,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

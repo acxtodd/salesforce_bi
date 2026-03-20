@@ -7,7 +7,6 @@ export class NetworkStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc;
   public readonly lambdaSecurityGroup: ec2.SecurityGroup;
   public readonly kmsKey: kms.Key;
-  public readonly opensearchVpcEndpointId: string;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -64,7 +63,7 @@ export class NetworkStack extends cdk.Stack {
       subnets: [{ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }],
     });
 
-    // VPC Endpoint for Bedrock Runtime
+    // VPC Endpoint for Bedrock Runtime (used by Query Lambda)
     const bedrockEndpoint = new ec2.InterfaceVpcEndpoint(
       this,
       "BedrockRuntimeEndpoint",
@@ -80,7 +79,7 @@ export class NetworkStack extends cdk.Stack {
       },
     );
 
-    // VPC Endpoint for Bedrock Agent Runtime
+    // VPC Endpoint for Bedrock Agent Runtime (kept for potential action Lambda use)
     const bedrockAgentEndpoint = new ec2.InterfaceVpcEndpoint(
       this,
       "BedrockAgentRuntimeEndpoint",
@@ -95,23 +94,6 @@ export class NetworkStack extends cdk.Stack {
         securityGroups: [this.lambdaSecurityGroup],
       },
     );
-
-    // VPC Endpoint for OpenSearch Serverless
-    const opensearchEndpoint = new ec2.InterfaceVpcEndpoint(
-      this,
-      "OpenSearchEndpoint",
-      {
-        vpc: this.vpc,
-        service: new ec2.InterfaceVpcEndpointService(
-          `com.amazonaws.${this.region}.aoss`,
-          443,
-        ),
-        privateDnsEnabled: true,
-        subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-        securityGroups: [this.lambdaSecurityGroup],
-      },
-    );
-    this.opensearchVpcEndpointId = opensearchEndpoint.vpcEndpointId;
 
     // Outputs
     new cdk.CfnOutput(this, "VpcId", {

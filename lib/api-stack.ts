@@ -6,8 +6,6 @@ import * as kms from "aws-cdk-lib/aws-kms";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as logs from "aws-cdk-lib/aws-logs";
-import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
-import * as cr from "aws-cdk-lib/custom-resources";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import * as path from "path";
@@ -30,31 +28,19 @@ interface ApiStackProps extends cdk.StackProps {
   vpc: ec2.Vpc;
   lambdaSecurityGroup: ec2.SecurityGroup;
   kmsKey: kms.Key;
-  telemetryTable: dynamodb.Table;
-  sessionsTable: dynamodb.Table;
   authzCacheTable: dynamodb.Table;
   rateLimitsTable: dynamodb.Table;
   actionMetadataTable: dynamodb.Table;
-  knowledgeBaseId: string;
   ingestLambda: lambda.Function;
-  // Phase 3: Graph Enhancement tables
-  graphNodesTable: dynamodb.Table;
-  graphEdgesTable: dynamodb.Table;
-  graphPathCacheTable: dynamodb.Table;
-  dataBucket: cdk.aws_s3.Bucket;
   // Zero-Config Schema Discovery table
   schemaCacheTable?: dynamodb.Table;
 }
 
 export class ApiStack extends cdk.Stack {
   public readonly api: apigateway.RestApi;
-  public readonly retrieveLambda: lambda.Function;
-  public readonly answerLambda: lambda.Function;
   public readonly queryLambda: lambda.DockerImageFunction;
   public readonly authzLambda: lambda.Function;
   public readonly actionLambda: lambda.Function;
-  public readonly vpcEndpoint: ec2.InterfaceVpcEndpoint;
-  public readonly vpcEndpointService: ec2.VpcEndpointService;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -63,132 +49,15 @@ export class ApiStack extends cdk.Stack {
       vpc,
       lambdaSecurityGroup,
       kmsKey,
-      telemetryTable,
-      sessionsTable,
       authzCacheTable,
       rateLimitsTable,
       actionMetadataTable,
-      knowledgeBaseId,
       ingestLambda,
-      graphNodesTable,
-      graphEdgesTable,
-      graphPathCacheTable,
-      dataBucket,
       schemaCacheTable,
     } = props;
 
     // -------------------------------------------------------------------------
-    // 1. API Gateway Private Link (Interface VPC Endpoint)
-    // -------------------------------------------------------------------------
-
-    // Security Group for API Gateway VPC Endpoint
-    const vpcEndpointSecurityGroup = new ec2.SecurityGroup(
-      this,
-      "VpcEndpointSecurityGroup",
-      {
-        vpc,
-        description: "Security group for API Gateway VPC endpoint",
-        allowAllOutbound: true,
-      },
-    );
-
-    vpcEndpointSecurityGroup.addIngressRule(
-      ec2.Peer.ipv4(vpc.vpcCidrBlock),
-      ec2.Port.tcp(443),
-      "Allow HTTPS from VPC",
-    );
-
-    vpcEndpointSecurityGroup.addIngressRule(
-      lambdaSecurityGroup,
-      ec2.Port.tcp(443),
-      "Allow HTTPS from Lambda functions",
-    );
-
-    this.vpcEndpoint = new ec2.InterfaceVpcEndpoint(
-      this,
-      "ApiGatewayVpcEndpoint",
-      {
-        vpc,
-        service: new ec2.InterfaceVpcEndpointService(
-          `com.amazonaws.${this.region}.execute-api`,
-          443,
-        ),
-        privateDnsEnabled: true,
-        subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-        securityGroups: [vpcEndpointSecurityGroup],
-      },
-    );
-
-    // -------------------------------------------------------------------------
-    // 2. Network Load Balancer & VPC Endpoint Service (for Private Connect)
-    // -------------------------------------------------------------------------
-
-    // Network Load Balancer (Internal)
-    const nlb = new elbv2.NetworkLoadBalancer(this, "PrivateLinkNLB", {
-      vpc,
-      internetFacing: false,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-    });
-
-    // Target Group for NLB - Targets are the IPs of the VPC Endpoint
-    const targetGroup = new elbv2.NetworkTargetGroup(
-      this,
-      "PrivateLinkTargetGroup",
-      {
-        vpc,
-        port: 443,
-        protocol: elbv2.Protocol.TCP,
-        targetType: elbv2.TargetType.IP,
-        healthCheck: {
-          protocol: elbv2.Protocol.TCP,
-          enabled: true,
-        },
-      },
-    );
-
-    const listener = nlb.addListener("PrivateLinkListener", {
-      port: 443,
-      defaultAction: elbv2.NetworkListenerAction.forward([targetGroup]),
-    });
-
-    // Custom Resource to find ENI IPs of the Interface Endpoint
-    // Kept for output reference, but not used for registration automatically
-    const getEndpointIpsParams: cr.AwsSdkCall = {
-      service: "EC2",
-      action: "describeNetworkInterfaces",
-      parameters: {
-        NetworkInterfaceIds: this.vpcEndpoint.vpcEndpointNetworkInterfaceIds,
-      },
-      physicalResourceId: cr.PhysicalResourceId.of("ApiGatewayEndpointIps"),
-    };
-
-    const getEndpointIps = new cr.AwsCustomResource(this, "GetEndpointIps", {
-      onCreate: getEndpointIpsParams,
-      onUpdate: getEndpointIpsParams,
-      policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
-        resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE,
-      }),
-    });
-
-    // MANUAL STEP REQUIRED: Register targets
-    // The automated registration via AwsCustomResource failed due to SDK module resolution issues.
-    // User must manually register the IPs of 'ApiGatewayVpcEndpoint' to 'PrivateLinkTargetGroup'.
-
-    // Create VPC Endpoint Service pointing to the NLB
-    this.vpcEndpointService = new ec2.VpcEndpointService(
-      this,
-      "SalesforceEndpointService",
-      {
-        vpcEndpointServiceLoadBalancers: [nlb],
-        acceptanceRequired: true,
-        allowedPrincipals: [
-          new iam.ArnPrincipal(`arn:aws:iam::${this.account}:root`),
-        ],
-      },
-    );
-
-    // -------------------------------------------------------------------------
-    // 3. Lambda Roles & Functions
+    // 1. Lambda Roles & Functions
     // -------------------------------------------------------------------------
 
     // Helper to create a Lambda role with common permissions
@@ -312,115 +181,6 @@ export class ApiStack extends cdk.Stack {
       },
     });
 
-    // 2. Retrieve Lambda Role
-    const retrieveRole = createLambdaRole(
-      "RetrieveLambdaRole",
-      "Role for Retrieve Lambda",
-    );
-    telemetryTable.grantReadWriteData(retrieveRole);
-
-    // Phase 3: Grant access to graph tables for relationship queries
-    graphNodesTable.grantReadData(retrieveRole);
-    graphEdgesTable.grantReadData(retrieveRole);
-    graphPathCacheTable.grantReadWriteData(retrieveRole);
-    dataBucket.grantRead(retrieveRole);
-
-    // -------------------------------------------------------------------------
-    // Schema Discovery Lambda Layer
-    // -------------------------------------------------------------------------
-    // **Feature: zero-config-production, Task 27.1**
-    // Shared Lambda Layer for schema_discovery module to avoid code duplication
-    // across retrieve, graph_builder, and other lambdas that need schema access.
-    //
-    // The layer is structured as:
-    //   /opt/python/schema_discovery/__init__.py
-    //   /opt/python/schema_discovery/models.py
-    //   /opt/python/schema_discovery/cache.py
-    //   /opt/python/schema_discovery/discoverer.py
-    //   /opt/python/schema_discovery/index.py
-    //
-    // Note: The layer directory must be pre-built with the correct structure.
-    // Use: lambda/layers/schema_discovery/python/schema_discovery/
-    const schemaDiscoveryLayer = new lambda.LayerVersion(
-      this,
-      "SchemaDiscoveryLayer",
-      {
-        layerVersionName: "salesforce-ai-search-schema-discovery",
-        description: "Shared schema discovery module for Salesforce AI Search",
-        code: lambda.Code.fromAsset(
-          path.join(__dirname, "../lambda/layers/schema_discovery"),
-          { exclude: LAMBDA_ASSET_EXCLUDES },
-        ),
-        compatibleRuntimes: [lambda.Runtime.PYTHON_3_11],
-        compatibleArchitectures: [
-          lambda.Architecture.X86_64,
-          lambda.Architecture.ARM_64,
-        ],
-      },
-    );
-
-    // Retrieve Lambda
-    this.retrieveLambda = new lambda.Function(this, "RetrieveLambda", {
-      functionName: "salesforce-ai-search-retrieve",
-      runtime: lambda.Runtime.PYTHON_3_11,
-      handler: "index.lambda_handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/retrieve"), { exclude: LAMBDA_ASSET_EXCLUDES }),
-      timeout: cdk.Duration.seconds(29),
-      memorySize: 1024,
-      role: retrieveRole,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [lambdaSecurityGroup],
-      // **Feature: zero-config-production, Task 27.1**
-      // Use shared schema_discovery layer instead of copied module
-      layers: [schemaDiscoveryLayer],
-      environment: {
-        AUTHZ_LAMBDA_FUNCTION_NAME: this.authzLambda.functionName,
-        KNOWLEDGE_BASE_ID: knowledgeBaseId,
-        TELEMETRY_TABLE_NAME: telemetryTable.tableName,
-        DEFAULT_TOP_K: "15",
-        MAX_TOP_K: "25",
-        CACHE_TTL_SECONDS: "60",
-        CACHE_MAX_SIZE: "100",
-        LOG_LEVEL: "INFO",
-        // Phase 3: Graph Enhancement tables
-        GRAPH_NODES_TABLE: graphNodesTable.tableName,
-        GRAPH_EDGES_TABLE: graphEdgesTable.tableName,
-        GRAPH_PATH_CACHE_TABLE: graphPathCacheTable.tableName,
-        DATA_BUCKET: dataBucket.bucketName,
-        // Phase 3: Feature flags
-        INTENT_ROUTING_ENABLED: "true",
-        GRAPH_ROUTING_ENABLED: "true",
-        INTENT_LOGGING_ENABLED: "true",
-        // Zero-Config Schema Discovery
-        SCHEMA_CACHE_TABLE:
-          schemaCacheTable?.tableName || "salesforce-ai-search-schema-cache",
-        SCHEMA_FILTER_ENABLED: "true",
-      },
-    });
-
-    // Grant Retrieve Lambda read access to schema cache table
-    if (schemaCacheTable) {
-      schemaCacheTable.grantReadData(this.retrieveLambda);
-    }
-
-    const retrieveVersion = this.retrieveLambda.currentVersion;
-    const retrieveAlias = new lambda.Alias(this, "RetrieveLambdaAlias", {
-      aliasName: "live",
-      version: retrieveVersion,
-      provisionedConcurrentExecutions: 5,
-    });
-
-    // Grant permissions
-    this.authzLambda.grantInvoke(this.retrieveLambda); // Retrieve invokes AuthZ
-
-    // 3. Answer Lambda Role
-    const answerRole = createLambdaRole(
-      "AnswerLambdaRole",
-      "Role for Answer Lambda",
-    );
-    sessionsTable.grantReadWriteData(answerRole);
-
     // -------------------------------------------------------------------------
     // Secrets Manager for API Key (Security Fix - Task 28.1)
     // -------------------------------------------------------------------------
@@ -435,70 +195,7 @@ export class ApiStack extends cdk.Stack {
       "salesforce-ai-search/streaming-api-key",
     );
 
-    // Answer Lambda
-    this.answerLambda = new lambda.DockerImageFunction(this, "AnswerLambda", {
-      functionName: "salesforce-ai-search-answer-docker",
-      code: lambda.DockerImageCode.fromImageAsset(
-        path.join(__dirname, "../lambda/answer"),
-      ),
-      timeout: cdk.Duration.seconds(29),
-      memorySize: 2048,
-      architecture: lambda.Architecture.ARM_64, // Critical for Mac M1/M2 builds
-      role: answerRole,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [lambdaSecurityGroup],
-      environment: {
-        AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
-        RETRIEVE_LAMBDA_FUNCTION_NAME: this.retrieveLambda.functionName,
-        SESSIONS_TABLE_NAME: sessionsTable.tableName,
-        BEDROCK_MODEL_ID:
-          "arn:aws:bedrock:us-west-2:382211616288:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        BEDROCK_GUARDRAIL_ID: process.env.BEDROCK_GUARDRAIL_ID || "",
-        BEDROCK_GUARDRAIL_VERSION: "DRAFT",
-        DEFAULT_TOP_K: "15",
-        MAX_TOP_K: "25",
-        DEFAULT_MAX_TOKENS: "600",
-        DEFAULT_TEMPERATURE: "0.3",
-        LOG_LEVEL: "INFO",
-        // **Feature: zero-config-production, Task 28.1**
-        // API key now retrieved from Secrets Manager at runtime
-        API_KEY_SECRET_ARN: streamingApiKeySecret.secretArn,
-      },
-    });
-
-    // Grant Answer Lambda permission to read the API key secret
-    streamingApiKeySecret.grantRead(this.answerLambda);
-
-    // Enable Function URL for Streaming
-    // **SECURITY WARNING - QA Finding #1 (graph-aware-zero-config-retrieval, Task 23)**
-    // This Function URL bypasses API Gateway and API key enforcement.
-    // Risk: Public, unauthenticated endpoint (authType: NONE, CORS: *)
-    // Mitigation: Application-level API key validation in Answer Lambda (fail-closed)
-    // Status: DEFERRED for post-POC - needed for streaming responses to LWC
-    // Production: Should use CloudFront + OAC, or WebSocket API Gateway
-    // See: Requirement 11.1 - "no public Function URLs"
-    const answerFunctionUrl = this.answerLambda.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE, // TODO: Switch to AWS_IAM with CloudFront OAC
-      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
-      cors: {
-        allowedOrigins: ["*"], // TODO: Restrict to Salesforce domains in production
-        allowedMethods: [lambda.HttpMethod.POST],
-        allowedHeaders: ["*"], // TODO: Restrict to required headers in production
-      },
-    });
-
-    const answerVersion = this.answerLambda.currentVersion;
-    const answerAlias = new lambda.Alias(this, "AnswerLambdaAlias", {
-      aliasName: "live",
-      version: answerVersion,
-      // provisionedConcurrentExecutions: 5, // Removed to fix deployment failure
-    });
-
-    // Grant permissions
-    this.retrieveLambda.grantInvoke(this.answerLambda); // Answer invokes Retrieve
-
-    // 3b. Query Lambda (Phase 2: Turbopuffer + tool-use via /query endpoint)
+    // 2. Query Lambda (Phase 2: Turbopuffer + tool-use via /query endpoint)
     const queryRole = createLambdaRole(
       "QueryLambdaRole",
       "Role for Query Lambda",
@@ -549,7 +246,7 @@ export class ApiStack extends cdk.Stack {
       },
     });
 
-    // 4. Action Lambda Role
+    // 3. Action Lambda Role
     const actionRole = createLambdaRole(
       "ActionLambdaRole",
       "Role for Action Lambda",
@@ -651,92 +348,6 @@ export class ApiStack extends cdk.Stack {
         ],
       },
     });
-
-    // Request/Response models for validation
-    const retrieveRequestModel = this.api.addModel("RetrieveRequestModel", {
-      contentType: "application/json",
-      modelName: "RetrieveRequest",
-      schema: {
-        type: apigateway.JsonSchemaType.OBJECT,
-        required: ["query", "salesforceUserId"],
-        properties: {
-          query: { type: apigateway.JsonSchemaType.STRING },
-          salesforceUserId: { type: apigateway.JsonSchemaType.STRING },
-          topK: { type: apigateway.JsonSchemaType.INTEGER },
-          filters: { type: apigateway.JsonSchemaType.OBJECT },
-          recordContext: { type: apigateway.JsonSchemaType.OBJECT },
-          hybrid: { type: apigateway.JsonSchemaType.BOOLEAN },
-          authzMode: { type: apigateway.JsonSchemaType.STRING },
-        },
-      },
-    });
-
-    const answerRequestModel = this.api.addModel("AnswerRequestModel", {
-      contentType: "application/json",
-      modelName: "AnswerRequest",
-      schema: {
-        type: apigateway.JsonSchemaType.OBJECT,
-        required: ["query", "salesforceUserId"],
-        properties: {
-          query: { type: apigateway.JsonSchemaType.STRING },
-          salesforceUserId: { type: apigateway.JsonSchemaType.STRING },
-          sessionId: { type: apigateway.JsonSchemaType.STRING },
-          topK: { type: apigateway.JsonSchemaType.INTEGER },
-          recordContext: { type: apigateway.JsonSchemaType.OBJECT },
-          policy: { type: apigateway.JsonSchemaType.OBJECT },
-        },
-      },
-    });
-
-    // /retrieve endpoint
-    const retrieveResource = this.api.root.addResource("retrieve");
-    retrieveResource.addMethod(
-      "POST",
-      new apigateway.LambdaIntegration(retrieveAlias, {
-        proxy: true,
-        timeout: cdk.Duration.seconds(29),
-      }),
-      {
-        apiKeyRequired: true,
-        requestValidator: new apigateway.RequestValidator(
-          this,
-          "RetrieveRequestValidator",
-          {
-            restApi: this.api,
-            validateRequestBody: true,
-            validateRequestParameters: false,
-          },
-        ),
-        requestModels: {
-          "application/json": retrieveRequestModel,
-        },
-      },
-    );
-
-    // /answer endpoint
-    const answerResource = this.api.root.addResource("answer");
-    answerResource.addMethod(
-      "POST",
-      new apigateway.LambdaIntegration(answerAlias, {
-        proxy: true,
-        timeout: cdk.Duration.seconds(29),
-      }),
-      {
-        apiKeyRequired: true,
-        requestValidator: new apigateway.RequestValidator(
-          this,
-          "AnswerRequestValidator",
-          {
-            restApi: this.api,
-            validateRequestBody: true,
-            validateRequestParameters: false,
-          },
-        ),
-        requestModels: {
-          "application/json": answerRequestModel,
-        },
-      },
-    );
 
     // /ingest endpoint (for batch export)
     const ingestResource = this.api.root.addResource("ingest");
@@ -864,53 +475,6 @@ export class ApiStack extends cdk.Stack {
     userUsagePlan.addApiKey(userApiKey);
     serviceUsagePlan.addApiKey(serviceApiKey);
 
-    // CloudWatch Alarms
-    new cdk.aws_cloudwatch.Alarm(
-      this,
-      "RetrieveProvisionedConcurrencyUtilization",
-      {
-        alarmName: "salesforce-ai-search-retrieve-provisioned-utilization",
-        alarmDescription:
-          "Alert when Retrieve Lambda provisioned concurrency utilization is high",
-        metric: new cdk.aws_cloudwatch.Metric({
-          namespace: "AWS/Lambda",
-          metricName: "ProvisionedConcurrencyUtilization",
-          dimensionsMap: {
-            FunctionName: this.retrieveLambda.functionName,
-            Resource: `${this.retrieveLambda.functionName}:live`,
-          },
-          statistic: "Average",
-          period: cdk.Duration.minutes(5),
-        }),
-        threshold: 0.8,
-        evaluationPeriods: 2,
-        comparisonOperator:
-          cdk.aws_cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-        treatMissingData: cdk.aws_cloudwatch.TreatMissingData.NOT_BREACHING,
-      },
-    );
-
-    /*
-    new cdk.aws_cloudwatch.Alarm(this, 'AnswerProvisionedConcurrencyUtilization', {
-      alarmName: 'salesforce-ai-search-answer-provisioned-utilization',
-      alarmDescription: 'Alert when Answer Lambda provisioned concurrency utilization is high',
-      metric: new cdk.aws_cloudwatch.Metric({
-        namespace: 'AWS/Lambda',
-        metricName: 'ProvisionedConcurrencyUtilization',
-        dimensionsMap: {
-          FunctionName: this.answerLambda.functionName,
-          Resource: `${this.answerLambda.functionName}:live`,
-        },
-        statistic: 'Average',
-        period: cdk.Duration.minutes(5),
-      }),
-      threshold: 0.8,
-      evaluationPeriods: 2,
-      comparisonOperator: cdk.aws_cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-      treatMissingData: cdk.aws_cloudwatch.TreatMissingData.NOT_BREACHING,
-    });
-    */
-
     // Outputs
     new cdk.CfnOutput(this, "ApiId", {
       value: this.api.restApiId,
@@ -936,28 +500,10 @@ export class ApiStack extends cdk.Stack {
       exportName: `${this.stackName}-ApiEndpoint`,
     });
 
-    new cdk.CfnOutput(this, "RetrieveLambdaArn", {
-      value: this.retrieveLambda.functionArn,
-      description: "Retrieve Lambda ARN",
-      exportName: `${this.stackName}-RetrieveLambdaArn`,
-    });
-
-    new cdk.CfnOutput(this, "AnswerLambdaArn", {
-      value: this.answerLambda.functionArn,
-      description: "Answer Lambda ARN",
-      exportName: `${this.stackName}-AnswerLambdaArn`,
-    });
-
     new cdk.CfnOutput(this, "AuthzLambdaArn", {
       value: this.authzLambda.functionArn,
       description: "AuthZ Lambda ARN",
       exportName: `${this.stackName}-AuthzLambdaArn`,
-    });
-
-    new cdk.CfnOutput(this, "AnswerFunctionUrl", {
-      value: answerFunctionUrl.url,
-      description: "Answer Lambda Function URL (Streaming)",
-      exportName: `${this.stackName}-AnswerFunctionUrl`,
     });
 
     new cdk.CfnOutput(this, "QueryFunctionUrl", {

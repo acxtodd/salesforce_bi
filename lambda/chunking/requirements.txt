@@ -1,2 +1,0 @@
-# No external dependencies required for chunking Lambda
-# Uses only Python standard library

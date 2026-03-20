@@ -4,28 +4,19 @@ import * as sns from "aws-cdk-lib/aws-sns";
 import * as subscriptions from "aws-cdk-lib/aws-sns-subscriptions";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
-import * as opensearchserverless from "aws-cdk-lib/aws-opensearchserverless";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as actions from "aws-cdk-lib/aws-cloudwatch-actions";
 import { Construct } from "constructs";
-import { CloudWatchInsightsQueries } from "./cloudwatch-insights-queries";
 
 interface MonitoringStackProps extends cdk.StackProps {
   api: apigateway.RestApi;
-  retrieveLambda: lambda.Function;
-  answerLambda?: lambda.Function;
   authzLambda: lambda.Function;
   actionLambda?: lambda.Function; // Phase 2
-  collection: opensearchserverless.CfnCollection;
   telemetryTable: dynamodb.Table;
   sessionsTable: dynamodb.Table;
   authzCacheTable: dynamodb.Table;
   rateLimitsTable?: dynamodb.Table; // Phase 2
-  // Phase 3: Graph Enhancement tables
-  graphNodesTable?: dynamodb.Table;
-  graphEdgesTable?: dynamodb.Table;
-  graphPathCacheTable?: dynamodb.Table;
 }
 
 export class MonitoringStack extends cdk.Stack {
@@ -36,7 +27,6 @@ export class MonitoringStack extends cdk.Stack {
   public readonly freshnessDashboard: cloudwatch.Dashboard;
   public readonly costDashboard: cloudwatch.Dashboard;
   public readonly agentActionsDashboard?: cloudwatch.Dashboard; // Phase 2
-  public readonly graphOperationsDashboard?: cloudwatch.Dashboard; // Phase 3
   public readonly plannerPerformanceDashboard?: cloudwatch.Dashboard; // Graph-Aware Zero-Config
 
   constructor(scope: Construct, id: string, props: MonitoringStackProps) {
@@ -44,19 +34,12 @@ export class MonitoringStack extends cdk.Stack {
 
     const {
       api,
-      retrieveLambda,
-      answerLambda,
       authzLambda,
       actionLambda,
-      collection,
       telemetryTable,
       sessionsTable,
       authzCacheTable,
       rateLimitsTable,
-      // Phase 3: Graph Enhancement tables
-      graphNodesTable,
-      graphEdgesTable,
-      graphPathCacheTable,
     } = props;
 
     // SNS Topics for alarm notifications
@@ -136,47 +119,6 @@ export class MonitoringStack extends cdk.Stack {
       period: cdk.Duration.minutes(1),
     });
 
-    // Lambda metrics
-    const retrieveLambdaDuration = retrieveLambda.metricDuration({
-      statistic: "p95",
-      period: cdk.Duration.minutes(1),
-    });
-
-    const answerLambdaDuration = answerLambda?.metricDuration({
-      statistic: "p95",
-      period: cdk.Duration.minutes(1),
-    });
-
-    const retrieveLambdaErrors = retrieveLambda.metricErrors({
-      statistic: "Sum",
-      period: cdk.Duration.minutes(1),
-    });
-
-    const answerLambdaErrors = answerLambda?.metricErrors({
-      statistic: "Sum",
-      period: cdk.Duration.minutes(1),
-    });
-
-    const retrieveLambdaThrottles = retrieveLambda.metricThrottles({
-      statistic: "Sum",
-      period: cdk.Duration.minutes(1),
-    });
-
-    const answerLambdaThrottles = answerLambda?.metricThrottles({
-      statistic: "Sum",
-      period: cdk.Duration.minutes(1),
-    });
-
-    const retrieveLambdaConcurrent = retrieveLambda.metricInvocations({
-      statistic: "Sum",
-      period: cdk.Duration.minutes(1),
-    });
-
-    const answerLambdaConcurrent = answerLambda?.metricInvocations({
-      statistic: "Sum",
-      period: cdk.Duration.minutes(1),
-    });
-
     // Add widgets to API Performance Dashboard
     this.apiPerformanceDashboard.addWidgets(
       new cloudwatch.GraphWidget({
@@ -193,52 +135,10 @@ export class MonitoringStack extends cdk.Stack {
       }),
     );
 
-    const durationMetrics = [retrieveLambdaDuration];
-    if (answerLambdaDuration) durationMetrics.push(answerLambdaDuration);
-
     this.apiPerformanceDashboard.addWidgets(
       new cloudwatch.GraphWidget({
         title: "API Gateway Latency (ms)",
         left: [apiLatency],
-        width: 12,
-        height: 6,
-      }),
-      new cloudwatch.GraphWidget({
-        title: "Lambda Duration - p95 (ms)",
-        left: durationMetrics,
-        width: 12,
-        height: 6,
-      }),
-    );
-
-    const errorMetrics = [retrieveLambdaErrors];
-    if (answerLambdaErrors) errorMetrics.push(answerLambdaErrors);
-
-    const throttleMetrics = [retrieveLambdaThrottles];
-    if (answerLambdaThrottles) throttleMetrics.push(answerLambdaThrottles);
-
-    this.apiPerformanceDashboard.addWidgets(
-      new cloudwatch.GraphWidget({
-        title: "Lambda Errors",
-        left: errorMetrics,
-        width: 12,
-        height: 6,
-      }),
-      new cloudwatch.GraphWidget({
-        title: "Lambda Throttles",
-        left: throttleMetrics,
-        width: 12,
-        height: 6,
-      }),
-    );
-
-    const concurrentMetrics = [retrieveLambdaConcurrent];
-    if (answerLambdaConcurrent) concurrentMetrics.push(answerLambdaConcurrent);
-
-    this.apiPerformanceDashboard.addWidgets(
-      new cloudwatch.GraphWidget({
-        title: "Lambda Concurrent Executions",
-        left: concurrentMetrics,
         width: 24,
         height: 6,
       }),
@@ -473,53 +373,9 @@ export class MonitoringStack extends cdk.Stack {
       period: cdk.Duration.hours(1),
     });
 
-    // OpenSearch Serverless costs (estimated from OCUs)
-    const openSearchSearchOCU = new cloudwatch.Metric({
-      namespace: "AWS/AOSS",
-      metricName: "SearchOCU",
-      dimensionsMap: {
-        CollectionName: collection.name,
-        ClientId: this.account,
-      },
-      statistic: "Average",
-      period: cdk.Duration.hours(1),
-    });
-
-    const openSearchIndexingOCU = new cloudwatch.Metric({
-      namespace: "AWS/AOSS",
-      metricName: "IndexingOCU",
-      dimensionsMap: {
-        CollectionName: collection.name,
-        ClientId: this.account,
-      },
-      statistic: "Average",
-      period: cdk.Duration.hours(1),
-    });
-
     // Lambda invocation costs
-    const invocationMetrics: any = {
-      retrieve: retrieveLambda.metricInvocations({
-        statistic: "Sum",
-        period: cdk.Duration.hours(1),
-      }),
-      authz: authzLambda.metricInvocations({
-        statistic: "Sum",
-        period: cdk.Duration.hours(1),
-      }),
-    };
-
-    let lambdaExpression = "retrieve + authz";
-    if (answerLambda) {
-      invocationMetrics.answer = answerLambda.metricInvocations({
-        statistic: "Sum",
-        period: cdk.Duration.hours(1),
-      });
-      lambdaExpression += " + answer";
-    }
-
-    const totalLambdaInvocations = new cloudwatch.MathExpression({
-      expression: lambdaExpression,
-      usingMetrics: invocationMetrics,
+    const totalLambdaInvocations = authzLambda.metricInvocations({
+      statistic: "Sum",
       period: cdk.Duration.hours(1),
     });
 
@@ -580,15 +436,9 @@ export class MonitoringStack extends cdk.Stack {
 
     this.costDashboard.addWidgets(
       new cloudwatch.GraphWidget({
-        title: "OpenSearch Serverless OCUs",
-        left: [openSearchSearchOCU, openSearchIndexingOCU],
-        width: 12,
-        height: 6,
-      }),
-      new cloudwatch.GraphWidget({
         title: "DynamoDB Capacity Units (Hourly)",
         left: [dynamoDbReadCapacity, dynamoDbWriteCapacity],
-        width: 12,
+        width: 24,
         height: 6,
       }),
     );
@@ -772,338 +622,6 @@ export class MonitoringStack extends cdk.Stack {
       new cdk.CfnOutput(this, "AgentActionsDashboardUrl", {
         value: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${this.agentActionsDashboard.dashboardName}`,
         description: "URL to Agent Actions Dashboard",
-      });
-    }
-
-    // ========================================
-    // Phase 3: Graph Operations Dashboard (Task 9.4)
-    // ========================================
-    if (graphNodesTable && graphEdgesTable) {
-      this.graphOperationsDashboard = new cloudwatch.Dashboard(
-        this,
-        "GraphOperationsDashboard",
-        {
-          dashboardName: "Salesforce-AI-Search-Graph-Operations",
-        },
-      );
-
-      // Graph traversal latency metrics (Task 9.1)
-      const graphTraversalLatencyP50 = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphTraversalLatency",
-        statistic: "p50",
-        period: cdk.Duration.minutes(5),
-      });
-
-      const graphTraversalLatencyP95 = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphTraversalLatency",
-        statistic: "p95",
-        period: cdk.Duration.minutes(5),
-      });
-
-      const graphTraversalLatencyP99 = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphTraversalLatency",
-        statistic: "p99",
-        period: cdk.Duration.minutes(5),
-      });
-
-      // Graph build latency metrics
-      const graphBuildLatencyP50 = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphBuildLatency",
-        statistic: "p50",
-        period: cdk.Duration.minutes(5),
-      });
-
-      const graphBuildLatencyP95 = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphBuildLatency",
-        statistic: "p95",
-        period: cdk.Duration.minutes(5),
-      });
-
-      // Graph node and edge counts
-      const graphNodesCreated = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphNodesCreated",
-        statistic: "Sum",
-        period: cdk.Duration.minutes(5),
-      });
-
-      const graphEdgesCreated = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphEdgesCreated",
-        statistic: "Sum",
-        period: cdk.Duration.minutes(5),
-      });
-
-      // Cache metrics
-      const graphCacheHits = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphCacheHit",
-        statistic: "Sum",
-        period: cdk.Duration.minutes(5),
-      });
-
-      const graphCacheMisses = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphCacheMiss",
-        statistic: "Sum",
-        period: cdk.Duration.minutes(5),
-      });
-
-      // Graph cache hit rate calculation
-      const graphCacheHitRate = new cloudwatch.MathExpression({
-        expression: "IF(hits + misses > 0, (hits / (hits + misses)) * 100, 0)",
-        usingMetrics: {
-          hits: graphCacheHits,
-          misses: graphCacheMisses,
-        },
-        period: cdk.Duration.minutes(5),
-        label: "Cache Hit Rate (%)",
-      });
-
-      // Graph errors
-      const graphTraversalErrors = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphTraversalErrors",
-        statistic: "Sum",
-        period: cdk.Duration.minutes(5),
-      });
-
-      const graphBuildErrors = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Graph",
-        metricName: "GraphBuildErrors",
-        statistic: "Sum",
-        period: cdk.Duration.minutes(5),
-      });
-
-      // Intent classification metrics (Task 9.2)
-      const intentClassificationLatencyP50 = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Intent",
-        metricName: "IntentClassificationLatency",
-        statistic: "p50",
-        period: cdk.Duration.minutes(5),
-      });
-
-      const intentClassificationLatencyP95 = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Intent",
-        metricName: "IntentClassificationLatency",
-        statistic: "p95",
-        period: cdk.Duration.minutes(5),
-      });
-
-      const intentConfidenceAvg = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Intent",
-        metricName: "IntentConfidence",
-        statistic: "Average",
-        period: cdk.Duration.minutes(5),
-      });
-
-      const intentFallbackCount = new cloudwatch.Metric({
-        namespace: "SalesforceAISearch/Intent",
-        metricName: "IntentFallback",
-        statistic: "Sum",
-        period: cdk.Duration.minutes(5),
-      });
-
-      // Add widgets to Graph Operations Dashboard (Task 9.4)
-      this.graphOperationsDashboard.addWidgets(
-        new cloudwatch.GraphWidget({
-          title: "Graph Traversal Latency (ms)",
-          left: [
-            graphTraversalLatencyP50,
-            graphTraversalLatencyP95,
-            graphTraversalLatencyP99,
-          ],
-          width: 12,
-          height: 6,
-        }),
-        new cloudwatch.GraphWidget({
-          title: "Graph Build Latency (ms)",
-          left: [graphBuildLatencyP50, graphBuildLatencyP95],
-          width: 12,
-          height: 6,
-        }),
-      );
-
-      this.graphOperationsDashboard.addWidgets(
-        new cloudwatch.GraphWidget({
-          title: "Graph Nodes & Edges Created",
-          left: [graphNodesCreated, graphEdgesCreated],
-          width: 12,
-          height: 6,
-        }),
-        new cloudwatch.SingleValueWidget({
-          title: "Graph Cache Hit Rate",
-          metrics: [graphCacheHitRate],
-          width: 6,
-          height: 6,
-        }),
-        new cloudwatch.GraphWidget({
-          title: "Cache Hits vs Misses",
-          left: [graphCacheHits, graphCacheMisses],
-          width: 6,
-          height: 6,
-        }),
-      );
-
-      this.graphOperationsDashboard.addWidgets(
-        new cloudwatch.GraphWidget({
-          title: "Intent Classification Latency (ms)",
-          left: [intentClassificationLatencyP50, intentClassificationLatencyP95],
-          width: 12,
-          height: 6,
-        }),
-        new cloudwatch.GraphWidget({
-          title: "Intent Confidence & Fallbacks",
-          left: [intentConfidenceAvg],
-          right: [intentFallbackCount],
-          width: 12,
-          height: 6,
-        }),
-      );
-
-      this.graphOperationsDashboard.addWidgets(
-        new cloudwatch.GraphWidget({
-          title: "Graph Errors",
-          left: [graphTraversalErrors, graphBuildErrors],
-          width: 12,
-          height: 6,
-        }),
-        new cloudwatch.GraphWidget({
-          title: "DynamoDB Graph Tables - Read Capacity",
-          left: [
-            graphNodesTable.metricConsumedReadCapacityUnits({
-              statistic: "Sum",
-              period: cdk.Duration.minutes(5),
-            }),
-            graphEdgesTable.metricConsumedReadCapacityUnits({
-              statistic: "Sum",
-              period: cdk.Duration.minutes(5),
-            }),
-          ],
-          width: 12,
-          height: 6,
-        }),
-      );
-
-      // Output for Graph Operations Dashboard
-      new cdk.CfnOutput(this, "GraphOperationsDashboardUrl", {
-        value: `https://console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=${this.graphOperationsDashboard.dashboardName}`,
-        description: "URL to Graph Operations Dashboard (Phase 3)",
-      });
-
-      // ========================================
-      // Phase 3: Graph Alarms (Task 9.3)
-      // ========================================
-
-      // Critical: Graph traversal p95 > 3s
-      const graphTraversalLatencyAlarm = new cloudwatch.Alarm(
-        this,
-        "GraphTraversalLatencyAlarm",
-        {
-          alarmName: "salesforce-ai-search-graph-traversal-latency-critical",
-          alarmDescription: "Graph traversal p95 latency exceeds 3 seconds",
-          metric: graphTraversalLatencyP95,
-          threshold: 3000, // 3 seconds in milliseconds
-          evaluationPeriods: 3,
-          datapointsToAlarm: 3,
-          comparisonOperator:
-            cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-          treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-        },
-      );
-      graphTraversalLatencyAlarm.addAlarmAction(
-        new actions.SnsAction(this.criticalAlarmTopic),
-      );
-
-      // Critical: Graph database error rate > 10%
-      const graphErrorRateAlarm = new cloudwatch.Alarm(
-        this,
-        "GraphErrorRateAlarm",
-        {
-          alarmName: "salesforce-ai-search-graph-error-rate-critical",
-          alarmDescription: "Graph database error rate exceeds 10%",
-          metric: new cloudwatch.MathExpression({
-            expression: "errors",
-            usingMetrics: {
-              errors: graphTraversalErrors,
-            },
-            period: cdk.Duration.minutes(5),
-          }),
-          threshold: 10,
-          evaluationPeriods: 3,
-          datapointsToAlarm: 3,
-          comparisonOperator:
-            cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-          treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-        },
-      );
-      graphErrorRateAlarm.addAlarmAction(
-        new actions.SnsAction(this.criticalAlarmTopic),
-      );
-
-      // Critical: Intent classification failure > 20%
-      const intentFailureAlarm = new cloudwatch.Alarm(
-        this,
-        "IntentClassificationFailureAlarm",
-        {
-          alarmName: "salesforce-ai-search-intent-failure-critical",
-          alarmDescription: "Intent classification fallback rate exceeds 20%",
-          metric: intentFallbackCount,
-          threshold: 20,
-          evaluationPeriods: 5,
-          datapointsToAlarm: 5,
-          comparisonOperator:
-            cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-          treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-        },
-      );
-      intentFailureAlarm.addAlarmAction(
-        new actions.SnsAction(this.criticalAlarmTopic),
-      );
-
-      // Warning: Graph cache hit rate < 50%
-      const graphCacheHitRateAlarm = new cloudwatch.Alarm(
-        this,
-        "GraphCacheHitRateAlarm",
-        {
-          alarmName: "salesforce-ai-search-graph-cache-hit-rate-warning",
-          alarmDescription: "Graph cache hit rate below 50%",
-          metric: graphCacheHitRate,
-          threshold: 50,
-          evaluationPeriods: 10,
-          datapointsToAlarm: 10,
-          comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
-          treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-        },
-      );
-      graphCacheHitRateAlarm.addAlarmAction(
-        new actions.SnsAction(this.warningAlarmTopic),
-      );
-
-      // Outputs for graph alarms
-      new cdk.CfnOutput(this, "GraphTraversalLatencyAlarmName", {
-        value: graphTraversalLatencyAlarm.alarmName,
-        description: "Alarm for graph traversal latency (Phase 3)",
-      });
-
-      new cdk.CfnOutput(this, "GraphErrorRateAlarmName", {
-        value: graphErrorRateAlarm.alarmName,
-        description: "Alarm for graph error rate (Phase 3)",
-      });
-
-      new cdk.CfnOutput(this, "IntentFailureAlarmName", {
-        value: intentFailureAlarm.alarmName,
-        description: "Alarm for intent classification failures (Phase 3)",
-      });
-
-      new cdk.CfnOutput(this, "GraphCacheHitRateAlarmName", {
-        value: graphCacheHitRateAlarm.alarmName,
-        description: "Alarm for graph cache hit rate (Phase 3)",
       });
     }
 
@@ -1534,49 +1052,6 @@ export class MonitoringStack extends cdk.Stack {
       new actions.SnsAction(this.criticalAlarmTopic),
     );
 
-    // Lambda error rate > 10% for 5 minutes
-    const retrieveLambdaErrorRateAlarm = new cloudwatch.Alarm(
-      this,
-      "RetrieveLambdaErrorRateAlarm",
-      {
-        alarmName: "salesforce-ai-search-retrieve-lambda-error-rate-critical",
-        alarmDescription:
-          "Retrieve Lambda error rate exceeds 10% for 5 minutes",
-        metric: retrieveLambdaErrors,
-        threshold: 10,
-        evaluationPeriods: 5,
-        datapointsToAlarm: 5,
-        comparisonOperator:
-          cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-        treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-      },
-    );
-    retrieveLambdaErrorRateAlarm.addAlarmAction(
-      new actions.SnsAction(this.criticalAlarmTopic),
-    );
-
-    let answerLambdaErrorRateAlarm;
-    if (answerLambda && answerLambdaErrors) {
-      answerLambdaErrorRateAlarm = new cloudwatch.Alarm(
-        this,
-        "AnswerLambdaErrorRateAlarm",
-        {
-          alarmName: "salesforce-ai-search-answer-lambda-error-rate-critical",
-          alarmDescription: "Answer Lambda error rate exceeds 10% for 5 minutes",
-          metric: answerLambdaErrors,
-          threshold: 10,
-          evaluationPeriods: 5,
-          datapointsToAlarm: 5,
-          comparisonOperator:
-            cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-          treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
-        },
-      );
-      answerLambdaErrorRateAlarm.addAlarmAction(
-        new actions.SnsAction(this.criticalAlarmTopic),
-      );
-    }
-
     // OpenSearch Serverless does not expose ClusterStatus.red metric in the same way.
     // We can rely on dashboard metrics for OCU usage and errors.
     // Skipping ClusterStatus alarm for Serverless.
@@ -1879,31 +1354,18 @@ export class MonitoringStack extends cdk.Stack {
     }
 
     // Composite alarm for overall system health
-    const alarmRules = [
-      cloudwatch.AlarmRule.fromAlarm(
-        api5xxRateAlarm,
-        cloudwatch.AlarmState.ALARM,
-      ),
-      cloudwatch.AlarmRule.fromAlarm(
-        retrieveLambdaErrorRateAlarm,
-        cloudwatch.AlarmState.ALARM,
-      ),
-    ];
-
-    if (answerLambdaErrorRateAlarm) {
-      alarmRules.push(cloudwatch.AlarmRule.fromAlarm(
-        answerLambdaErrorRateAlarm,
-        cloudwatch.AlarmState.ALARM,
-      ));
-    }
-
     const systemHealthAlarm = new cloudwatch.CompositeAlarm(
       this,
       "SystemHealthAlarm",
       {
         alarmDescription: "Overall system health is degraded",
         compositeAlarmName: "salesforce-ai-search-system-health",
-        alarmRule: cloudwatch.AlarmRule.anyOf(...alarmRules),
+        alarmRule: cloudwatch.AlarmRule.anyOf(
+          cloudwatch.AlarmRule.fromAlarm(
+            api5xxRateAlarm,
+            cloudwatch.AlarmState.ALARM,
+          ),
+        ),
       },
     );
     systemHealthAlarm.addAlarmAction(
@@ -1922,21 +1384,6 @@ export class MonitoringStack extends cdk.Stack {
 
     // Import existing log groups (created by Lambda or ApiStack)
     // We use fromLogGroupName to reference them for Insights queries
-    const retrieveLambdaLogGroup = logs.LogGroup.fromLogGroupName(
-      this,
-      "RetrieveLambdaLogGroup",
-      `/aws/lambda/${retrieveLambda.functionName}`
-    );
-
-    let answerLambdaLogGroup;
-    if (answerLambda) {
-      answerLambdaLogGroup = logs.LogGroup.fromLogGroupName(
-        this,
-        "AnswerLambdaLogGroup",
-        `/aws/lambda/${answerLambda.functionName}`
-      );
-    }
-
     const authzLambdaLogGroup = logs.LogGroup.fromLogGroupName(
       this,
       "AuthzLambdaLogGroupName", // Fixed ID collision risk by changing ID
@@ -1948,40 +1395,9 @@ export class MonitoringStack extends cdk.Stack {
     // For POC, we rely on CloudWatch Logs retention policy set in ApiStack or default
 
     // Outputs for log groups
-    new cdk.CfnOutput(this, "RetrieveLambdaLogGroupName", {
-      value: retrieveLambdaLogGroup.logGroupName,
-      description: "Log group for Retrieve Lambda",
-    });
-
-    if (answerLambdaLogGroup) {
-      new cdk.CfnOutput(this, "AnswerLambdaLogGroupName", {
-        value: answerLambdaLogGroup.logGroupName,
-        description: "Log group for Answer Lambda",
-      });
-    }
-
     new cdk.CfnOutput(this, "AuthzLambdaLogGroupNameOutput", { // Fixed output name collision
       value: authzLambdaLogGroup.logGroupName,
       description: "Log group for AuthZ Lambda",
-    });
-
-    // ========================================
-    // CloudWatch Insights Queries
-    // ========================================
-
-    const insightsQueries = new CloudWatchInsightsQueries(
-      this,
-      "InsightsQueries",
-      {
-        retrieveLambdaLogGroup,
-        answerLambdaLogGroup,
-        authzLambdaLogGroup,
-      },
-    );
-
-    new cdk.CfnOutput(this, "InsightsQueriesCount", {
-      value: insightsQueries.queryDefinitions.length.toString(),
-      description: "Number of CloudWatch Insights queries created",
     });
 
     // ========================================
@@ -2261,5 +1677,3 @@ export class MonitoringStack extends cdk.Stack {
     cdk.Tags.of(this).add("Component", "Monitoring");
   }
 }
-
-// ========================================

@@ -1,7 +1,5 @@
 import * as cdk from "aws-cdk-lib";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as sfn from "aws-cdk-lib/aws-stepfunctions";
-import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as iam from "aws-cdk-lib/aws-iam";
@@ -11,7 +9,6 @@ import * as appflow from "aws-cdk-lib/aws-appflow";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
-import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { Construct } from "constructs";
@@ -22,15 +19,10 @@ interface IngestionStackProps extends cdk.StackProps {
   lambdaSecurityGroup: ec2.SecurityGroup;
   kmsKey: kms.Key;
   dataBucket: s3.Bucket;
-  knowledgeBaseId?: string;
-  dataSourceId?: string;
   salesforceInstanceUrl?: string;
   salesforceConnectedAppClientId?: string;
   salesforceConnectedAppClientSecretArn?: string;
   salesforceJwtToken?: string;
-  // Phase 3: Graph Enhancement tables
-  graphNodesTable?: dynamodb.Table;
-  graphEdgesTable?: dynamodb.Table;
   // Zero-Config Schema Discovery table
   schemaCacheTable?: dynamodb.Table;
   // Audit trail bucket
@@ -52,7 +44,6 @@ const LAMBDA_ASSET_EXCLUDES = [
 ];
 
 export class IngestionStack extends cdk.Stack {
-  public readonly stateMachine: sfn.StateMachine;
   public readonly dlq: sqs.Queue;
   public readonly cdcBucket: s3.Bucket;
   public readonly ingestLambda: lambda.Function;
@@ -65,15 +56,10 @@ export class IngestionStack extends cdk.Stack {
       lambdaSecurityGroup,
       kmsKey,
       dataBucket,
-      knowledgeBaseId,
-      dataSourceId,
       salesforceInstanceUrl,
       salesforceConnectedAppClientId,
       salesforceConnectedAppClientSecretArn,
       salesforceJwtToken,
-      // Phase 3: Graph Enhancement tables
-      graphNodesTable,
-      graphEdgesTable,
       // Zero-Config Schema Discovery table
       schemaCacheTable,
     } = props;
@@ -238,16 +224,6 @@ export class IngestionStack extends cdk.Stack {
       );
     }
 
-    // Lambda execution role with necessary permissions
-    const lambdaRole = new iam.Role(this, "IngestionLambdaRole", {
-      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "service-role/AWSLambdaVPCAccessExecutionRole",
-        ),
-      ],
-    });
-
     // Separate role for Ingest Lambda to avoid circular dependency
     const ingestLambdaRole = new iam.Role(this, "IngestLambdaRole", {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
@@ -257,49 +233,6 @@ export class IngestionStack extends cdk.Stack {
         ),
       ],
     });
-
-    // Grant permissions
-    dataBucket.grantReadWrite(lambdaRole);
-    kmsKey.grantEncryptDecrypt(lambdaRole);
-
-    // Grant Bedrock permissions for embedding and KB sync
-    lambdaRole.addToPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: [
-          "bedrock:InvokeModel",
-          "bedrock:StartIngestionJob",
-          "bedrock:GetIngestionJob",
-        ],
-        resources: [
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
-          `arn:aws:bedrock:${this.region}:${this.account}:knowledge-base/*`,
-        ],
-      }),
-    );
-
-    // CDC Processor Lambda
-    const cdcProcessorLambda = new lambda.Function(this, "CDCProcessorLambda", {
-      functionName: "salesforce-ai-search-cdc-processor",
-      runtime: lambda.Runtime.PYTHON_3_11,
-      handler: "index.lambda_handler",
-      code: lambda.Code.fromAsset(
-        path.join(__dirname, "../lambda/cdc_processor"),
-        { exclude: LAMBDA_ASSET_EXCLUDES },
-      ),
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 512,
-      role: lambdaRole,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [lambdaSecurityGroup],
-      environment: {
-        LOG_LEVEL: "INFO",
-      },
-    });
-
-    // Grant CDC processor access to CDC bucket
-    this.cdcBucket.grantRead(cdcProcessorLambda);
 
     // =========================================================================
     // Phase 2: CDC Sync Lambda — direct Turbopuffer sync via denorm+embed+upsert
@@ -533,169 +466,9 @@ export class IngestionStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [lambdaSecurityGroup],
       environment: {
-        STATE_MACHINE_ARN: "", // Will be set after state machine is created
         LOG_LEVEL: "INFO",
       },
     });
-
-    // Validate Lambda
-    const validateLambda = new lambda.Function(this, "ValidateLambda", {
-      functionName: "salesforce-ai-search-validate",
-      runtime: lambda.Runtime.PYTHON_3_11,
-      handler: "index.lambda_handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/validate"), { exclude: LAMBDA_ASSET_EXCLUDES }),
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 512,
-      role: lambdaRole,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [lambdaSecurityGroup],
-      environment: {
-        LOG_LEVEL: "INFO",
-      },
-    });
-
-    // Transform Lambda
-    const transformLambda = new lambda.Function(this, "TransformLambda", {
-      functionName: "salesforce-ai-search-transform",
-      runtime: lambda.Runtime.PYTHON_3_11,
-      handler: "index.lambda_handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/transform"), { exclude: LAMBDA_ASSET_EXCLUDES }),
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 512,
-      role: lambdaRole,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [lambdaSecurityGroup],
-      environment: {
-        LOG_LEVEL: "INFO",
-      },
-    });
-
-    // Chunking Lambda
-    const chunkingLambda = new lambda.Function(this, "ChunkingLambda", {
-      functionName: "salesforce-ai-search-chunking",
-      runtime: lambda.Runtime.PYTHON_3_11,
-      handler: "index.lambda_handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/chunking"), { exclude: LAMBDA_ASSET_EXCLUDES }),
-      timeout: cdk.Duration.minutes(2),
-      memorySize: 1024,
-      role: lambdaRole,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [lambdaSecurityGroup],
-      environment: {
-        LOG_LEVEL: "INFO",
-        DATA_BUCKET: dataBucket.bucketName,
-        SCHEMA_CACHE_TABLE: "salesforce-ai-search-schema-cache",
-      },
-    });
-
-    // Enrich Lambda
-    const enrichLambda = new lambda.Function(this, "EnrichLambda", {
-      functionName: "salesforce-ai-search-enrich",
-      runtime: lambda.Runtime.PYTHON_3_11,
-      handler: "index.lambda_handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/enrich"), { exclude: LAMBDA_ASSET_EXCLUDES }),
-      timeout: cdk.Duration.seconds(30),
-      memorySize: 512,
-      role: lambdaRole,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [lambdaSecurityGroup],
-      environment: {
-        LOG_LEVEL: "INFO",
-        DATA_BUCKET: dataBucket.bucketName,
-      },
-    });
-
-    // Embed Lambda
-    const embedLambda = new lambda.Function(this, "EmbedLambda", {
-      functionName: "salesforce-ai-search-embed",
-      runtime: lambda.Runtime.PYTHON_3_11,
-      handler: "index.lambda_handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/embed"), { exclude: LAMBDA_ASSET_EXCLUDES }),
-      timeout: cdk.Duration.minutes(5),
-      memorySize: 2048,
-      role: lambdaRole,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [lambdaSecurityGroup],
-      environment: {
-        LOG_LEVEL: "INFO",
-        DATA_BUCKET: dataBucket.bucketName,
-      },
-    });
-
-    // Sync Lambda
-    const syncLambda = new lambda.Function(this, "SyncLambda", {
-      functionName: "salesforce-ai-search-sync",
-      runtime: lambda.Runtime.PYTHON_3_11,
-      handler: "index.lambda_handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../lambda/sync"), { exclude: LAMBDA_ASSET_EXCLUDES }),
-      timeout: cdk.Duration.minutes(2),
-      memorySize: 1024,
-      role: lambdaRole,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [lambdaSecurityGroup],
-      environment: {
-        DATA_BUCKET: dataBucket.bucketName,
-        KNOWLEDGE_BASE_ID: knowledgeBaseId || "",
-        DATA_SOURCE_ID: dataSourceId || "",
-        LOG_LEVEL: "INFO",
-      },
-    });
-
-    // Phase 3: Graph Builder Lambda (conditionally created when graph tables are provided)
-    let graphBuilderLambda: lambda.Function | undefined;
-    if (graphNodesTable && graphEdgesTable) {
-      graphBuilderLambda = new lambda.Function(this, "GraphBuilderLambda", {
-        functionName: "salesforce-ai-search-graph-builder",
-        runtime: lambda.Runtime.PYTHON_3_11,
-        handler: "index.lambda_handler",
-        code: lambda.Code.fromAsset(
-          path.join(__dirname, "../lambda/graph_builder"),
-          { exclude: LAMBDA_ASSET_EXCLUDES },
-        ),
-        timeout: cdk.Duration.seconds(60),
-        memorySize: 512,
-        role: lambdaRole,
-        vpc,
-        vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-        securityGroups: [lambdaSecurityGroup],
-        environment: {
-          GRAPH_NODES_TABLE: graphNodesTable.tableName,
-          GRAPH_EDGES_TABLE: graphEdgesTable.tableName,
-          SCHEMA_CACHE_TABLE:
-            schemaCacheTable?.tableName || "salesforce-ai-search-schema-cache",
-          LOG_LEVEL: "INFO",
-        },
-      });
-
-      // Grant Graph Builder Lambda access to graph tables
-      graphNodesTable.grantReadWriteData(graphBuilderLambda);
-      graphEdgesTable.grantReadWriteData(graphBuilderLambda);
-
-      // Grant Graph Builder Lambda CloudWatch PutMetricData for graph metrics
-      graphBuilderLambda.addToRolePolicy(
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["cloudwatch:PutMetricData"],
-          resources: ["*"],
-          conditions: {
-            StringEquals: {
-              "cloudwatch:namespace": "SalesforceAISearch/GraphBuilder",
-            },
-          },
-        }),
-      );
-
-      // Grant Graph Builder Lambda read access to schema cache table
-      if (schemaCacheTable) {
-        schemaCacheTable.grantReadData(graphBuilderLambda);
-      }
-    }
 
     // =========================================================================
     // Zero-Config Schema Discovery Lambda
@@ -908,199 +681,7 @@ export class IngestionStack extends cdk.Stack {
       );
     }
 
-    // Step Functions tasks
-    const cdcProcessorTask = new tasks.LambdaInvoke(this, "CDCProcessorTask", {
-      lambdaFunction: cdcProcessorLambda,
-      outputPath: "$.Payload",
-    });
-
-    const validateTask = new tasks.LambdaInvoke(this, "ValidateTask", {
-      lambdaFunction: validateLambda,
-      outputPath: "$.Payload",
-    });
-
-    const transformTask = new tasks.LambdaInvoke(this, "TransformTask", {
-      lambdaFunction: transformLambda,
-      outputPath: "$.Payload",
-    });
-
-    const chunkTask = new tasks.LambdaInvoke(this, "ChunkTask", {
-      lambdaFunction: chunkingLambda,
-      outputPath: "$.Payload",
-    });
-
-    const enrichTask = new tasks.LambdaInvoke(this, "EnrichTask", {
-      lambdaFunction: enrichLambda,
-      outputPath: "$.Payload",
-    });
-
-    const embedTask = new tasks.LambdaInvoke(this, "EmbedTask", {
-      lambdaFunction: embedLambda,
-      outputPath: "$.Payload",
-    });
-
-    const syncTask = new tasks.LambdaInvoke(this, "SyncTask", {
-      lambdaFunction: syncLambda,
-      outputPath: "$.Payload",
-    });
-
-    // Phase 3: Graph Builder task (conditionally created)
-    let graphBuilderTask: tasks.LambdaInvoke | undefined;
-    if (graphBuilderLambda) {
-      graphBuilderTask = new tasks.LambdaInvoke(this, "GraphBuilderTask", {
-        lambdaFunction: graphBuilderLambda,
-        outputPath: "$.Payload",
-      });
-    }
-
-    // Define workflow
-    const noValidRecords = new sfn.Succeed(this, "NoValidRecords");
-    const success = new sfn.Succeed(this, "Success");
-    const fail = new sfn.Fail(this, "Fail", {
-      comment: "Ingestion failed, sent to DLQ",
-    });
-
-    // DLQ tasks for each step
-    const sendValidateToDLQ = new tasks.SqsSendMessage(
-      this,
-      "SendValidateToDLQ",
-      {
-        queue: this.dlq,
-        messageBody: sfn.TaskInput.fromJsonPathAt("$"),
-      },
-    ).next(fail);
-
-    const sendTransformToDLQ = new tasks.SqsSendMessage(
-      this,
-      "SendTransformToDLQ",
-      {
-        queue: this.dlq,
-        messageBody: sfn.TaskInput.fromJsonPathAt("$"),
-      },
-    ).next(fail);
-
-    const sendChunkToDLQ = new tasks.SqsSendMessage(this, "SendChunkToDLQ", {
-      queue: this.dlq,
-      messageBody: sfn.TaskInput.fromJsonPathAt("$"),
-    }).next(fail);
-
-    const sendEnrichToDLQ = new tasks.SqsSendMessage(this, "SendEnrichToDLQ", {
-      queue: this.dlq,
-      messageBody: sfn.TaskInput.fromJsonPathAt("$"),
-    }).next(fail);
-
-    const sendEmbedToDLQ = new tasks.SqsSendMessage(this, "SendEmbedToDLQ", {
-      queue: this.dlq,
-      messageBody: sfn.TaskInput.fromJsonPathAt("$"),
-    }).next(fail);
-
-    const sendSyncToDLQ = new tasks.SqsSendMessage(this, "SendSyncToDLQ", {
-      queue: this.dlq,
-      messageBody: sfn.TaskInput.fromJsonPathAt("$"),
-    }).next(fail);
-
-    const sendCDCProcessorToDLQ = new tasks.SqsSendMessage(
-      this,
-      "SendCDCProcessorToDLQ",
-      {
-        queue: this.dlq,
-        messageBody: sfn.TaskInput.fromJsonPathAt("$"),
-      },
-    ).next(fail);
-
-    // Phase 3: Graph Builder DLQ handler (conditionally created)
-    let sendGraphBuilderToDLQ: sfn.Chain | undefined;
-    if (graphBuilderTask) {
-      sendGraphBuilderToDLQ = new tasks.SqsSendMessage(
-        this,
-        "SendGraphBuilderToDLQ",
-        {
-          queue: this.dlq,
-          messageBody: sfn.TaskInput.fromJsonPathAt("$"),
-        },
-      ).next(fail);
-    }
-
-    const checkValidRecords = new sfn.Choice(this, "CheckValidRecords")
-      .when(sfn.Condition.numberGreaterThan("$.validCount", 0), transformTask)
-      .otherwise(noValidRecords);
-
-    // Start with CDC processor for event-driven ingestion
-    const definition = cdcProcessorTask
-      .addCatch(sendCDCProcessorToDLQ, {
-        resultPath: "$.error",
-      })
-      .next(validateTask);
-
-    validateTask
-      .addCatch(sendValidateToDLQ, {
-        resultPath: "$.error",
-      })
-      .next(checkValidRecords);
-
-    transformTask
-      .addCatch(sendTransformToDLQ, {
-        resultPath: "$.error",
-      })
-      .next(chunkTask);
-
-    // Phase 3: Conditionally insert Graph Builder after chunking
-    if (graphBuilderTask && sendGraphBuilderToDLQ) {
-      chunkTask
-        .addCatch(sendChunkToDLQ, {
-          resultPath: "$.error",
-        })
-        .next(graphBuilderTask);
-
-      graphBuilderTask
-        .addCatch(sendGraphBuilderToDLQ, {
-          resultPath: "$.error",
-        })
-        .next(enrichTask);
-    } else {
-      chunkTask
-        .addCatch(sendChunkToDLQ, {
-          resultPath: "$.error",
-        })
-        .next(enrichTask);
-    }
-
-    enrichTask
-      .addCatch(sendEnrichToDLQ, {
-        resultPath: "$.error",
-      })
-      .next(embedTask);
-
-    embedTask
-      .addCatch(sendEmbedToDLQ, {
-        resultPath: "$.error",
-      })
-      .next(syncTask);
-
-    syncTask
-      .addCatch(sendSyncToDLQ, {
-        resultPath: "$.error",
-      })
-      .next(success);
-
-    // Create State Machine
-    this.stateMachine = new sfn.StateMachine(this, "IngestionStateMachine", {
-      stateMachineName: "salesforce-ai-search-ingestion",
-      definition,
-      timeout: cdk.Duration.minutes(15),
-      tracingEnabled: true,
-    });
-
-    // Update ingest Lambda with state machine ARN
-    this.ingestLambda.addEnvironment(
-      "STATE_MACHINE_ARN",
-      this.stateMachine.stateMachineArn,
-    );
-
-    // Grant ingest Lambda permission to start executions
-    this.stateMachine.grantStartExecution(this.ingestLambda);
-
-    // EventBridge rule to trigger Step Functions on S3 CDC events
+    // EventBridge rule to trigger CDC Sync Lambda on S3 CDC events
     const cdcEventRule = new events.Rule(this, "CDCEventRule", {
       ruleName: "salesforce-ai-search-cdc-trigger",
       description: "Trigger ingestion pipeline when CDC data arrives in S3",
@@ -1122,20 +703,7 @@ export class IngestionStack extends cdk.Stack {
       },
     });
 
-    // Add Step Functions as target
-    cdcEventRule.addTarget(
-      new targets.SfnStateMachine(this.stateMachine, {
-        input: events.RuleTargetInput.fromObject({
-          bucket: events.EventField.fromPath("$.detail.bucket.name"),
-          key: events.EventField.fromPath("$.detail.object.key"),
-          eventTime: events.EventField.fromPath("$.time"),
-          eventSource: "cdc",
-        }),
-      }),
-    );
-
-    // Phase 2: Add CDC Sync Lambda as second target on the same EventBridge rule.
-    // Same input transform as Step Functions target — delivers flat {bucket, key}.
+    // CDC Sync Lambda as EventBridge target
     cdcEventRule.addTarget(
       new targets.LambdaFunction(cdcSyncLambda, {
         event: events.RuleTargetInput.fromObject({
@@ -1271,21 +839,6 @@ export class IngestionStack extends cdk.Stack {
         ],
         width: 12,
       }),
-      new cloudwatch.GraphWidget({
-        title: "Step Functions Execution Duration",
-        left: [
-          new cloudwatch.Metric({
-            namespace: "AWS/States",
-            metricName: "ExecutionTime",
-            statistic: "Average",
-            dimensionsMap: {
-              StateMachineArn: this.stateMachine.stateMachineArn,
-            },
-            period: cdk.Duration.minutes(5),
-          }),
-        ],
-        width: 12,
-      }),
     );
 
     // CloudWatch Alarms for freshness lag
@@ -1320,12 +873,6 @@ export class IngestionStack extends cdk.Stack {
     });
 
     // Outputs
-    new cdk.CfnOutput(this, "StateMachineArn", {
-      value: this.stateMachine.stateMachineArn,
-      description: "Ingestion State Machine ARN",
-      exportName: `${this.stackName}-StateMachineArn`,
-    });
-
     new cdk.CfnOutput(this, "DLQUrl", {
       value: this.dlq.queueUrl,
       description: "Dead Letter Queue URL",

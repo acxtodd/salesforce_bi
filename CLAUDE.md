@@ -3,6 +3,9 @@
 Repo-specific agent rules only. Keep this file narrow.
 `tasks.json` is the roadmap; use `python3 scripts/task_manager.py` for all task
 state changes.
+For current searchable object scope and sync ownership, read
+`docs/architecture/object_scope_and_sync.md` before changing indexing or query
+scope.
 
 # Default Environments
 
@@ -54,6 +57,10 @@ Do not treat raw vector payloads, binary blobs, or machine-oriented dumps as an
 "inspectable document" unless the user explicitly asked for that format. Default
 to pretty JSON or Markdown and exclude embedding vectors from the human-facing
 view unless vectors are the subject of the task.
+6. Some repo docs still describe the legacy graph/Bedrock system. For current
+connector work, prefer `README.md` and
+`docs/architecture/object_scope_and_sync.md`; use the old graph docs only when
+touching legacy paths like `lambda/retrieve` or `lambda/answer`.
 
 > Self-Feedback Loop: If a task is confusing due to missing or contradictory repo context, add a temporary note here with:
 > (a) what was confusing, (b) what wrong assumption it caused, and (c) the proposed permanent fix in code/docs.

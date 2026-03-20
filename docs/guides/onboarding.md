@@ -1,19 +1,37 @@
 # Agent Onboarding Guide
 
-Welcome! This guide will help you understand the Salesforce AI Search project structure, architecture, and how to work effectively on this codebase.
+Welcome! This guide now starts with the current Turbopuffer connector path and
+then leaves the older graph/Bedrock material below as legacy reference only.
 
 ## Read This First (15–20 min)
 
-Start with `docs/architecture/salesforce_ai_search_architecture.md` for a consolidated overview of the system, current state, key flows, and load‑bearing requirements.
-Then return here for detailed repo orientation and debugging playbooks.
+Start with these files in order:
+
+1. `README.md`
+2. `docs/architecture/object_scope_and_sync.md`
+3. `CLAUDE.md`
+
+If your task touches the Phase 4 object-expansion move, also read:
+
+4. `docs/runbooks/poll_sync.md`
+
+Only use `docs/architecture/salesforce_ai_search_architecture.md` when you are
+working on legacy graph/Bedrock paths such as `lambda/retrieve` or
+`lambda/answer`.
 
 ## Project Overview
 
-This is a **Graph-Enhanced RAG (Retrieval-Augmented Generation) system** for Commercial Real Estate (CRE) that:
-- Translates natural language queries into structured filters
-- Uses graph traversal for cross-object queries (e.g., "available space in Class A office buildings")
-- Enforces Salesforce sharing rules and field-level security
-- Returns precise, authorized results without per-query hard-coding
+This repo's current connector direction is:
+
+- Turbopuffer as the search backend
+- Denormalized Salesforce records as the indexed document model
+- `/query` Lambda with Claude tool-use over `search_records` and `aggregate_records`
+- `cdc_sync` as the live freshness path for the 5 CDC-backed objects
+- Bulk load plus planned poll sync for broader non-CDC searchable scope
+
+The remainder of this document is historical reference from the older
+graph-enhanced architecture. Treat it as background, not the current source of
+truth for new connector work.
 
 ## System Architecture
 

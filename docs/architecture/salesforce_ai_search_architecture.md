@@ -3,6 +3,10 @@
 **Author:** QA Lead
 **Source of Truth:** Live deployment and code (Lambda, CDK, Apex), not legacy docs.
 
+Historical note: this document describes the older graph/Bedrock architecture.
+For current Turbopuffer connector work, start with
+`docs/architecture/object_scope_and_sync.md` and `README.md`.
+
 ---
 
 ## Executive Summary

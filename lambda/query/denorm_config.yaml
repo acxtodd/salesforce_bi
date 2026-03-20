@@ -1,0 +1,476 @@
+# Denormalization config for the full 11-object indexed scope.
+# Objects currently indexed (CDC or poll sync):
+#   CDC (5):  Property, Lease, Availability, Account, Contact
+#   Poll (6): Deal, Sale, Inquiry, Listing, Preference, Task
+# Deferred (config-only, 0 records): Lead, ContentNote
+# Review and commit before use
+
+ascendix__Property__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__City__c              # filterable, key search field
+    - ascendix__State__c             # filterable
+    - ascendix__PropertyClass__c     # picklist, filterable
+    - ascendix__PropertySubType__c   # picklist, filterable
+    - ascendix__Description__c       # textarea, long text for semantic search
+    - ascendix__Street__c            # address
+    - ascendix__BuildingStatus__c    # picklist, filterable
+  metadata_fields:
+    - ascendix__TotalBuildingArea__c  # double, filterable (total SF)
+    - ascendix__YearBuilt__c         # string, filterable
+    - ascendix__Floors__c            # double, filterable
+    - ascendix__PostalCode__c        # string, filterable
+    - ascendix__County__c            # string, filterable
+    - ascendix__Occupancy__c         # double, filterable
+    - ascendix__LandArea__c          # double, filterable
+    - ascendix__ConstructionType__c  # picklist, filterable
+    - ascendix__Tenancy__c           # picklist, filterable
+    - ascendix__Geolocation__Latitude__s  # geolocation latitude
+    - ascendix__Geolocation__Longitude__s # geolocation longitude
+  parents:
+    ascendix__CBSA__c:               # -> ascendix__Geography__c
+      - Name                         # parent nameField
+    ascendix__Complex__c:            # -> ascendix__Complex__c
+      - Name                         # parent nameField
+    ascendix__Country__c:            # -> ascendix__Country__c
+      - Name                         # parent nameField
+    ascendix__DeveloperContact__c:   # -> Contact
+      - Name                         # parent nameField
+      - Phone                        # parent compact
+      - Email                        # parent compact
+      - MobilePhone                  # parent compact
+    ascendix__Developer__c:          # -> Account
+      - Name                         # parent nameField
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+    ascendix__ListingBrokerCompany__c: # -> Account
+      - Name                         # parent nameField
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+    ascendix__ListingBrokerContact__c: # -> Contact
+      - Name                         # parent nameField
+      - Phone                        # parent compact
+      - Email                        # parent compact
+      - MobilePhone                  # parent compact
+    ascendix__OwnerLandlordContact__c: # -> Contact
+      - Name                         # parent nameField
+      - Phone                        # parent compact
+      - Email                        # parent compact
+      - MobilePhone                  # parent compact
+    ascendix__OwnerLandlord__c:      # -> Account
+      - Name                         # parent nameField
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # parent nameField
+    ascendix__PropertyManagerContact__c: # -> Contact
+      - Name                         # parent nameField
+      - Phone                        # parent compact
+      - Email                        # parent compact
+      - MobilePhone                  # parent compact
+    ascendix__PropertyManager__c:    # -> Account
+      - Name                         # parent nameField
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+    ascendix__Region__c:             # -> ascendix__Geography__c
+      - Name                         # parent nameField
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # parent nameField
+
+ascendix__Lease__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__LeaseType__c         # picklist, filterable
+    - ascendix__Description__c       # textarea, long text
+    - ascendix__UnitType__c          # picklist, filterable
+  metadata_fields:
+    - ascendix__Size__c              # double, filterable (leased SF)
+    - ascendix__LeaseRatePerUOM__c   # currency, filterable (rate PSF)
+    - ascendix__AverageRent__c       # currency, filterable
+    - ascendix__TermCommencementDate__c  # date, filterable
+    - ascendix__TermExpirationDate__c    # date, filterable
+    - ascendix__TermMonths__c        # double, filterable
+    - ascendix__OccupancyDate__c     # date, filterable
+    - ascendix__LeaseSigned__c       # date, filterable
+  parents:
+    ascendix__Property__c:           # -> ascendix__Property__c (master-detail)
+      - Name                         # property name
+      - ascendix__City__c            # property city
+      - ascendix__State__c           # property state
+      - ascendix__PropertyClass__c   # property class
+      - ascendix__PropertySubType__c # property subtype
+      - ascendix__TotalBuildingArea__c  # property total SF
+    ascendix__ListingBrokerCompany__c: # -> Account
+      - Name                         # parent nameField
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+    ascendix__ListingBrokerContact__c: # -> Contact
+      - Name                         # parent nameField
+      - Phone                        # parent compact
+      - Email                        # parent compact
+      - MobilePhone                  # parent compact
+    ascendix__OriginatingDeal__c:    # -> ascendix__Deal__c
+      - Name                         # parent nameField
+    ascendix__OwnerLandlordContact__c: # -> Contact
+      - Name                         # parent nameField
+      - Phone                        # parent compact
+      - Email                        # parent compact
+      - MobilePhone                  # parent compact
+    ascendix__Tenant__c:             # -> Account
+      - Name                         # tenant name
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+    ascendix__TenantContact__c:      # -> Contact
+      - Name                         # parent nameField
+      - Phone                        # parent compact
+      - Email                        # parent compact
+      - MobilePhone                  # parent compact
+    ascendix__TenantRepBrokerContact__c: # -> Contact
+      - Name                         # parent nameField
+      - Phone                        # parent compact
+      - Email                        # parent compact
+      - MobilePhone                  # parent compact
+    ascendix__TenantRepBroker__c:    # -> Account
+      - Name                         # parent nameField
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+    ascendix__OwnerLandlord__c:      # -> Account
+      - Name                         # owner/landlord name
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+
+ascendix__Availability__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__UseType__c           # picklist, filterable (space type)
+    - ascendix__UseSubType__c        # picklist, filterable
+    - ascendix__Status__c            # picklist, filterable
+    - ascendix__SpaceDescription__c  # textarea, long text
+    - ascendix__LeaseType__c         # picklist, filterable
+  metadata_fields:
+    - ascendix__AvailableArea__c     # double, filterable (available SF)
+    - ascendix__RentLow__c           # currency, filterable (asking rate low)
+    - ascendix__RentHigh__c          # currency, filterable (asking rate high)
+    - ascendix__AskingPrice__c       # currency, filterable
+    - ascendix__AvailableFrom__c     # date, filterable
+    - ascendix__MaxContiguousArea__c # double, filterable
+    - ascendix__MinDivisibleArea__c  # double, filterable
+    - ascendix__LeaseTermMin__c      # double, filterable
+    - ascendix__LeaseTermMax__c      # double, filterable
+  parents:
+    ascendix__Property__c:           # -> ascendix__Property__c (master-detail)
+      - Name                         # property name
+      - ascendix__City__c            # property city
+      - ascendix__State__c           # property state
+      - ascendix__PropertyClass__c   # property class
+      - ascendix__PropertySubType__c # property subtype
+      - ascendix__TotalBuildingArea__c  # property total SF
+    ascendix__Listing__c:            # -> ascendix__Listing__c
+      - Name                         # parent nameField
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # market name
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # submarket name
+    ascendix__Region__c:             # -> ascendix__Geography__c
+      - Name                         # region name
+
+Account:
+  embed_fields:
+    - Name                           # nameField
+    - Type                           # picklist, filterable
+    - Industry                       # picklist, filterable
+    - Description                    # long text for semantic search
+    - Phone                          # contact info
+    - Website                        # company website
+    - BillingStreet                  # address
+    - BillingCity                    # address
+    - BillingState                   # address
+  metadata_fields:
+    - AnnualRevenue                  # currency, filterable
+    - NumberOfEmployees              # numeric, filterable
+    - BillingPostalCode              # address
+    - ShippingStreet                 # address
+    - ShippingCity                   # address
+    - ShippingState                  # address
+    - ShippingPostalCode             # address
+    - BillingLatitude                # geolocation latitude
+    - BillingLongitude               # geolocation longitude
+    - ShippingLatitude               # geolocation latitude
+    - ShippingLongitude              # geolocation longitude
+  parents:
+    ParentId:                        # -> Account
+      - Name                         # parent nameField
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+
+Contact:
+  embed_fields:
+    - Name                           # nameField
+    - Title                          # title/role
+    - Email                          # contact info
+    - Phone                          # contact info
+    - MobilePhone                    # contact info
+    - Department                     # filterable
+    - Description                    # long text for semantic search
+    - MailingStreet                  # address
+    - MailingCity                    # address
+    - MailingState                   # address
+  metadata_fields:
+    - MailingPostalCode              # address
+    - OtherStreet                    # address
+    - OtherCity                      # address
+    - OtherState                     # address
+    - OtherPostalCode                # address
+    - Birthdate                      # date, filterable
+    - MailingLatitude                # geolocation latitude
+    - MailingLongitude               # geolocation longitude
+    - OtherLatitude                  # geolocation latitude
+    - OtherLongitude                 # geolocation longitude
+  parents:
+    AccountId:                       # -> Account
+      - Name                         # parent nameField
+      - Type                         # parent compact
+      - Phone                        # parent compact
+      - Website                      # parent compact
+      - Industry                     # parent compact
+      - AnnualRevenue                # parent compact
+    ReportsToId:                     # -> Contact
+      - Name                         # parent nameField
+      - Title                        # parent compact
+      - Email                        # parent compact
+      - Phone                        # parent compact
+      - MobilePhone                  # parent compact
+
+# ---------------------------------------------------------------
+# Poll-synced objects (restored + new from Ascendix Search config)
+# ---------------------------------------------------------------
+
+ascendix__Deal__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__SalesStage__c        # picklist, filterable (deal stage)
+    - ascendix__LeaseType__c         # picklist, filterable
+    - ascendix__Status__c            # picklist, filterable
+    - ascendix__PropertyType__c      # picklist, filterable
+  metadata_fields:
+    - ascendix__TransactionType__c   # multipicklist (lease/sale/sublease)
+    - ascendix__GrossFeeAmount__c    # currency (deal value / gross fee)
+    - ascendix__GrossDealValue__c    # currency (gross deal value)
+    - ascendix__CloseDateEstimated__c  # date, filterable (close date)
+    - ascendix__CloseDateActual__c   # date, filterable
+    - ascendix__Probability__c       # percent
+    - ascendix__Size__c              # double (deal size SF)
+    - ascendix__LeaseRatePerUOM__c   # currency (lease rate PSF)
+    - ascendix__LeaseTermMonths__c   # double
+    - ascendix__CompanyGrossFee__c   # currency
+  parents:
+    ascendix__Property__c:           # -> ascendix__Property__c
+      - Name                         # property name
+      - ascendix__City__c            # property city
+      - ascendix__State__c           # property state
+      - ascendix__PropertyClass__c   # property class
+    ascendix__Client__c:             # -> Account
+      - Name                         # client account name
+    ascendix__Buyer__c:              # -> Account
+      - Name                         # buyer name
+    ascendix__Seller__c:             # -> Account
+      - Name                         # seller name
+    ascendix__Tenant__c:             # -> Account
+      - Name                         # tenant name
+    ascendix__OwnerLandlord__c:      # -> Account
+      - Name                         # owner/landlord name
+    ascendix__TenantRepBroker__c:    # -> Account
+      - Name                         # tenant rep broker
+    ascendix__ListingBrokerCompany__c: # -> Account
+      - Name                         # listing broker
+    ascendix__BuyerRep__c:           # -> Account
+      - Name                         # buyer rep
+    ascendix__LeadBrokerCompany__c:  # -> Account
+      - Name                         # lead broker
+
+ascendix__Sale__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__PropertyClass__c     # picklist, filterable
+  metadata_fields:
+    - ascendix__SalePrice__c         # currency, filterable
+    - ascendix__SalePricePerUOM__c   # currency, formula (price PSF)
+    - ascendix__TotalArea__c         # double
+    - ascendix__CapRatePercent__c    # percent (cap rate)
+    - ascendix__NetIncome__c         # currency (NOI)
+    - ascendix__ListingPrice__c      # currency
+    - ascendix__ListingDate__c       # date, filterable
+    - ascendix__SaleDate__c          # date, filterable
+    - ascendix__DateOnMarket__c      # date, filterable
+    - ascendix__NumberUnitsRooms__c  # double
+    - ascendix__GrossIncome__c       # currency
+  parents:
+    ascendix__Property__c:           # -> ascendix__Property__c (required)
+      - Name                         # property name
+      - ascendix__City__c            # property city
+      - ascendix__State__c           # property state
+      - ascendix__PropertyClass__c   # property class
+    ascendix__Buyer__c:              # -> Account
+      - Name                         # buyer name
+    ascendix__Seller__c:             # -> Account
+      - Name                         # seller name
+    ascendix__SellingBroker__c:      # -> Account
+      - Name                         # selling broker
+
+ascendix__Inquiry__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__Description__c       # textarea, long text
+    - ascendix__PropertyType__c      # picklist, filterable
+    - ascendix__PropertyClass__c     # picklist, filterable
+    - ascendix__InquirySource__c     # picklist, filterable
+  metadata_fields:
+    - ascendix__AreaMinimum__c       # double (min size)
+    - ascendix__AreaMaximum__c       # double (max size)
+    - ascendix__RentMinimum__c       # currency (min rent)
+    - ascendix__RentMaximum__c       # currency (max rent)
+    - ascendix__PriceMinimum__c      # currency (min price)
+    - ascendix__PriceMaximum__c      # currency (max price)
+    - ascendix__RequiredMoveInDate__c  # date, filterable
+    - ascendix__Active__c            # boolean (is active)
+  parents:
+    ascendix__Property__c:           # -> ascendix__Property__c
+      - Name                         # property name
+      - ascendix__City__c            # property city
+      - ascendix__State__c           # property state
+    ascendix__Availability__c:       # -> ascendix__Availability__c
+      - Name                         # availability name
+    ascendix__Listing__c:            # -> ascendix__Listing__c
+      - Name                         # listing name
+    ascendix__BrokerCompany__c:      # -> Account
+      - Name                         # broker company name
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # market name
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # submarket name
+
+ascendix__Listing__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__Description__c       # textarea, long text
+    - ascendix__UseType__c           # picklist, filterable (space use type)
+    - ascendix__PropertyType__c      # picklist, filterable
+    - ascendix__Status__c            # picklist, filterable
+    - ascendix__SaleType__c          # picklist, filterable
+  metadata_fields:
+    - ascendix__ListingDate__c       # date, filterable
+    - ascendix__ListingExpiration__c # date, filterable
+    - ascendix__AskingPrice__c       # currency
+    - ascendix__SalePrice__c         # currency
+    - ascendix__SalePricePerUOM__c   # currency
+    - ascendix__VacantArea__c        # double (vacant SF)
+  parents:
+    ascendix__Property__c:           # -> ascendix__Property__c (required)
+      - Name                         # property name
+      - ascendix__City__c            # property city
+      - ascendix__State__c           # property state
+      - ascendix__PropertyClass__c   # property class
+    ascendix__ListingBrokerCompany__c: # -> Account
+      - Name                         # listing broker
+    ascendix__ListingBrokerContact__c: # -> Contact
+      - Name                         # listing broker contact
+    ascendix__OwnerLandlord__c:      # -> Account
+      - Name                         # owner/landlord
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # market name
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # submarket name
+
+ascendix__Preference__c:
+  embed_fields:
+    - Name                           # nameField
+    - ascendix__SaleOrLease__c       # picklist, filterable
+    - ascendix__PropertyType__c      # picklist, filterable
+    - ascendix__PropertyClass__c     # picklist, filterable
+  metadata_fields:
+    - ascendix__AreaMinimum__c       # double (min size)
+    - ascendix__AreaMaximum__c       # double (max size)
+    - ascendix__RentMinimum__c       # currency (min rent)
+    - ascendix__RentMaximum__c       # currency (max rent)
+    - ascendix__PriceMinimum__c      # currency (min price)
+    - ascendix__PriceMaximum__c      # currency (max price)
+    - ascendix__RequiredMoveInDate__c          # date, filterable
+    - ascendix__CurrentLeaseExpirationDate__c  # date, filterable
+  parents:
+    ascendix__Account__c:            # -> Account
+      - Name                         # account name
+    ascendix__Contact__c:            # -> Contact
+      - Name                         # contact name
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # market name
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # submarket name
+
+Task:
+  embed_fields:
+    - Subject                        # nameField equivalent
+    - Description                    # textarea, long text
+    - Status                         # picklist, filterable
+    - Priority                       # picklist, filterable
+  metadata_fields:
+    - ActivityDate                   # date, filterable
+    - TaskSubtype                    # picklist, filterable
+  parents:
+    WhoId:                           # -> Contact/Lead
+      - Name                         # who name
+    WhatId:                          # -> Account/Opportunity/etc.
+      - Name                         # what name
+    AccountId:                       # -> Account
+      - Name                         # account name
+
+# ---------------------------------------------------------------
+# Deferred objects (configured but 0 records, not loaded)
+# ---------------------------------------------------------------
+
+# Lead:
+#   embed_fields:
+#     - Name
+#     - Company
+#     - Title
+#     - Status
+#   metadata_fields:
+#     - Email
+#     - Phone
+#     - Industry
+#     - LeadSource
+#   parents: {}
+
+# ContentNote:
+#   embed_fields:
+#     - Title
+#   metadata_fields:
+#     - FileType
+#     - CreatedDate
+#   parents: {}

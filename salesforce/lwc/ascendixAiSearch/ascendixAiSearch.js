@@ -190,8 +190,13 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             // Case-insensitive matching without strict word boundaries for better flexibility
             const regex = new RegExp('(?<!<[^>]*?)(' + escapedName + ')(?![^<]*?>)', 'gi');
 
+            // Use direct /lightning/r/{id}/view URL instead of href="#" with data attributes.
+            // lightning-formatted-rich-text strips data-* attributes and custom classes,
+            // so click interception via handleAnswerLinkClick won't work. The direct URL
+            // ensures the link works even after sanitization.
+            const recordUrl = '/lightning/r/' + recordId + '/view';
             formatted = formatted.replace(regex, (match) => {
-                return '<a href="#" data-recordid="' + recordId + '" data-sobject="' + sobject + '" class="slds-text-link record-link citation-reference" title="View ' + sobject + ': ' + name + '">' + match + '</a>';
+                return '<a href="' + recordUrl + '" target="_blank" title="View ' + sobject + ': ' + name + '">' + match + '</a>';
             });
         });
 

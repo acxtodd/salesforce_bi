@@ -2802,14 +2802,19 @@
         {
           "id": "4.12",
           "title": "Clean up help-response and answer readability in the LWC search UI",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:29:39.860463+00:00",
-          "updatedAt": "2026-03-20T09:30:44.357053+00:00",
+          "updatedAt": "2026-03-20T10:39:31.319669+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T10:39:31.319834+00:00",
+              "note": "All subtasks done: prompt shaping (4.12.1), renderer cleanup (4.12.2), table rendering (4.12.5), styling (4.12.3), regression tests (4.12.4)"
+            }
+          ],
           "description": "Address the current help/onboarding failure mode where broad capability questions render as dense wall-of-text answers in the Ascendix AI Search LWC. Coordinate prompt-output shaping, answer rendering cleanup, readability improvements, and regression coverage so broad help queries are concise and scannable without regressing normal search behavior.",
           "technical_context": "Use the screenshoted 'What kinds of searches can you do?' output as the acceptance baseline. This is not a redesign task and not a request for more features. The problem is the combination of overlong help responses, fragile markdown-to-HTML conversion in the LWC, and dense answer styling. Keep the solution within the current Salesforce LWC surface and the existing /query architecture.",
           "acceptance_criteria": [
@@ -2822,19 +2827,25 @@
             "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js",
             "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html",
             "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.css"
-          ]
+          ],
+          "completedAt": "2026-03-20T10:39:31.319832+00:00"
         },
         {
           "id": "4.12.1",
           "title": "Tighten help and onboarding response shape for broad capability queries",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:29:46.210527+00:00",
-          "updatedAt": "2026-03-20T09:30:44.697885+00:00",
+          "updatedAt": "2026-03-20T10:39:27.056919+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T10:39:27.057929+00:00",
+              "note": "Added guideline 17 to _build_guidelines() in lib/system_prompt.py for help/onboarding response shaping"
+            }
+          ],
           "description": "Update the query-agent prompt behavior for broad help requests such as 'what can you do?' or 'what kinds of searches can you do?' so the agent returns a short onboarding answer instead of a long capability dump. Keep normal search questions on the existing tool-use path.",
           "technical_context": "Start in lib/system_prompt.py and the mirrored lambda/query/lib/system_prompt.py copy. Add explicit guidance for capability/help/how-can-you-help intents. Prefer a bounded structure: one-sentence summary, 3 to 5 capability groups, at most 1 to 2 example questions per group, and a short 'try asking...' footer. Do not turn this into a new intent router unless the existing prompt path proves insufficient.",
           "parent": "4.12",
@@ -2851,19 +2862,25 @@
           "depends_on": [
             "4.10"
           ],
-          "gate_criteria": "Use the current 11-object prompt improvements as the baseline; refine output shape without regressing object coverage or current QA fixes."
+          "gate_criteria": "Use the current 11-object prompt improvements as the baseline; refine output shape without regressing object coverage or current QA fixes.",
+          "completedAt": "2026-03-20T10:39:27.057927+00:00"
         },
         {
           "id": "4.12.2",
           "title": "Simplify LWC answer rendering for predictable structured output",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:29:52.351207+00:00",
-          "updatedAt": "2026-03-20T09:30:44.990295+00:00",
+          "updatedAt": "2026-03-20T10:39:27.107577+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T10:39:27.107713+00:00",
+              "note": "Replaced two-pass list processing with unified state machine in ascendixAiSearch.js formattedAnswer getter"
+            }
+          ],
           "description": "Reduce formatting fragility in the Ascendix AI Search LWC answer renderer so broad help responses and normal search answers render consistently as readable headings, paragraphs, bullets, and numbered lists without malformed wrappers or accidental wall-of-text output.",
           "technical_context": "Review salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js formattedAnswer closely. The current regex-based markdown-to-HTML conversion is the main risk area. Narrow the supported answer format instead of trying to support arbitrary markdown. Preserve citation linkification and lightning-formatted-rich-text compatibility.",
           "parent": "4.12",
@@ -2879,19 +2896,25 @@
           "depends_on": [
             "4.12.1"
           ],
-          "gate_criteria": "Align supported rendering behavior with the tightened help/onboarding response shape before broadening formatter changes."
+          "gate_criteria": "Align supported rendering behavior with the tightened help/onboarding response shape before broadening formatter changes.",
+          "completedAt": "2026-03-20T10:39:27.107711+00:00"
         },
         {
           "id": "4.12.3",
           "title": "Improve answer panel readability without changing the overall LWC surface",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:29:59.580036+00:00",
-          "updatedAt": "2026-03-20T09:30:45.282384+00:00",
+          "updatedAt": "2026-03-20T10:39:27.208193+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T10:39:27.208352+00:00",
+              "note": "Updated answer-text CSS: white bg, border, larger font, better spacing for headings/paragraphs/lists"
+            }
+          ],
           "description": "Clean up the answer panel presentation in the Ascendix AI Search LWC so long answers are easier to scan and no longer read as a dense gray text slab. Improve typography, spacing, section separation, and hierarchy while preserving the existing Salesforce visual language.",
           "technical_context": "Focus on salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html and salesforce/lwc/ascendixAiSearch/ascendixAiSearch.css. This is a readability cleanup, not a redesign. Increase legibility first: body text size, line-height, spacing between sections, content width, and visual separation between the answer body and citations controls. Keep the current answer/citations interaction model unless a small markup change materially improves readability.",
           "parent": "4.12",
@@ -2905,21 +2928,27 @@
             "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.css"
           ],
           "depends_on": [
-            "4.12.2"
+            "4.12.5"
           ],
-          "gate_criteria": "Apply visual cleanup after renderer structure is stable so CSS work targets the final content shape."
+          "gate_criteria": "Apply final readability styling after table-aware and structured rendering determine the final content shapes.",
+          "completedAt": "2026-03-20T10:39:27.208349+00:00"
         },
         {
           "id": "4.12.4",
           "title": "Add regression coverage for broad help-query answer quality",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T09:30:05.644727+00:00",
-          "updatedAt": "2026-03-20T09:30:45.671810+00:00",
+          "updatedAt": "2026-03-20T10:39:27.257871+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T10:39:27.258036+00:00",
+              "note": "Added TestHelpResponseGuideline (3 tests) and Answer Formatting Jest describe block (~10 tests)"
+            }
+          ],
           "description": "Add focused regression coverage for the specific failure mode shown in QA: broad help/onboarding questions producing overlong, hard-to-scan output in the LWC. Capture both prompt guidance and renderer behavior so future prompt tuning does not reintroduce the same wall-of-text result.",
           "technical_context": "Extend prompt coverage in tests/test_system_prompt.py and add focused coverage around the LWC answer-formatting path if the current LWC test harness supports it. If not, isolate the formatter logic enough for fixture-driven tests. Use a representative 'what can you do?' style answer and assert readable structure rather than exact wording. This task should prevent the screenshoted failure mode from reappearing silently.",
           "parent": "4.12",
@@ -2935,7 +2964,119 @@
           "depends_on": [
             "4.12.3"
           ],
-          "gate_criteria": "Lock in the final broad-help readability target after the UI presentation changes land."
+          "gate_criteria": "Lock regression coverage after both structured rendering and final readability cleanup are in place.",
+          "completedAt": "2026-03-20T10:39:27.258033+00:00"
+        },
+        {
+          "id": "4.12.5",
+          "title": "Add structured rich-answer rendering for tables and ranked result layouts",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T09:54:00.583289+00:00",
+          "updatedAt": "2026-03-20T10:39:27.156539+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T10:39:27.156688+00:00",
+              "note": "Added _convertMarkdownTables() and _parseTableRow() helpers with CSS table styles"
+            }
+          ],
+          "description": "Extend the Ascendix AI Search LWC answer rendering path to support richer structured outputs such as markdown-style tables, ranked result rows, and compact stat/group layouts where the answer shape benefits from more than plain paragraphs and bullets. This specifically targets outputs like top-N market or deal summaries that currently degrade into pipe-delimited text blobs.",
+          "technical_context": "Build on the renderer cleanup in salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js after the supported formatting surface is narrowed. Add support for table-aware rendering and other bounded structured layouts only where the output shape is predictable and safe. Do not turn lightning-formatted-rich-text into a generic HTML renderer. Preserve citation links and provide a plain-text/list fallback if structured parsing fails.",
+          "parent": "4.12",
+          "acceptance_criteria": [
+            "Structured rendering remains bounded and predictable: if parsing fails or the content is ambiguous, the answer falls back cleanly to paragraph/list rendering rather than malformed HTML.",
+            "Citation link behavior still works inside or alongside structured layouts such as tables or ranked rows.",
+            "Markdown-style tables and similar ranked-result outputs render as actual structured layouts in the LWC instead of raw pipe-delimited text blobs."
+          ],
+          "references": [
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js",
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html",
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.css"
+          ],
+          "depends_on": [
+            "4.12.2"
+          ],
+          "gate_criteria": "Add richer structured layouts only after the base supported formatting model is simplified and stable.",
+          "completedAt": "2026-03-20T10:39:27.156686+00:00"
+        },
+        {
+          "id": "4.13",
+          "title": "Guard ambiguous leaderboard queries and unsupported grouped aggregations in /query",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T10:04:37.137913+00:00",
+          "updatedAt": "2026-03-20T10:39:37.336818+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T10:39:37.336973+00:00",
+              "note": "4.13a: sort+annotate grouped aggregates in tool_dispatch.py. 4.13b: sort_order/top_n in tool defs + updated few-shot + guideline 6 addendum. 4.13c/d: already done (prompt guardrails). 4.13e: 6 tests in test_leaderboard_guard.py + extended test_tool_dispatch.py and test_system_prompt.py. All 168 python tests pass."
+            }
+          ],
+          "description": "Prevent the /query agent from presenting best-effort search samples as authoritative ranked leaderboards when the user asks for grouped top-N queries that require a clear metric and a single valid grouping dimension. This task covers queries like 'top brokers by deal size' where the current indexed schema has multiple broker role fields and the agent currently fabricates a ranking from individual search hits instead of clarifying or declining.",
+          "technical_context": "Current /query architecture passes the raw user question directly into the Bedrock tool-use loop in lambda/query/index.py and lib/query_handler.py; there is no separate query-rewrite/decomposition stage on this path. The current prompt in lib/system_prompt.py also says 'Search first, clarify later', which biases the model toward acting on slightly ambiguous questions. At the backend layer, aggregate_records supports count/sum/avg plus group_by, but Turbopuffer aggregation is computed client-side in lib/turbopuffer_backend.py and only groups on a single indexed attribute. Deal records expose multiple broker role fields (tenant_rep_broker_name, listing_broker_company_name, buyer_rep_name, lead_broker_company_name) rather than one canonical broker dimension. Fix should prefer a targeted guard or lightweight preflight interpretation for ambiguous leaderboard queries over a full legacy-style query decomposer. Acceptable solutions include: (1) prompt/tooling guardrails that force clarification when the metric or grouping field is ambiguous, (2) backend/tool-dispatch support for explicit top-N grouped aggregate results if a single valid dimension exists, and/or (3) a narrow pre-LLM intent/guard layer for unsupported grouped-entity leaderboards. Do not reintroduce the old retrieve-path schema decomposer as the primary /query architecture without a strong justification.",
+          "acceptance_criteria": [
+            "Queries that ask for grouped leaderboards or top-N rankings with an ambiguous metric or ambiguous grouping dimension (for example 'top brokers by deal size') no longer return fabricated rankings from individual search hits; they either clarify the metric/dimension or state the capability gap plainly.",
+            "When a leaderboard query does map to a single valid grouped aggregate in the indexed schema, the system returns results derived from aggregate_records or equivalent backend-supported grouping logic, with deterministic sorting and top-N truncation rather than ad hoc LLM ranking.",
+            "Regression coverage exists for both supported and unsupported leaderboard-style queries, including at minimum: top markets by deal count, top brokers by clearly specified metric and role (if supported), and ambiguous broker leaderboard requests that must clarify or decline."
+          ],
+          "references": [
+            "lib/system_prompt.py",
+            "lib/query_handler.py",
+            "lib/tool_dispatch.py",
+            "lib/turbopuffer_backend.py",
+            "lambda/query/index.py",
+            "tests/test_tool_dispatch.py",
+            "tests/test_query_handler.py"
+          ],
+          "depends_on": [
+            "4.10"
+          ],
+          "gate_criteria": "Use the current prompt/tool surface as the baseline and tighten behavior for leaderboard queries without regressing existing 11-object query support.",
+          "completedAt": "2026-03-20T10:39:37.336970+00:00"
+        },
+        {
+          "id": "4.13.1",
+          "title": "Add clarification UX and pending-interpretation handling for answerable-with-clarification queries",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T10:11:29.625103+00:00",
+          "updatedAt": "2026-03-20T10:39:50.445100+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T10:39:50.445284+00:00",
+              "note": "4.13.1a: clarification_options field on QueryResult. 4.13.1b: extract_clarifications() with CLARIFY marker parsing. 4.13.1c: clarification SSE event in lambda/query/index.py. 4.13.1d: Apex SSE parser handles clarification event. 4.13.1e: LWC pills with handleClarificationClick + hasClarificationOptions. 4.13.1f: 7 tests in test_clarification_flow.py + 3 Jest tests."
+            }
+          ],
+          "description": "Support the class of /query requests that are not directly answerable as written but become answerable with one or two constrained clarifications. Replace unsupported freeform follow-up expectations with an explicit clarification UX so users can choose the intended metric, grouping dimension, or role without requiring full chat memory.",
+          "technical_context": "Current LWC behavior is single-shot: handleSubmit resets the current answer and sends only the current textarea value plus sessionId from salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js, and Apex forwards session_id in salesforce/classes/AscendixAISearchController.cls. But /query does not use session_id for conversational memory; lambda/query/index.py only uses it for namespace warm-cache and lib/query_handler.py constructs a fresh message list for each request. That means a user typing 'yes, that's what I want' has no prior clarification context on the backend. Recommended implementation path is pragmatic, not a full chat system: when the system detects an answerable-with-clarification query, return a structured clarification payload or answer footer with explicit options (for example gross deal value vs gross fee vs square footage; lead broker vs tenant rep vs listing broker). The LWC should render those options as buttons/chips or prefilled next-query actions that submit a rewritten explicit question, rather than relying on freeform conversational memory. A later enhancement can add short-lived pending interpretation state keyed by session_id if freeform clarification becomes necessary, but the first fix should avoid requiring generic multi-turn memory.",
+          "parent": "4.13",
+          "acceptance_criteria": [
+            "The LWC provides a clear place for the user to respond to clarification prompts, preferably via explicit selectable options or rewritten follow-up actions rather than requiring generic chat memory.",
+            "Choosing a clarification option results in a fully explicit follow-up query or equivalent structured request, so the backend can answer correctly even though the current /query path is stateless across requests.",
+            "Regression coverage exists for the end-to-end clarification flow, including the case where a user asks an ambiguous leaderboard query and then selects one of the offered interpretations.",
+            "When a query is answerable with a small clarification, the system responds with a constrained clarification UX rather than a fabricated answer or an ungrounded freeform follow-up request."
+          ],
+          "references": [
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js",
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html",
+            "salesforce/classes/AscendixAISearchController.cls",
+            "lambda/query/index.py",
+            "lib/query_handler.py"
+          ],
+          "depends_on": [
+            "4.13"
+          ],
+          "gate_criteria": "Use the leaderboard/aggregation guard design before adding clarification UX so the UI is solving the right ambiguity classes.",
+          "completedAt": "2026-03-20T10:39:50.445281+00:00"
         }
       ]
     }
@@ -2952,13 +3093,14 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 13,
+      "4.": 14,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,
       "4.8.": 4,
       "4.9.": 11,
-      "4.12.": 5
+      "4.12.": 6,
+      "4.13.": 2
     }
   }
 }

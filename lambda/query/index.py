@@ -104,16 +104,16 @@ def _split_answer_into_chunks(answer: str) -> list[str]:
     """Split an answer into sentence-level chunks for progressive rendering.
 
     Splits on sentence-ending punctuation followed by a space, or on
-    paragraph breaks.  Falls back to the full text as a single chunk if
-    no split points are found.
+    paragraph breaks.  Each chunk retains its trailing whitespace so that
+    concatenating all chunks reproduces the original text exactly.
     """
     if not answer:
         return []
 
-    # Split on sentence boundaries: period / exclamation / question mark
-    # followed by a space or end-of-string.  Also split on double newlines
-    # (paragraph breaks).
-    parts = re.split(r"(?<=[.!?])\s+|\n\n", answer)
+    # Split after sentence-ending punctuation + space, keeping the space
+    # attached to the preceding chunk.  Also split on paragraph breaks,
+    # preserving the newlines so round-trip concatenation is lossless.
+    parts = re.split(r"(?<=[.!?] )(?=\S)|(?<=\n\n)(?=\S)", answer)
     # Remove empty strings that may result from consecutive splits.
     return [p for p in parts if p]
 
@@ -252,6 +252,12 @@ def handler(event: dict, context: Any) -> dict:
     # --- Citations event -------------------------------------------------
     if result.citations:
         sse_parts.append(format_sse("citations", {"citations": result.citations}))
+
+    # --- Clarification event ---------------------------------------------
+    if result.clarification_options:
+        sse_parts.append(format_sse("clarification", {
+            "options": result.clarification_options
+        }))
 
     # --- Done event ------------------------------------------------------
     sse_parts.append(

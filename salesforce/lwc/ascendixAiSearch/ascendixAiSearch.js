@@ -18,6 +18,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     @track selectedCitation = null;
     @track errorMessage = '';
     @track showRetryButton = false;
+    @track clarificationOptions = [];
     @track selectedFilters = {
         region: null,
         businessUnit: null,
@@ -86,6 +87,10 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         };
     }
 
+    get hasClarificationOptions() {
+        return this.clarificationOptions && this.clarificationOptions.length > 0;
+    }
+
     get formattedAnswer() {
         if (!this.answer) return '';
 
@@ -104,50 +109,39 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         // Convert italic text (single asterisk, avoiding conflicts with bold)
         formatted = formatted.replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, '<em>$1</em>');
 
-        // Convert numbered lists
-        const lines = formatted.split('\n');
-        const processedLines = [];
-        let inNumberedList = false;
+        // Convert lists (unified state machine for both numbered and bullet)
+        {
+            const lines = formatted.split('\n');
+            const processedLines = [];
+            let listState = null; // null | 'ol' | 'ul'
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const numberedMatch = line.match(/^(\d+)\.\s+(.*)$/);
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const numberedMatch = line.match(/^(\d+)\.\s+(.*)$/);
+                const bulletMatch = line.match(/^-\s+(.*)$/);
 
-            if (numberedMatch) {
-                const [, num, text] = numberedMatch;
-                if (num === '1' || !inNumberedList) {
-                    processedLines.push('<ol>');
-                    inNumberedList = true;
+                if (numberedMatch) {
+                    if (listState === 'ul') processedLines.push('</ul>');
+                    if (listState !== 'ol') { processedLines.push('<ol>'); listState = 'ol'; }
+                    processedLines.push('<li>' + numberedMatch[2] + '</li>');
+                } else if (bulletMatch) {
+                    if (listState === 'ol') processedLines.push('</ol>');
+                    if (listState !== 'ul') { processedLines.push('<ul>'); listState = 'ul'; }
+                    processedLines.push('<li>' + bulletMatch[1] + '</li>');
+                } else {
+                    if (listState === 'ol') processedLines.push('</ol>');
+                    else if (listState === 'ul') processedLines.push('</ul>');
+                    listState = null;
+                    processedLines.push(line);
                 }
-                processedLines.push('<li>' + text + '</li>');
-
-                // Check if next line is not a numbered item
-                const nextLine = lines[i + 1] || '';
-                if (!nextLine.match(/^\d+\.\s+/)) {
-                    processedLines.push('</ol>');
-                    inNumberedList = false;
-                }
-            } else {
-                if (inNumberedList) {
-                    processedLines.push('</ol>');
-                    inNumberedList = false;
-                }
-                processedLines.push(line);
             }
+            if (listState === 'ol') processedLines.push('</ol>');
+            if (listState === 'ul') processedLines.push('</ul>');
+            formatted = processedLines.join('\n');
         }
 
-        formatted = processedLines.join('\n');
-
-        // Convert bullet lists
-        formatted = formatted.replace(/^-\s+(.*)$/gm, '<li>$1</li>');
-
-        // Wrap consecutive bullet items in <ul> tags
-        formatted = formatted.replace(/(<li>(?!.*<ol>).*?<\/li>\n?)+/g, function(match) {
-            if (!match.includes('<ol>')) {
-                return '<ul>' + match + '</ul>';
-            }
-            return match;
-        });
+        // ===== MARKDOWN TABLE CONVERSION =====
+        formatted = this._convertMarkdownTables(formatted);
 
         // ===== HYPERLINK CONVERSION (for record names) =====
 
@@ -209,8 +203,9 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             const trimmed = para.trim();
             if (!trimmed) return '';
 
-            // Don't wrap if already a block element
-            if (trimmed.match(/^<(h[1-6]|ul|ol|div|table)/)) {
+            // Don't wrap if already a block element (opening or closing tag)
+            if (trimmed.match(/^<(h[1-6]|ul|ol|div|table)/) ||
+                trimmed.match(/<\/(ul|ol|h[1-6]|table)>/)) {
                 return trimmed;
             }
 
@@ -220,10 +215,10 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         }).filter(p => p).join('\n');
 
         // Clean up extra breaks after block elements
-        formatted = formatted.replace(/<\/(h[1-6]|ul|ol)><br\/>/g, '</$1>');
-        formatted = formatted.replace(/<br\/><(h[1-6]|ul|ol)/g, '<$1');
-        formatted = formatted.replace(/<\/p>\n<(h[1-6]|ul|ol)/g, '</p><$1');
-        formatted = formatted.replace(/<\/(h[1-6]|ul|ol)>\n<p>/g, '</$1><p>');
+        formatted = formatted.replace(/<\/(h[1-6]|ul|ol|table)><br\/>/g, '</$1>');
+        formatted = formatted.replace(/<br\/><(h[1-6]|ul|ol|table)/g, '<$1');
+        formatted = formatted.replace(/<\/p>\n<(h[1-6]|ul|ol|table)/g, '</p><$1');
+        formatted = formatted.replace(/<\/(h[1-6]|ul|ol|table)>\n<p>/g, '</$1><p>');
 
         return formatted;
     }
@@ -358,6 +353,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         // Reset state
         this.answer = '';
         this.citations = [];
+        this.clarificationOptions = [];
         this.errorMessage = '';
         this.showRetryButton = false;
         this.showAnswerSection = true;
@@ -365,6 +361,15 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
 
         // Call the answer endpoint
         this.streamAnswer();
+    }
+
+    handleClarificationClick(event) {
+        const query = event.currentTarget.dataset.query;
+        if (query) {
+            this.queryText = query;
+            this.clarificationOptions = [];
+            this.handleSubmit();
+        }
     }
 
     handleRetry() {
@@ -514,6 +519,15 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                 // Simulate streaming by displaying answer in chunks
                 await this.simulateStreaming(answerText);
 
+                // Process clarification options if present
+                if (response.clarificationOptions) {
+                    this.clarificationOptions = response.clarificationOptions.map((opt, idx) => ({
+                        key: 'clarify-' + idx,
+                        label: opt.label,
+                        query: opt.query
+                    }));
+                }
+
                 // Check for special cases
                 if (response.reason === 'no_accessible_results') {
                     this.showToast('No Results', 'No results found that you have access to.', 'info');
@@ -652,6 +666,71 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         if (this.selectedCitation && this.selectedCitation.recordId) {
             this.navigateToRecord(this.selectedCitation.recordId);
         }
+    }
+
+    _parseTableRow(line) {
+        // Parse a pipe-delimited markdown table row into cells.
+        // Trims leading/trailing pipes and whitespace per cell.
+        if (!line || !line.includes('|')) return null;
+        const stripped = line.replace(/^\|/, '').replace(/\|$/, '');
+        return stripped.split('|').map(cell => cell.trim());
+    }
+
+    _convertMarkdownTables(text) {
+        const lines = text.split('\n');
+        const output = [];
+        let i = 0;
+
+        while (i < lines.length) {
+            // Detect table: current line has pipes and next line is a separator row
+            if (
+                i + 1 < lines.length &&
+                lines[i].includes('|') &&
+                lines[i + 1].match(/^\|?[\s-:|]+\|[\s-:|]*\|?$/)
+            ) {
+                const headerCells = this._parseTableRow(lines[i]);
+                if (!headerCells || headerCells.length < 2) {
+                    output.push(lines[i]);
+                    i++;
+                    continue;
+                }
+
+                // Skip header and separator rows
+                i += 2;
+
+                // Collect data rows
+                const dataRows = [];
+                while (i < lines.length && lines[i].includes('|')) {
+                    const cells = this._parseTableRow(lines[i]);
+                    if (cells && cells.length >= 2) {
+                        dataRows.push(cells);
+                    }
+                    i++;
+                }
+
+                // Emit HTML table
+                let tableHtml = '<table><thead><tr>';
+                headerCells.forEach(h => {
+                    tableHtml += '<th>' + h + '</th>';
+                });
+                tableHtml += '</tr></thead><tbody>';
+                dataRows.forEach(row => {
+                    tableHtml += '<tr>';
+                    // Pad or truncate to match header count
+                    for (let c = 0; c < headerCells.length; c++) {
+                        tableHtml += '<td>' + (row[c] || '') + '</td>';
+                    }
+                    tableHtml += '</tr>';
+                });
+                tableHtml += '</tbody></table>';
+                output.push(tableHtml);
+            } else {
+                output.push(lines[i]);
+                i++;
+            }
+        }
+
+        return output.join('\n');
     }
 
     navigateToRecord(recordId, openInNewTab = false) {

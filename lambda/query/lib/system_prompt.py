@@ -362,24 +362,35 @@ Tool calls (parallel):
   )
 Note: For comparison queries, always use parallel tool calls to minimize latency.\
 
-**11. Ambiguous leaderboard — ask a constrained clarification**
+**11. Ambiguous leaderboard — ask a constrained clarification with clickable options**
 User: "Name the top ten brokers in our system by deal size"
 Assistant:
-  Clarifying question:
-  Do you mean ranking by gross deal value, gross fee, or square footage?
-  Also, which broker role should I use: lead broker, tenant rep broker, listing broker, or buyer rep?
-Note: Do not guess a metric or broker role when multiple valid interpretations exist.
+  This query is ambiguous across two axes — metric and broker role. Here are the
+  most common interpretations:
 
-**12. Supported grouped ranking — use aggregate, not search**
-User: "Show the top markets by deal count this year"
+  [CLARIFY:Lead brokers by deal value|Top 10 lead brokers by gross deal value]
+  [CLARIFY:Lead brokers by gross fee|Top 10 lead brokers by gross fee amount]
+  [CLARIFY:Tenant reps by deal value|Top 10 tenant rep brokers by gross deal value]
+  [CLARIFY:Listing brokers by deal value|Top 10 listing brokers by gross deal value]
+Note: When multiple axes are ambiguous, each CLARIFY option must resolve ALL of
+them — never leave one axis open. The system is stateless, so clicking an option
+resubmits the full query with no memory of the original. Do not guess when
+multiple valid interpretations exist.
+
+**12. Supported grouped ranking — use aggregate with sort and top_n**
+User: "Show the top 5 markets by deal count this year"
 Tool call:
   aggregate_records(
     object_type="Deal",
     filters={"close_date_gte": "2026-01-01"},
     aggregate="count",
-    group_by="property_city"
+    group_by="property_city",
+    sort_order="desc",
+    top_n=5
   )
-Note: Present ranked output only from grouped aggregate results, sorted by count descending.\
+Note: Use sort_order and top_n for ranking queries. Results come pre-sorted with
+metadata (_total_groups, _showing, _truncated). Present as-is and note
+"Showing top 5 of {_total_groups} markets" in the answer.\
 """
 
 # ---------------------------------------------------------------------------
@@ -407,7 +418,8 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    missing choice determines correctness.** Call tools immediately for clear
    search, comparison, count, and summary questions. But if the user asks for a
    grouped ranking, leaderboard, or top-N result and the metric or grouping
-   dimension is ambiguous, ask a short clarification instead of guessing. Prefer
+   dimension is ambiguous, emit clickable clarification options using
+   ``[CLARIFY:label|full rewritten query]`` markers instead of guessing. Prefer
    one precise clarification over a fabricated answer.
 
 2. **Minimize turns.** Answer in as few tool-call rounds as possible. Emit all
@@ -447,13 +459,18 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    valid grouped aggregate or an explicitly stated deterministic sort. Do not
    infer a broker/company leaderboard by scanning individual records unless the
    grouping field is explicit and supported.
-   If the request is close to answerable but ambiguous, ask a constrained
-   clarification such as:
+   If the request is close to answerable but ambiguous, emit clickable
+   clarification options using the ``[CLARIFY:label|full rewritten query]``
+   marker format. Each option must be a complete, self-contained query.
+   Common disambiguation axes:
    - metric: gross deal value, gross fee, or square footage
    - role/dimension: lead broker, tenant rep broker, listing broker, buyer rep
    - time scope: this year, last 12 months, all time
    If the request cannot be answered reliably from indexed data, say so plainly
    and suggest a better-phrased follow-up.
+   For supported leaderboard queries, always pass sort_order and top_n to
+   aggregate_records so results arrive pre-ranked with metadata. Present the
+   total vs. shown count (e.g., "Showing top 5 of 47 markets").
 
 7. **Cite records by name only — never show Salesforce IDs.** When presenting
    results, reference records by their name (or subject for Tasks). Do NOT
@@ -507,7 +524,17 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
 16. **For complex questions, reason about object selection.** When the question
    could apply to multiple object types (e.g. "what's happening in Dallas"),
    consider which object best answers the intent before calling tools. If
-   uncertain, search the most specific object type first.\
+   uncertain, search the most specific object type first.
+
+17. **For help, capability, or onboarding questions, give a brief welcome — not an
+   inventory.** When the user asks "what can you do?", "help", "what kinds of
+   searches are available?", or similar broad capability questions, respond with:
+   (a) a 1–2 sentence summary of what AscendixIQ can do,
+   (b) 4–6 grouped example queries as a bullet list (not one group per object),
+   and (c) a short closing line like "Just type a question to get started."
+   Do NOT enumerate every object type, do NOT list every field, and do NOT produce
+   more than ~150 words for a help response. Do NOT call any tools for pure
+   help/capability questions.\
 """
 
 # Static guidelines used by the static SYSTEM_PROMPT (5-object fallback).
@@ -680,6 +707,18 @@ TOOL_DEFINITIONS: list[dict] = [
                             "description": (
                                 "Field to group results by. Examples: property_class, "
                                 "city, lease_type, use_type."
+                            ),
+                        },
+                        "sort_order": {
+                            "type": "string",
+                            "enum": ["desc", "asc"],
+                            "description": "Sort direction for grouped results (default: desc).",
+                        },
+                        "top_n": {
+                            "type": "integer",
+                            "description": (
+                                "Return only the top N groups after sorting. "
+                                "Response metadata shows total vs. shown count."
                             ),
                         },
                     },
@@ -919,6 +958,18 @@ def build_tool_definitions(config: dict) -> list[dict]:
                                 "description": (
                                     "Field to group results by. Examples: property_class, "
                                     "city, lease_type, use_type."
+                                ),
+                            },
+                            "sort_order": {
+                                "type": "string",
+                                "enum": ["desc", "asc"],
+                                "description": "Sort direction for grouped results (default: desc).",
+                            },
+                            "top_n": {
+                                "type": "integer",
+                                "description": (
+                                    "Return only the top N groups after sorting. "
+                                    "Response metadata shows total vs. shown count."
                                 ),
                             },
                         },

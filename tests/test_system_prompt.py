@@ -299,7 +299,7 @@ class TestSystemPrompt:
 
     def test_has_ambiguous_leaderboard_example(self):
         assert "Name the top ten brokers in our system by deal size" in SYSTEM_PROMPT
-        assert "Do you mean ranking by gross deal value, gross fee, or square footage?" in SYSTEM_PROMPT
+        assert "[CLARIFY:" in SYSTEM_PROMPT
 
     def test_has_deal_few_shot_example(self):
         """Static prompt includes the Deal few-shot example."""
@@ -637,3 +637,74 @@ class TestBuildToolDefinitions:
         search_tool = next(t for t in tools if t["toolSpec"]["name"] == "search_records")
         enum = search_tool["toolSpec"]["inputSchema"]["json"]["properties"]["object_type"]["enum"]
         assert enum == ["Availability", "Lease", "Property"]
+
+
+# =========================================================================
+# 5. Leaderboard tool params (Task 4.13e)
+# =========================================================================
+
+
+class TestLeaderboardToolParams:
+    """Verify sort_order and top_n exist in aggregate_records definitions."""
+
+    def _get_agg_props(self, tools):
+        agg = next(t for t in tools if t["toolSpec"]["name"] == "aggregate_records")
+        return agg["toolSpec"]["inputSchema"]["json"]["properties"]
+
+    def test_static_has_sort_order(self):
+        props = self._get_agg_props(TOOL_DEFINITIONS)
+        assert "sort_order" in props
+        assert props["sort_order"]["enum"] == ["desc", "asc"]
+
+    def test_static_has_top_n(self):
+        props = self._get_agg_props(TOOL_DEFINITIONS)
+        assert "top_n" in props
+        assert props["top_n"]["type"] == "integer"
+
+    def test_dynamic_has_sort_order(self):
+        tools = build_tool_definitions(SAMPLE_CONFIG_11)
+        props = self._get_agg_props(tools)
+        assert "sort_order" in props
+
+    def test_dynamic_has_top_n(self):
+        tools = build_tool_definitions(SAMPLE_CONFIG_11)
+        props = self._get_agg_props(tools)
+        assert "top_n" in props
+
+    def test_guideline_6_in_static_prompt(self):
+        assert "Do not fabricate grouped rankings" in SYSTEM_PROMPT
+        assert "sort_order" in SYSTEM_PROMPT
+
+    def test_guideline_6_in_dynamic_prompt(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert "sort_order" in result
+        assert "top_n" in result
+
+    def test_clarify_marker_format_in_static_prompt(self):
+        """The [CLARIFY:label|query] marker format must be documented in the prompt."""
+        assert "[CLARIFY:" in SYSTEM_PROMPT
+        assert "full rewritten query" in SYSTEM_PROMPT
+
+    def test_clarify_marker_format_in_dynamic_prompt(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert "[CLARIFY:" in result
+
+
+# =========================================================================
+# 6. Help-response guideline (Task 4.12.4)
+# =========================================================================
+
+
+class TestHelpResponseGuideline:
+    """Verify guideline 17 (help/onboarding) exists in prompts."""
+
+    def test_static_prompt_has_help_guidance(self):
+        assert "help, capability, or onboarding questions" in SYSTEM_PROMPT
+
+    def test_dynamic_prompt_has_help_guidance(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert "help, capability, or onboarding questions" in result
+
+    def test_guideline_discourages_capability_dumps(self):
+        assert "Do NOT enumerate every object type" in SYSTEM_PROMPT
+        assert "Do NOT call any tools for pure" in SYSTEM_PROMPT

@@ -102,6 +102,10 @@ public with sharing class AscendixAISearchController {
                                 citationsList.add(transformed);
                             }
                         }
+                    } else if (currentEvent == 'clarification') {
+                        if (data.containsKey('options')) {
+                            result.put('clarificationOptions', data.get('options'));
+                        }
                     } else if (currentEvent == 'done') {
                         // Merge any final metadata
                         if (data.containsKey('reason')) {

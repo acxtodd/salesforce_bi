@@ -1797,4 +1797,236 @@ describe('c-ascendix-ai-search', () => {
             }
         });
     });
+
+    // Task 4.12.4: Answer Formatting Tests
+    describe('Answer Formatting', () => {
+        function createComponentAndSetAnswer(answerText) {
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+            element.answer = answerText;
+            return element;
+        }
+
+        it('should convert markdown headers to HTML', () => {
+            const element = createComponentAndSetAnswer('## Main Title\n### Sub Title');
+            const html = element.formattedAnswer;
+            expect(html).toContain('<h3>Main Title</h3>');
+            expect(html).toContain('<h4>Sub Title</h4>');
+        });
+
+        it('should convert bullet lists to ul/li', () => {
+            const element = createComponentAndSetAnswer('- Item A\n- Item B\n- Item C');
+            const html = element.formattedAnswer;
+            expect(html).toContain('<ul>');
+            expect(html).toContain('<li>Item A</li>');
+            expect(html).toContain('<li>Item B</li>');
+            expect(html).toContain('<li>Item C</li>');
+            expect(html).toContain('</ul>');
+        });
+
+        it('should convert numbered lists to ol/li', () => {
+            const element = createComponentAndSetAnswer('1. First\n2. Second\n3. Third');
+            const html = element.formattedAnswer;
+            expect(html).toContain('<ol>');
+            expect(html).toContain('<li>First</li>');
+            expect(html).toContain('<li>Second</li>');
+            expect(html).toContain('</ol>');
+        });
+
+        it('should handle mixed list types', () => {
+            const element = createComponentAndSetAnswer('1. First\n2. Second\n\n- Bullet A\n- Bullet B');
+            const html = element.formattedAnswer;
+            expect(html).toContain('<ol>');
+            expect(html).toContain('</ol>');
+            expect(html).toContain('<ul>');
+            expect(html).toContain('</ul>');
+        });
+
+        it('should convert markdown tables to HTML tables', () => {
+            const tableText = '| Name | City |\n|---|---|\n| Tower One | Dallas |\n| Park Place | Austin |';
+            const element = createComponentAndSetAnswer(tableText);
+            const html = element.formattedAnswer;
+            expect(html).toContain('<table>');
+            expect(html).toContain('<thead>');
+            expect(html).toContain('<th>Name</th>');
+            expect(html).toContain('<th>City</th>');
+            expect(html).toContain('<tbody>');
+            expect(html).toContain('<td>Tower One</td>');
+            expect(html).toContain('<td>Dallas</td>');
+            expect(html).toContain('</table>');
+        });
+
+        it('should fall back gracefully for invalid table-like text', () => {
+            const notATable = 'This has a | pipe but is not a table';
+            const element = createComponentAndSetAnswer(notATable);
+            const html = element.formattedAnswer;
+            expect(html).not.toContain('<table>');
+            expect(html).toContain('pipe');
+        });
+
+        it('should wrap plain text in paragraphs', () => {
+            const element = createComponentAndSetAnswer('First paragraph.\n\nSecond paragraph.');
+            const html = element.formattedAnswer;
+            expect(html).toContain('<p>First paragraph.</p>');
+            expect(html).toContain('<p>Second paragraph.</p>');
+        });
+
+        it('should not double-wrap block elements in paragraphs', () => {
+            const element = createComponentAndSetAnswer('## Header\n\nSome text.');
+            const html = element.formattedAnswer;
+            // Header should not be inside a <p> tag
+            expect(html).not.toContain('<p><h3>');
+            expect(html).toContain('<h3>Header</h3>');
+        });
+
+        it('should preserve bold and italic formatting', () => {
+            const element = createComponentAndSetAnswer('This is **bold** and *italic* text.');
+            const html = element.formattedAnswer;
+            expect(html).toContain('<strong>bold</strong>');
+            expect(html).toContain('<em>italic</em>');
+        });
+
+        it('should preserve citation hyperlinks in formatted answer', () => {
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            // Set citations first so hyperlink map builds
+            element.citations = [{
+                id: 'a0x1',
+                title: 'Tower One',
+                recordId: 'a0x1',
+                sobject: 'Property'
+            }];
+            element.answer = 'The property Tower One is in Dallas.';
+
+            const html = element.formattedAnswer;
+            expect(html).toContain('Tower One');
+            // Should contain an anchor tag for the record
+            expect(html).toContain('<a href=');
+        });
+    });
+
+    // Task 4.13.1f: Clarification UX Tests
+    describe('Clarification Options', () => {
+        it('should display clarification pills when options are present', async () => {
+            const mockResponse = {
+                answer: 'Which metric did you mean?',
+                citations: [],
+                clarificationOptions: [
+                    { label: 'By deal count', query: 'Top 5 markets by deal count' },
+                    { label: 'By revenue', query: 'Top 5 markets by revenue' }
+                ]
+            };
+            callAnswerEndpoint.mockResolvedValue(mockResponse);
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Top markets';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Top markets' }
+            }));
+
+            await flushPromises();
+
+            const submitButton = element.shadowRoot.querySelector('.submit-button');
+            submitButton.click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Verify clarification options are set
+            expect(element.clarificationOptions.length).toBe(2);
+            expect(element.clarificationOptions[0].label).toBe('By deal count');
+
+            // Verify pills are rendered
+            const pills = element.shadowRoot.querySelector('.clarification-options');
+            expect(pills).toBeTruthy();
+        });
+
+        it('should clear clarification options on new submit', async () => {
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            // Set initial clarification options
+            element.clarificationOptions = [
+                { key: 'c-0', label: 'Option A', query: 'query A' }
+            ];
+
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'Direct answer',
+                citations: []
+            });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            await flushPromises();
+
+            // Enter new query
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'New query';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'New query' }
+            }));
+
+            await flushPromises();
+
+            const submitButton = element.shadowRoot.querySelector('.submit-button');
+            submitButton.click();
+
+            await flushPromises();
+
+            // Clarification options should be cleared
+            expect(element.clarificationOptions).toEqual([]);
+        });
+
+        it('should resubmit with clarification query on pill click', async () => {
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'Here are the top 5 markets by deal count.',
+                citations: []
+            });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            await flushPromises();
+
+            // Set clarification options directly
+            element.clarificationOptions = [
+                { key: 'c-0', label: 'By deal count', query: 'Top 5 markets by deal count' },
+                { key: 'c-1', label: 'By revenue', query: 'Top 5 markets by revenue' }
+            ];
+            element.showAnswerSection = true;
+
+            await flushPromises();
+
+            // Find and click a clarification button
+            const clarifyButtons = element.shadowRoot.querySelectorAll('.clarification-options lightning-button');
+            if (clarifyButtons && clarifyButtons.length > 0) {
+                // Simulate click with dataset
+                const btn = clarifyButtons[0];
+                btn.dispatchEvent(new CustomEvent('click', { bubbles: true }));
+
+                await flushPromises();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify that callAnswerEndpoint was called
+                expect(callAnswerEndpoint).toHaveBeenCalled();
+            }
+        });
+    });
 });

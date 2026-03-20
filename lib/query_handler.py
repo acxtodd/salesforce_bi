@@ -13,6 +13,7 @@ response before returning.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -37,6 +38,30 @@ logger = logging.getLogger(__name__)
 
 # Safety cap on conversation turns to prevent infinite loops.
 MAX_TURNS = 10
+
+
+# ---------------------------------------------------------------------------
+# Clarification extraction
+# ---------------------------------------------------------------------------
+
+# Pattern: [CLARIFY:label|query]
+_CLARIFY_RE = re.compile(r"\[CLARIFY:([^|\]]+)\|([^\]]+)\]")
+
+
+def extract_clarifications(answer: str) -> tuple[str, list[dict]]:
+    """Extract ``[CLARIFY:label|query]`` markers from an answer.
+
+    Returns ``(clean_answer, options)`` where *clean_answer* has the markers
+    stripped and *options* is a list of ``{"label": ..., "query": ...}`` dicts.
+    """
+    options: list[dict] = []
+    for match in _CLARIFY_RE.finditer(answer):
+        options.append({
+            "label": match.group(1).strip(),
+            "query": match.group(2).strip(),
+        })
+    clean = _CLARIFY_RE.sub("", answer).strip()
+    return clean, options
 
 
 # ---------------------------------------------------------------------------
@@ -72,6 +97,10 @@ class QueryResult:
 
     turn_durations: list[float] = field(default_factory=list)
     """Duration of each Bedrock Converse API call in seconds."""
+
+    clarification_options: list[dict] = field(default_factory=list)
+    """Clickable clarification options for ambiguous queries.
+    Each entry is ``{"label": "By deal count", "query": "Show top 5 markets by deal count"}``."""
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +191,8 @@ class QueryHandler:
 
             if stop_reason == "end_turn":
                 # Claude is done -- extract final text.
-                answer = self._extract_text(assistant_message)
+                raw_answer = self._extract_text(assistant_message)
+                answer, clarification_options = extract_clarifications(raw_answer)
                 citations = self._extract_citations(answer, all_search_results)
                 return QueryResult(
                     answer=answer,
@@ -173,6 +203,7 @@ class QueryHandler:
                     search_result_count=search_result_count,
                     tool_call_log=tool_call_log,
                     turn_durations=turn_durations,
+                    clarification_options=clarification_options,
                 )
 
             if stop_reason == "tool_use":

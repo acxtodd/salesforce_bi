@@ -114,6 +114,17 @@
                             </div>
                         </template>
                     </template>
+
+                    <!-- Clarification Options -->
+                    <template if:true={hasClarificationOptions}>
+                        <div class="clarification-options slds-m-top_small">
+                            <template for:each={clarificationOptions} for:item="option">
+                                <lightning-button key={option.key} variant="neutral" label={option.label}
+                                    data-query={option.query} onclick={handleClarificationClick}
+                                    class="slds-m-right_x-small slds-m-bottom_x-small"></lightning-button>
+                            </template>
+                        </div>
+                    </template>
                 </div>
             </template>
 

@@ -739,6 +739,12 @@ class TestEndToEnd:
         assert result["result"]["groups"]["A"]["count"] == 10
         call_kwargs = backend.aggregate.call_args[1]
         assert call_kwargs["group_by"] == "propertyclass"
+        # 4.13e: verify sorting metadata for grouped results
+        r = result["result"]
+        assert r["_sorted_by"] == "count"
+        assert r["_order"] == "desc"
+        keys = list(r["groups"].keys())
+        assert r["groups"][keys[0]]["count"] >= r["groups"][keys[1]]["count"]
 
 
 # =========================================================================

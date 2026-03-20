@@ -501,6 +501,9 @@ class ToolDispatcher:
         if group_by:
             group_by = self._resolve_field(group_by, object_type)
 
+        sort_order = params.get("sort_order", "desc")
+        top_n = params.get("top_n")
+
         result = self._backend.aggregate(
             self._namespace,
             filters=resolved,
@@ -508,4 +511,38 @@ class ToolDispatcher:
             aggregate_field=aggregate_field,
             group_by=group_by,
         )
+
+        # Post-process grouped results: sort and optionally truncate.
+        if "groups" in result and result["groups"]:
+            groups = result["groups"]
+            agg_key = aggregate  # "count", "sum", or "avg"
+            reverse = (sort_order != "asc")
+
+            # Sort by aggregate value (desc or asc), then alphabetically by
+            # group key for deterministic ordering when values tie.
+            if reverse:
+                sorted_items = sorted(
+                    groups.items(),
+                    key=lambda kv: (-kv[1].get(agg_key, 0), kv[0]),
+                )
+            else:
+                sorted_items = sorted(
+                    groups.items(),
+                    key=lambda kv: (kv[1].get(agg_key, 0), kv[0]),
+                )
+
+            total_groups = len(sorted_items)
+
+            truncated = False
+            if top_n and top_n < total_groups:
+                sorted_items = sorted_items[:top_n]
+                truncated = True
+
+            result["groups"] = dict(sorted_items)
+            result["_sorted_by"] = agg_key
+            result["_order"] = "desc" if reverse else "asc"
+            result["_total_groups"] = total_groups
+            result["_showing"] = len(sorted_items)
+            result["_truncated"] = truncated
+
         return {"result": result}

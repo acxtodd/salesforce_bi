@@ -2752,6 +2752,144 @@
           ],
           "startedAt": "2026-03-20T08:09:57.410164+00:00",
           "completedAt": "2026-03-20T08:17:42.182390+00:00"
+        },
+        {
+          "id": "4.12",
+          "title": "Clean up help-response and answer readability in the LWC search UI",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T09:29:39.860463+00:00",
+          "updatedAt": "2026-03-20T09:30:44.357053+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Address the current help/onboarding failure mode where broad capability questions render as dense wall-of-text answers in the Ascendix AI Search LWC. Coordinate prompt-output shaping, answer rendering cleanup, readability improvements, and regression coverage so broad help queries are concise and scannable without regressing normal search behavior.",
+          "technical_context": "Use the screenshoted 'What kinds of searches can you do?' output as the acceptance baseline. This is not a redesign task and not a request for more features. The problem is the combination of overlong help responses, fragile markdown-to-HTML conversion in the LWC, and dense answer styling. Keep the solution within the current Salesforce LWC surface and the existing /query architecture.",
+          "acceptance_criteria": [
+            "Broad help/onboarding questions such as 'what can you do?' render in the Ascendix AI Search LWC as concise, scannable answers instead of long capability dumps.",
+            "Answer rendering and panel presentation are cleaned up without breaking citation link behavior, normal search answers, or the current /query integration surface.",
+            "Regression coverage exists for the broad help-query failure mode so future prompt or UI changes do not silently reintroduce the same wall-of-text result."
+          ],
+          "references": [
+            "lib/system_prompt.py",
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js",
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html",
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.css"
+          ]
+        },
+        {
+          "id": "4.12.1",
+          "title": "Tighten help and onboarding response shape for broad capability queries",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T09:29:46.210527+00:00",
+          "updatedAt": "2026-03-20T09:30:44.697885+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Update the query-agent prompt behavior for broad help requests such as 'what can you do?' or 'what kinds of searches can you do?' so the agent returns a short onboarding answer instead of a long capability dump. Keep normal search questions on the existing tool-use path.",
+          "technical_context": "Start in lib/system_prompt.py and the mirrored lambda/query/lib/system_prompt.py copy. Add explicit guidance for capability/help/how-can-you-help intents. Prefer a bounded structure: one-sentence summary, 3 to 5 capability groups, at most 1 to 2 example questions per group, and a short 'try asking...' footer. Do not turn this into a new intent router unless the existing prompt path proves insufficient.",
+          "parent": "4.12",
+          "acceptance_criteria": [
+            "Broad capability/help queries return a bounded onboarding-style response with a short summary and a small number of grouped examples rather than a long object-by-object inventory.",
+            "Normal search-oriented questions continue to use the existing tool-use behavior and are not forced into the onboarding response shape.",
+            "Prompt guidance explicitly discourages capability-dump answers, repeated object inventories, and overlong example lists for vague help requests."
+          ],
+          "references": [
+            "lib/system_prompt.py",
+            "lambda/query/lib/system_prompt.py",
+            "docs/agent_prompt_export.md"
+          ],
+          "depends_on": [
+            "4.10"
+          ],
+          "gate_criteria": "Use the current 11-object prompt improvements as the baseline; refine output shape without regressing object coverage or current QA fixes."
+        },
+        {
+          "id": "4.12.2",
+          "title": "Simplify LWC answer rendering for predictable structured output",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T09:29:52.351207+00:00",
+          "updatedAt": "2026-03-20T09:30:44.990295+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Reduce formatting fragility in the Ascendix AI Search LWC answer renderer so broad help responses and normal search answers render consistently as readable headings, paragraphs, bullets, and numbered lists without malformed wrappers or accidental wall-of-text output.",
+          "technical_context": "Review salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js formattedAnswer closely. The current regex-based markdown-to-HTML conversion is the main risk area. Narrow the supported answer format instead of trying to support arbitrary markdown. Preserve citation linkification and lightning-formatted-rich-text compatibility.",
+          "parent": "4.12",
+          "acceptance_criteria": [
+            "The LWC answer renderer reliably formats headings, paragraphs, bullets, and numbered lists for both broad help answers and normal search responses.",
+            "Renderer changes eliminate malformed list wrappers, accidental HTML overreach, and obvious wall-of-text amplification caused by the current regex-heavy formatting path.",
+            "Citation linkification continues to work for cited record names after renderer cleanup."
+          ],
+          "references": [
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js",
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html"
+          ],
+          "depends_on": [
+            "4.12.1"
+          ],
+          "gate_criteria": "Align supported rendering behavior with the tightened help/onboarding response shape before broadening formatter changes."
+        },
+        {
+          "id": "4.12.3",
+          "title": "Improve answer panel readability without changing the overall LWC surface",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T09:29:59.580036+00:00",
+          "updatedAt": "2026-03-20T09:30:45.282384+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Clean up the answer panel presentation in the Ascendix AI Search LWC so long answers are easier to scan and no longer read as a dense gray text slab. Improve typography, spacing, section separation, and hierarchy while preserving the existing Salesforce visual language.",
+          "technical_context": "Focus on salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html and salesforce/lwc/ascendixAiSearch/ascendixAiSearch.css. This is a readability cleanup, not a redesign. Increase legibility first: body text size, line-height, spacing between sections, content width, and visual separation between the answer body and citations controls. Keep the current answer/citations interaction model unless a small markup change materially improves readability.",
+          "parent": "4.12",
+          "acceptance_criteria": [
+            "The answer panel is materially easier to scan on desktop and mobile through improved text size, spacing, section separation, and visual hierarchy.",
+            "The answer region no longer reads as a dense gray text slab for long-form help responses.",
+            "Citations and related controls remain usable and visually subordinate to the main answer content."
+          ],
+          "references": [
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html",
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.css"
+          ],
+          "depends_on": [
+            "4.12.2"
+          ],
+          "gate_criteria": "Apply visual cleanup after renderer structure is stable so CSS work targets the final content shape."
+        },
+        {
+          "id": "4.12.4",
+          "title": "Add regression coverage for broad help-query answer quality",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T09:30:05.644727+00:00",
+          "updatedAt": "2026-03-20T09:30:45.671810+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Add focused regression coverage for the specific failure mode shown in QA: broad help/onboarding questions producing overlong, hard-to-scan output in the LWC. Capture both prompt guidance and renderer behavior so future prompt tuning does not reintroduce the same wall-of-text result.",
+          "technical_context": "Extend prompt coverage in tests/test_system_prompt.py and add focused coverage around the LWC answer-formatting path if the current LWC test harness supports it. If not, isolate the formatter logic enough for fixture-driven tests. Use a representative 'what can you do?' style answer and assert readable structure rather than exact wording. This task should prevent the screenshoted failure mode from reappearing silently.",
+          "parent": "4.12",
+          "acceptance_criteria": [
+            "Prompt coverage exists for broad help/onboarding response guidance so capability-dump regressions are caught during review or CI.",
+            "Focused coverage exists for the answer-formatting path or an extracted formatter helper using representative broad-help answer fixtures.",
+            "The regression fixture and assertions are tied to the specific QA failure mode: readable structure and bounded output, not exact wording."
+          ],
+          "references": [
+            "tests/test_system_prompt.py",
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js"
+          ],
+          "depends_on": [
+            "4.12.3"
+          ],
+          "gate_criteria": "Lock in the final broad-help readability target after the UI presentation changes land."
         }
       ]
     }
@@ -2768,12 +2906,13 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 11,
+      "4.": 13,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,
       "4.8.": 4,
-      "4.9.": 11
+      "4.9.": 11,
+      "4.12.": 5
     }
   }
 }

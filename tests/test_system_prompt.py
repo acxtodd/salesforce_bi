@@ -287,6 +287,20 @@ class TestSystemPrompt:
         assert "market" in SYSTEM_PROMPT.lower()
         assert "property_city" in SYSTEM_PROMPT
 
+    def test_mentions_grouped_ranking_guard(self):
+        assert "Do not fabricate grouped rankings" in SYSTEM_PROMPT
+        assert "leaderboard" in SYSTEM_PROMPT
+        assert "grouped aggregate" in SYSTEM_PROMPT
+
+    def test_mentions_interpretation_footer(self):
+        assert "If interpretation materially affects correctness" in SYSTEM_PROMPT
+        assert "Interpreted as:" in SYSTEM_PROMPT
+        assert "Try next:" in SYSTEM_PROMPT
+
+    def test_has_ambiguous_leaderboard_example(self):
+        assert "Name the top ten brokers in our system by deal size" in SYSTEM_PROMPT
+        assert "Do you mean ranking by gross deal value, gross fee, or square footage?" in SYSTEM_PROMPT
+
     def test_has_deal_few_shot_example(self):
         """Static prompt includes the Deal few-shot example."""
         assert "Deal" in SYSTEM_PROMPT
@@ -472,6 +486,18 @@ class TestBuildSystemPrompt:
         result = build_system_prompt(SAMPLE_CONFIG)
         assert "Guidelines" in result
         assert "denormalized" in result.lower() or "denorm" in result.lower()
+
+    def test_includes_grouped_ranking_guard(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert "Do not fabricate grouped rankings" in result
+        assert "leaderboard" in result
+        assert "gross deal value, gross fee, or square footage" in result
+
+    def test_includes_interpretation_footer_guidance(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert "If interpretation materially affects correctness" in result
+        assert "Interpreted as:" in result
+        assert "Limitation:" in result
 
     def test_live_salesforce_query_not_available(self):
         result = build_system_prompt(SAMPLE_CONFIG)

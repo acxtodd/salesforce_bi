@@ -313,10 +313,12 @@ class QueryHandler:
     ) -> list[dict]:
         """Build citation list from search results referenced in the answer.
 
-        A record is cited if its ``id`` or ``name`` appears as a substring
-        of *answer*.  Duplicates (by id) are removed.
+        All search results are included as citations so the LWC can build
+        a complete hyperlink map.  The LWC linkification regex handles
+        which names actually get linked in the rendered answer.
+        Duplicates (by id) are removed.
         """
-        if not answer or not search_results:
+        if not search_results:
             return []
 
         seen_ids: set[str] = set()
@@ -327,14 +329,10 @@ class QueryHandler:
             # Some objects (e.g. Task) use "subject" instead of "name"
             record_name = record.get("name", "") or record.get("subject", "")
 
-            if record_id in seen_ids:
+            if not record_id or record_id in seen_ids:
                 continue
 
-            id_match = record_id and record_id in answer
-            name_match = record_name and record_name in answer
-
-            if id_match or name_match:
-                citations.append({"id": record_id, "name": record_name})
-                seen_ids.add(record_id)
+            citations.append({"id": record_id, "name": record_name})
+            seen_ids.add(record_id)
 
         return citations

@@ -542,11 +542,13 @@ class TestCitationExtraction:
         handler = _make_handler(bedrock, backend)
         result = handler.query("Top properties in Dallas")
 
-        assert len(result.citations) == 2
+        # All search results are included as citations so the LWC can
+        # build a complete hyperlink map for any record name in the answer.
+        assert len(result.citations) == 3
         cited_names = {c["name"] for c in result.citations}
-        assert cited_names == {"Tower One", "Plaza Two"}
+        assert cited_names == {"Tower One", "Plaza Two", "Hidden Gem"}
         cited_ids = {c["id"] for c in result.citations}
-        assert cited_ids == {"a0x001", "a0x002"}
+        assert cited_ids == {"a0x001", "a0x002", "a0x003"}
 
     def test_citations_by_id(self):
         backend = _make_backend()
@@ -650,9 +652,12 @@ class TestCitationExtraction:
 
         citations = QueryHandler._extract_citations(answer, search_results)
 
-        assert len(citations) == 1
+        # All search results become citations for the LWC hyperlink map.
+        assert len(citations) == 2
         assert citations[0]["id"] == "00T001"
         assert citations[0]["name"] == "Follow up with tenant"
+        assert citations[1]["id"] == "00T002"
+        assert citations[1]["name"] == "Send proposal"
 
     def test_citations_prefer_name_over_subject(self):
         """When both name and subject exist, name should be used."""

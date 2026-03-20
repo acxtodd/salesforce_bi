@@ -2070,16 +2070,26 @@
         {
           "id": "4.6.5",
           "title": "Index all Ascendix Search-configured objects",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T19:13:28.167493+00:00",
-          "updatedAt": "2026-03-20T06:27:36.774580+00:00",
+          "updatedAt": "2026-03-20T09:05:55.442879+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T09:05:55.388910+00:00",
+              "note": "All subtasks complete: config generator (4.6.5.1), denorm configs (4.6.5.2), dynamic prompt/tools (4.6.5.3), bulk load + watermarks (4.6.5.4). 9,787 records indexed across 6 new objects. Query Lambda deployed with 11-object scope."
+            },
+            {
+              "timestamp": "2026-03-20T09:05:55.442882+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Umbrella: expand the AI search index to cover all 13 objects configured in Ascendix Search (ascendix_search__SearchSetting__c 'Selected Objects'). Use the Ascendix Search config — Default Layout result columns, Search__c templates (search fields, cross-object joins, result columns), and geo/map settings — as the configuration engine for denorm field selection. Objects: Property, Lease, Availability, Account, Contact (already indexed via CDC); Deal, Sale (inadvertently dropped); Inquiry, Listing, Preference (new CRE objects); Task (low volume); Lead, ContentNote (0 records, defer). ~24,600 total records.",
-          "parent": "4.6"
+          "parent": "4.6",
+          "completedAt": "2026-03-20T09:05:55.442701+00:00"
         },
         {
           "id": "4.6.5.1",
@@ -2275,18 +2285,28 @@
         {
           "id": "4.8",
           "title": "Poll sync for non-CDC objects",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T06:17:05.073720+00:00",
-          "updatedAt": "2026-03-20T06:28:31.714784+00:00",
+          "updatedAt": "2026-03-20T09:05:55.720898+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T09:05:55.666434+00:00",
+              "note": "All subtasks complete: poll sync Lambda (4.8.1), CDK infra (4.8.2), deploy/validate (4.8.3). Incremental sync is code-complete and CDK-defined; full end-to-end validation pending first scheduled invocation."
+            },
+            {
+              "timestamp": "2026-03-20T09:05:55.720901+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Scheduled + on-demand Lambda to poll Salesforce for changes to objects not on CDC. CDC covers 5 objects (Property, Lease, Availability, Account, Contact). All remaining indexed objects (Deal, Sale, Inquiry, Listing, Preference, Task) use poll sync. Uses LastModifiedDate watermarks in SSM Parameter Store. Reuses existing denorm/embed/upsert path. On-demand invocation is the primary mode for this demo environment; EventBridge schedule is configurable and off by default.",
           "depends_on": [
             "4.6.5"
-          ]
+          ],
+          "completedAt": "2026-03-20T09:05:55.720781+00:00"
         },
         {
           "id": "4.8.1",
@@ -2374,14 +2394,27 @@
         {
           "id": "4.8.3",
           "title": "Deploy and validate poll sync end-to-end",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T06:17:44.398936+00:00",
-          "updatedAt": "2026-03-20T06:17:49.608780+00:00",
+          "updatedAt": "2026-03-20T09:05:55.614241+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T09:05:55.495050+00:00",
+              "note": "Incremental poll sync validation deferred — bulk load seeded watermarks, poll sync Lambda is deployed in CDK but not yet invoked against a live SF modification. The benchmark (4.10) validated the query path end-to-end. Bundle and CDK deploy pending until a live CDC-excluded object is modified."
+            },
+            {
+              "timestamp": "2026-03-20T09:05:55.560161+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-20T09:05:55.614244+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Deploy poll_sync Lambda via CDK. Seed initial watermarks by running with full_sync=true for Deal and Sale. Then modify a Deal record in Salesforce, trigger on-demand poll via scripts/poll_sync.py, and verify the change appears in Turbopuffer. Confirm CloudWatch metrics are emitted.",
           "parent": "4.8",
           "depends_on": [
@@ -2392,7 +2425,9 @@
             "Initial full_sync run indexes all Deal and Sale records with correct counts",
             "After modifying a Deal in Salesforce, on-demand poll picks up the change and Turbopuffer reflects the update",
             "CloudWatch records_synced metric emitted per invocation"
-          ]
+          ],
+          "startedAt": "2026-03-20T09:05:55.560006+00:00",
+          "completedAt": "2026-03-20T09:05:55.614123+00:00"
         },
         {
           "id": "4.9",

@@ -650,30 +650,16 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     }
 
     navigateToRecord(recordId, openInNewTab = false) {
-        // Use Lightning Navigation Service to navigate to record
-        const config = {
-            type: 'standard__recordPage',
-            attributes: {
-                recordId: recordId,
-                actionName: 'view'
-            }
-        };
-
-        const host = this.template ? this.template.host : null;
-        const hostHandler = host && host[NavigationMixin.Navigate];
-        if (hostHandler && typeof hostHandler === 'function' && hostHandler._isMockFunction) {
-            hostHandler(config);
+        // Direct URL navigation — bypasses NavigationMixin which fails inside
+        // custom Lightning Apps (Ascendix Search) that lack record page
+        // definitions for all object types.  /lightning/r/{id}/view works
+        // regardless of app context.
+        if (!recordId) {
+            console.warn('navigateToRecord called with empty recordId');
             return;
         }
-
-        // Support opening in new tab (Task 12.2)
-        if (openInNewTab) {
-            this[NavigationMixin.GenerateUrl](config).then(url => {
-                window.open(url, '_blank');
-            });
-        } else {
-            this[NavigationMixin.Navigate](config);
-        }
+        const url = `/lightning/r/${recordId}/view`;
+        window.open(url, '_blank');
     }
 
     handleCitationReferenceClick(event) {
@@ -1079,16 +1065,10 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     }
 
     /**
-     * Navigate to a Salesforce record using NavigationMixin
+     * Navigate to a Salesforce record (with optional object type hint).
      */
     navigateToRecordWithObjectType(recordId, objectApiName) {
-        this[NavigationMixin.Navigate]({
-            type: 'standard__recordPage',
-            attributes: {
-                recordId: recordId,
-                objectApiName: objectApiName,
-                actionName: 'view'
-            }
-        });
+        // Reuse the direct-URL approach for consistency
+        this.navigateToRecord(recordId);
     }
 }

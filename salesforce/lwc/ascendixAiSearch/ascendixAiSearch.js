@@ -190,11 +190,11 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             // Case-insensitive matching without strict word boundaries for better flexibility
             const regex = new RegExp('(?<!<[^>]*?)(' + escapedName + ')(?![^<]*?>)', 'gi');
 
-            // Use direct /lightning/r/{id}/view URL instead of href="#" with data attributes.
-            // lightning-formatted-rich-text strips data-* attributes and custom classes,
-            // so click interception via handleAnswerLinkClick won't work. The direct URL
-            // ensures the link works even after sanitization.
-            const recordUrl = '/lightning/r/' + recordId + '/view';
+            // lightning-formatted-rich-text only allows absolute URLs (http/https protocol).
+            // Relative URLs like /lightning/r/xxx/view get stripped during sanitization.
+            // Use window.location.origin to build a full absolute URL.
+            const baseUrl = window.location.origin;
+            const recordUrl = baseUrl + '/lightning/r/' + recordId + '/view';
             formatted = formatted.replace(regex, (match) => {
                 return '<a href="' + recordUrl + '" target="_blank" title="View ' + sobject + ': ' + name + '">' + match + '</a>';
             });
@@ -655,15 +655,13 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     }
 
     navigateToRecord(recordId, openInNewTab = false) {
-        // Direct URL navigation — bypasses NavigationMixin which fails inside
-        // custom Lightning Apps (Ascendix Search) that lack record page
-        // definitions for all object types.  /lightning/r/{id}/view works
-        // regardless of app context.
+        // Direct absolute URL navigation — bypasses NavigationMixin which
+        // fails inside custom Lightning Apps (Ascendix Search).
         if (!recordId) {
             console.warn('navigateToRecord called with empty recordId');
             return;
         }
-        const url = `/lightning/r/${recordId}/view`;
+        const url = `${window.location.origin}/lightning/r/${recordId}/view`;
         window.open(url, '_blank');
     }
 

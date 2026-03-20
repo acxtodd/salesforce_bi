@@ -68,16 +68,23 @@ FULL_TEXT_SEARCH_SCHEMA: dict[str, dict[str, Any]] = {
     "noi": {"type": "float"},
     # Deal numeric fields (expanded)
     "grossfeeamount": {"type": "float"},
+    "grossdealvalue": {"type": "float"},
+    "companygrossfee": {"type": "float"},
+    "leasetermmonths": {"type": "float"},
     # Inquiry numeric fields
-    "desiredsize": {"type": "float"},
-    "desiredrent": {"type": "float"},
+    "areaminimum": {"type": "float"},
+    "areamaximum": {"type": "float"},
+    "rentminimum": {"type": "float"},
+    "rentmaximum": {"type": "float"},
+    "priceminimum": {"type": "float"},
+    "pricemaximum": {"type": "float"},
     # Listing numeric fields
-    "askingrate": {"type": "float"},
-    # Preference numeric fields
-    "minsize": {"type": "float"},
-    "maxsize": {"type": "float"},
-    "minrate": {"type": "float"},
-    "maxrate": {"type": "float"},
+    "vacantarea": {"type": "float"},
+    # Preference numeric fields (same names as Inquiry)
+    # (areaminimum, areamaximum, etc. already declared above)
+    # Sale extra numeric fields
+    "numberunitsrooms": {"type": "float"},
+    "grossincome": {"type": "float"},
     # Geospatial component fields
     "geolocationlatitude": {"type": "float"},
     "geolocationlongitude": {"type": "float"},

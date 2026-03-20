@@ -275,17 +275,21 @@ Contact:
 ascendix__Deal__c:
   embed_fields:
     - Name                           # nameField
-    - ascendix__TransactionType__c   # picklist, filterable (lease/sale/sublease)
     - ascendix__SalesStage__c        # picklist, filterable (deal stage)
-    - ascendix__Description__c       # textarea, long text for semantic search
-    - ascendix__DealType__c          # picklist, filterable
+    - ascendix__LeaseType__c         # picklist, filterable
+    - ascendix__Status__c            # picklist, filterable
+    - ascendix__PropertyType__c      # picklist, filterable
   metadata_fields:
-    - ascendix__GrossFeeAmount__c    # currency, filterable (deal value)
+    - ascendix__TransactionType__c   # multipicklist (lease/sale/sublease)
+    - ascendix__GrossFeeAmount__c    # currency (deal value / gross fee)
+    - ascendix__GrossDealValue__c    # currency (gross deal value)
     - ascendix__CloseDateEstimated__c  # date, filterable (close date)
-    - ascendix__Probability__c       # percent, filterable
-    - ascendix__Commission__c        # currency, filterable
-    - ascendix__LeaseRate__c         # currency, filterable
-    - ascendix__DealAmount__c        # currency, filterable
+    - ascendix__CloseDateActual__c   # date, filterable
+    - ascendix__Probability__c       # percent
+    - ascendix__Size__c              # double (deal size SF)
+    - ascendix__LeaseRatePerUOM__c   # currency (lease rate PSF)
+    - ascendix__LeaseTermMonths__c   # double
+    - ascendix__CompanyGrossFee__c   # currency
   parents:
     ascendix__Property__c:           # -> ascendix__Property__c
       - Name                         # property name
@@ -314,19 +318,21 @@ ascendix__Deal__c:
 ascendix__Sale__c:
   embed_fields:
     - Name                           # nameField
-    - ascendix__Description__c       # textarea, long text
-    - ascendix__SaleType__c          # picklist, filterable
+    - ascendix__PropertyClass__c     # picklist, filterable
   metadata_fields:
     - ascendix__SalePrice__c         # currency, filterable
-    - ascendix__SalePricePerUOM__c   # currency, filterable (price PSF)
-    - ascendix__TotalArea__c         # double, filterable
-    - ascendix__CapRatePercent__c    # percent, filterable
-    - ascendix__NetIncome__c         # currency, filterable (NOI)
-    - ascendix__ListingPrice__c      # currency, filterable
+    - ascendix__SalePricePerUOM__c   # currency, formula (price PSF)
+    - ascendix__TotalArea__c         # double
+    - ascendix__CapRatePercent__c    # percent (cap rate)
+    - ascendix__NetIncome__c         # currency (NOI)
+    - ascendix__ListingPrice__c      # currency
     - ascendix__ListingDate__c       # date, filterable
     - ascendix__SaleDate__c          # date, filterable
+    - ascendix__DateOnMarket__c      # date, filterable
+    - ascendix__NumberUnitsRooms__c  # double
+    - ascendix__GrossIncome__c       # currency
   parents:
-    ascendix__Property__c:           # -> ascendix__Property__c
+    ascendix__Property__c:           # -> ascendix__Property__c (required)
       - Name                         # property name
       - ascendix__City__c            # property city
       - ascendix__State__c           # property state
@@ -335,17 +341,25 @@ ascendix__Sale__c:
       - Name                         # buyer name
     ascendix__Seller__c:             # -> Account
       - Name                         # seller name
+    ascendix__SellingBroker__c:      # -> Account
+      - Name                         # selling broker
 
 ascendix__Inquiry__c:
   embed_fields:
     - Name                           # nameField
     - ascendix__Description__c       # textarea, long text
-    - ascendix__InquiryType__c       # picklist, filterable
-    - ascendix__Status__c            # picklist, filterable
+    - ascendix__PropertyType__c      # picklist, filterable
+    - ascendix__PropertyClass__c     # picklist, filterable
+    - ascendix__InquirySource__c     # picklist, filterable
   metadata_fields:
-    - ascendix__InquiryDate__c       # date, filterable
-    - ascendix__DesiredSize__c       # double, filterable
-    - ascendix__DesiredRent__c       # currency, filterable
+    - ascendix__AreaMinimum__c       # double (min size)
+    - ascendix__AreaMaximum__c       # double (max size)
+    - ascendix__RentMinimum__c       # currency (min rent)
+    - ascendix__RentMaximum__c       # currency (max rent)
+    - ascendix__PriceMinimum__c      # currency (min price)
+    - ascendix__PriceMaximum__c      # currency (max price)
+    - ascendix__RequiredMoveInDate__c  # date, filterable
+    - ascendix__Active__c            # boolean (is active)
   parents:
     ascendix__Property__c:           # -> ascendix__Property__c
       - Name                         # property name
@@ -357,25 +371,28 @@ ascendix__Inquiry__c:
       - Name                         # listing name
     ascendix__BrokerCompany__c:      # -> Account
       - Name                         # broker company name
-    ascendix__Account__c:            # -> Account
-      - Name                         # inquiring account
-    ascendix__Contact__c:            # -> Contact
-      - Name                         # inquiring contact
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # market name
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # submarket name
 
 ascendix__Listing__c:
   embed_fields:
     - Name                           # nameField
     - ascendix__Description__c       # textarea, long text
-    - ascendix__ListingType__c       # picklist, filterable
+    - ascendix__UseType__c           # picklist, filterable (space use type)
+    - ascendix__PropertyType__c      # picklist, filterable
     - ascendix__Status__c            # picklist, filterable
+    - ascendix__SaleType__c          # picklist, filterable
   metadata_fields:
     - ascendix__ListingDate__c       # date, filterable
-    - ascendix__ExpirationDate__c    # date, filterable
-    - ascendix__AskingPrice__c       # currency, filterable
-    - ascendix__AskingRate__c        # currency, filterable
-    - ascendix__AvailableArea__c     # double, filterable
+    - ascendix__ListingExpiration__c # date, filterable
+    - ascendix__AskingPrice__c       # currency
+    - ascendix__SalePrice__c         # currency
+    - ascendix__SalePricePerUOM__c   # currency
+    - ascendix__VacantArea__c        # double (vacant SF)
   parents:
-    ascendix__Property__c:           # -> ascendix__Property__c
+    ascendix__Property__c:           # -> ascendix__Property__c (required)
       - Name                         # property name
       - ascendix__City__c            # property city
       - ascendix__State__c           # property state
@@ -386,25 +403,35 @@ ascendix__Listing__c:
       - Name                         # listing broker contact
     ascendix__OwnerLandlord__c:      # -> Account
       - Name                         # owner/landlord
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # market name
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # submarket name
 
 ascendix__Preference__c:
   embed_fields:
     - Name                           # nameField
-    - ascendix__Description__c       # textarea, long text
-    - ascendix__PreferenceType__c    # picklist, filterable
-    - ascendix__Status__c            # picklist, filterable
+    - ascendix__SaleOrLease__c       # picklist, filterable
+    - ascendix__PropertyType__c      # picklist, filterable
+    - ascendix__PropertyClass__c     # picklist, filterable
   metadata_fields:
-    - ascendix__MinSize__c           # double, filterable
-    - ascendix__MaxSize__c           # double, filterable
-    - ascendix__MinRate__c           # currency, filterable
-    - ascendix__MaxRate__c           # currency, filterable
-    - ascendix__PreferredCity__c     # string, filterable
-    - ascendix__PreferredState__c    # string, filterable
+    - ascendix__AreaMinimum__c       # double (min size)
+    - ascendix__AreaMaximum__c       # double (max size)
+    - ascendix__RentMinimum__c       # currency (min rent)
+    - ascendix__RentMaximum__c       # currency (max rent)
+    - ascendix__PriceMinimum__c      # currency (min price)
+    - ascendix__PriceMaximum__c      # currency (max price)
+    - ascendix__RequiredMoveInDate__c          # date, filterable
+    - ascendix__CurrentLeaseExpirationDate__c  # date, filterable
   parents:
     ascendix__Account__c:            # -> Account
       - Name                         # account name
     ascendix__Contact__c:            # -> Contact
       - Name                         # contact name
+    ascendix__Market__c:             # -> ascendix__Geography__c
+      - Name                         # market name
+    ascendix__SubMarket__c:          # -> ascendix__Geography__c
+      - Name                         # submarket name
 
 Task:
   embed_fields:
@@ -415,7 +442,6 @@ Task:
   metadata_fields:
     - ActivityDate                   # date, filterable
     - TaskSubtype                    # picklist, filterable
-    - Type                           # picklist, filterable
   parents:
     WhoId:                           # -> Contact/Lead
       - Name                         # who name

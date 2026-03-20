@@ -6,6 +6,8 @@ state changes.
 For current searchable object scope and sync ownership, read
 `docs/architecture/object_scope_and_sync.md` before changing indexing or query
 scope.
+For Ascendix-driven scope/config work, also read
+`docs/architecture/ascendix_search_signal_priority_and_validation.md`.
 
 # Default Environments
 
@@ -61,6 +63,10 @@ view unless vectors are the subject of the task.
 connector work, prefer `README.md` and
 `docs/architecture/object_scope_and_sync.md`; use the old graph docs only when
 touching legacy paths like `lambda/retrieve` or `lambda/answer`.
+7. Treat Ascendix Search as an admin-intent signal and structural validation
+reference, not as the capability ceiling of the NL search product. Do not
+assume query behavior must mirror Ascendix saved searches, result ordering, or
+SOQL-builder constraints.
 
 > Self-Feedback Loop: If a task is confusing due to missing or contradictory repo context, add a temporary note here with:
 > (a) what was confusing, (b) what wrong assumption it caused, and (c) the proposed permanent fix in code/docs.

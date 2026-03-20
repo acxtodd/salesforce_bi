@@ -64,6 +64,10 @@ Current POC runtime tools are:
 custom `/query` Lambda orchestration over Turbopuffer, not direct live Salesforce
 tooling.
 
+Ascendix Search configuration may inform which objects and fields deserve
+coverage, but query-time behavior is not meant to be limited to Ascendix's UI
+or saved-search patterns.
+
 ## What To Trust
 
 For current connector work, trust these sources in this order:

@@ -31,6 +31,9 @@ Salesforce Org                          AWS (us-west-2)
 ## How It Works
 
 1. **Denorm config generator** harvests Salesforce metadata (compact layouts, search layouts, page layouts, list views) to auto-determine which fields to embed and which parent fields to denormalize onto child records.
+   Ascendix Search admin config is an input signal for object scope, field
+   priority, and relationship hints, but it does not limit what the NL query
+   system can ask or answer once records are indexed.
 2. **Bulk loader** exports records via Salesforce Bulk API 2.0, denormalizes per config, embeds via Bedrock Titan v2, and upserts to Turbopuffer.
 3. **CDC sync** keeps the 5 live demo objects fresh — the current target path is Salesforce CDC -> AppFlow -> S3 -> EventBridge -> `cdc_sync` Lambda, which fetches the full record, denormalizes, embeds, and upserts changed records.
 4. **Poll sync** is the in-flight expansion path for non-CDC objects after their authoritative initial bulk seed.
@@ -68,6 +71,7 @@ The LLM decides the query strategy — single search, parallel cross-object sear
 | Query orchestration | Claude tool-use | Replaces custom planner/decomposer/intent router with ~3 tool definitions |
 | Cross-object queries | Denormalized documents | Parent fields inlined on children at write time; no graph traversal needed |
 | Field selection | Metadata-driven (auto-generated YAML) | Salesforce compact/search/page layouts tell us what's important |
+| Ascendix Search role | Admin-intent signal, not product ceiling | Helps inform index scope, denorm, and validation without constraining NL search to Ascendix UI/query-builder behavior |
 | Permissions | Org-level auth in POC; per-user OAuth deferred to v1 | POC validates search quality and indexing scope before live Salesforce user-context work |
 | Multi-tenant | Namespace-per-org | Inactive orgs on S3 at ~$0.02/GB |
 
@@ -209,6 +213,7 @@ Key pattern: `documents/{org_id}/{object_type}/{record_id}.json`. Config snapsho
 
 - [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-connector-spec.md) — Unified product & design spec (start here)
 - [`docs/architecture/object_scope_and_sync.md`](docs/architecture/object_scope_and_sync.md) — Current source of truth for searchable objects and sync ownership
+- [`docs/architecture/ascendix_search_signal_priority_and_validation.md`](docs/architecture/ascendix_search_signal_priority_and_validation.md) — How Ascendix Search should inform config without limiting NL search behavior
 - [`docs/turbopuffer/README.md`](docs/turbopuffer/README.md) — Turbopuffer reference library with repo-specific usage notes
 - [`TASK_TRACKING.md`](TASK_TRACKING.md) — Task tracking guide
 - `docs/guides/` — Onboarding, operator guide, AppFlow setup, quick start

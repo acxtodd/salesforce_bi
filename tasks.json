@@ -2367,25 +2367,27 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:13:40.870049+00:00",
-          "updatedAt": "2026-03-20T07:14:10.010937+00:00",
+          "updatedAt": "2026-03-20T07:42:13.833419+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [],
-          "description": "Build a config control plane so admin changes in Ascendix Search (Selected Objects, Default Layout, saved searches, relationship paths, result columns) can be detected, compiled into runtime artifacts, classified by impact, and applied without relying on ad hoc manual regeneration. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "description": "Build a config control plane around the actual Ascendix Search payload model so admin changes in Selected Objects, field filters, Default Layout rows, saved searches, relationship paths, and result columns can be detected, compiled into runtime artifacts, classified by impact, and applied without relying on ad hoc manual regeneration. Ascendix Search should be used as an admin-intent signal and structural validation reference, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
           "references": [
-            "docs/architecture/ascendix_search_config_refresh_plan.md"
+            "docs/architecture/ascendix_search_config_refresh_plan.md",
+            "docs/architecture/ascendix_search_signal_priority_and_validation.md"
           ],
           "depends_on": [
             "4.6.5",
             "4.8"
           ],
           "acceptance_criteria": [
-            "A versioned compiled config artifact exists per org and is derived from Ascendix Search source config plus Salesforce metadata.",
-            "Admin config changes are detected, diffed, and classified into no-op, prompt-only, field-scope, relationship, or object-scope impacts.",
+            "A versioned compiled config artifact exists per org and is derived from normalized Ascendix Search source config, including concatenated Selected Objects* rows, Default Layout rows, saved-search templates, and Salesforce metadata.",
+            "Admin config changes are detected, diffed, and classified into no-op, prompt-only, field-scope, relationship, or object-scope impacts using the normalized Ascendix Search payload model.",
             "Safe changes can be applied without code redeploy, and reindex-heavy changes route through an explicit apply workflow.",
-            "End-to-end validation proves field add, object add, relationship change, and prompt-only change scenarios against the live control-plane flow."
-          ]
+            "Validation uses Ascendix Search as a structural reference for object scope, field allowlists, default columns, and relationship paths while preserving freedom for the NL search system to exceed Ascendix's query-builder patterns."
+          ],
+          "technical_context": "The demo org stores Ascendix Search config in ascendix_search__SearchSetting__c.Name plus ascendix_search__Value__c, not in dedicated SelectedObjects/ResultColumns fields. Selected Objects is chunked across multiple rows and must be concatenated before JSON parsing. Default layouts are stored as Default Layout * rows whose Value__c is a JSON array of result-column expressions. Saved searches remain in ascendix_search__Search__c.Template__c and are useful as relationship and filter fixtures for structural validation. This control plane should inform indexing and denorm, not constrain NL query behavior to Ascendix Search parity."
         },
         {
           "id": "4.9.1",
@@ -2393,20 +2395,23 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:18.385687+00:00",
-          "updatedAt": "2026-03-20T07:15:47.308948+00:00",
+          "updatedAt": "2026-03-20T07:42:46.344725+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [],
-          "description": "Refactor the current generator work into library-grade compile entrypoints that can be invoked by automation instead of only by the CLI. Reuse the Ascendix Search harvesting already added in scripts/generate_denorm_config.py. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "description": "Refactor the current generator work into library-grade compile entrypoints that can be invoked by automation instead of only by the CLI. The compiler must normalize the actual Ascendix Search payload shape in the demo org, including chunked SearchSetting rows and saved-search templates. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
           "parent": "4.9",
           "references": [
-            "docs/architecture/ascendix_search_config_refresh_plan.md"
+            "docs/architecture/ascendix_search_config_refresh_plan.md",
+            "docs/architecture/ascendix_search_signal_priority_and_validation.md"
           ],
           "acceptance_criteria": [
             "Compiler logic is callable as library code without shelling out to the CLI.",
-            "Compiled output includes object scope, denorm config, and query-scope inputs derived from Ascendix Search plus Salesforce metadata."
-          ]
+            "The compiler normalizes ascendix_search__SearchSetting__c.Name plus ascendix_search__Value__c, including ordered concatenation of Selected Objects* fragments and parsing of Default Layout * rows into per-object result-column fixtures.",
+            "Compiled output includes object scope, field allowlists, denorm config, and query-scope inputs derived from Ascendix Search plus Salesforce metadata."
+          ],
+          "technical_context": "Current code and tests still assume dedicated SearchSetting fields such as ascendix_search__SelectedObjects__c and ascendix_search__ResultColumns__c. The demo org instead uses SearchSetting Name plus Value__c. Update the extraction boundary so downstream config refresh, diffing, and tests all consume one normalized payload model."
         },
         {
           "id": "4.9.2",
@@ -2463,24 +2468,26 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:42.535179+00:00",
-          "updatedAt": "2026-03-20T07:15:47.600685+00:00",
+          "updatedAt": "2026-03-20T07:43:14.141156+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [],
-          "description": "Compare candidate compiled config against the active version and classify changes into none, prompt-only, field-scope, relationship, or object-scope impacts so apply behavior is explicit. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "description": "Compare candidate compiled config against the active version and classify changes into none, prompt-only, field-scope, relationship, or object-scope impacts so apply behavior is explicit. Diffing should operate on the normalized Ascendix Search payload model, including Selected Objects fragments, filtered field lists, Default Layout rows, and Search__c templates. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
           "parent": "4.9",
           "references": [
-            "docs/architecture/ascendix_search_config_refresh_plan.md"
+            "docs/architecture/ascendix_search_config_refresh_plan.md",
+            "docs/architecture/ascendix_search_signal_priority_and_validation.md"
           ],
           "depends_on": [
             "4.9.2",
             "4.9.3"
           ],
           "acceptance_criteria": [
-            "Diff output identifies added or removed objects, field-scope changes, relationship-path changes, and prompt-only changes.",
+            "Diff output identifies added or removed objects, filtered-field changes, default-column changes, relationship-path changes, and prompt-only changes from the normalized Ascendix Search source model.",
             "Impact classification is persisted alongside the candidate config and is consumable by apply logic and operators."
-          ]
+          ],
+          "technical_context": "Classify on normalized business signals, not raw row churn. For example, Selected Objects fragment count changes without semantic object-set changes should be a no-op, while a field list change inside a filtered object descriptor should be field-scope. Saved-search relationship deltas should classify from Template__c sections, not from string-level JSON diffs alone."
         },
         {
           "id": "4.9.5",
@@ -2588,23 +2595,53 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:15:03.232121+00:00",
-          "updatedAt": "2026-03-20T07:15:48.084083+00:00",
+          "updatedAt": "2026-03-20T07:44:42.461794+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [],
-          "description": "Prove the full control-plane loop against real Ascendix Search admin changes: field add, object add, relationship-path change, and prompt-only change. Record the resulting active config versions and search validation evidence. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "description": "Prove the full control-plane loop against real Ascendix Search admin changes: field add, object add, relationship-path change, and prompt-only change. Record the resulting active config versions and search validation evidence using Ascendix Search as a structural reference for admin intent, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
           "parent": "4.9",
           "references": [
-            "docs/architecture/ascendix_search_config_refresh_plan.md"
+            "docs/architecture/ascendix_search_config_refresh_plan.md",
+            "docs/architecture/ascendix_search_signal_priority_and_validation.md"
           ],
           "depends_on": [
             "4.9.7",
-            "4.9.8"
+            "4.9.8",
+            "4.9.10"
           ],
           "acceptance_criteria": [
-            "Field add, object add, relationship-path change, and prompt-only change scenarios are validated end to end against the control-plane flow.",
-            "Validation records the detected diff, impact classification, applied action, resulting active version, and search verification evidence for each scenario."
+            "Field add, object add, relationship-path change, and prompt-only change scenarios are validated end to end against the control-plane flow using fixtures from Selected Objects*, Default Layout rows, and Search__c templates.",
+            "Validation records the detected diff, impact classification, applied action, resulting active version, and structural parity evidence for each scenario without treating Ascendix Search ranking or exact query behavior as the acceptance target."
+          ],
+          "technical_context": "Use the new structural validation harness rather than manual eyeballing. Evidence should map each test scenario back to normalized Ascendix fixtures: object set from Selected Objects*, filtered fields from object descriptors, default columns from Default Layout rows, and relationships from Search__c Template__c."
+        },
+        {
+          "id": "4.9.10",
+          "title": "Add Ascendix Search structural validation harness",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:44:08.465636+00:00",
+          "updatedAt": "2026-03-20T07:44:37.941127+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Build fixture extraction and parity assertions from live Ascendix Search config so the control-plane flow can be validated against object scope, field allowlists, default columns, and relationship paths without requiring identical ranking or answer wording. This harness is for structural validation and config-refresh evidence, not for constraining the natural language product to Ascendix Search behavior. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
+          "technical_context": "Use normalized fixtures derived from SearchSetting Name plus Value__c and Search__c Template__c. Treat Ascendix Search as a structural reference for object set, filtered fields, default columns, and saved-search relationship paths. Do not compare semantic ranking or LLM phrasing, and do not use this harness to limit valid NL behaviors that go beyond Ascendix's query-builder surface.",
+          "parent": "4.9",
+          "acceptance_criteria": [
+            "Validation fixtures can be extracted from normalized Ascendix Search config, including Selected Objects*, filtered field lists, Default Layout rows, and Search__c templates.",
+            "Parity checks assert object scope, field allowlists, default-column coverage, and relationship-path coverage without requiring identical ranking, identical answer wording, or identical query-builder behavior.",
+            "The validation harness can be used by end-to-end config refresh tests to attach structural evidence to each detected and applied change without asserting Ascendix Search parity as the product goal."
+          ],
+          "depends_on": [
+            "4.9.1",
+            "4.9.4"
+          ],
+          "references": [
+            "docs/architecture/ascendix_search_signal_priority_and_validation.md"
           ]
         }
       ]
@@ -2627,7 +2664,7 @@
       "4.6.": 6,
       "4.6.5.": 5,
       "4.8.": 4,
-      "4.9.": 10
+      "4.9.": 11
     }
   }
 }

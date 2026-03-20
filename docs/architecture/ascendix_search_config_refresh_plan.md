@@ -3,6 +3,11 @@
 This plan turns Ascendix Search admin configuration into a repeatable control
 plane for indexing, denormalization, and query scope.
 
+It does not make Ascendix Search the product ceiling. Ascendix Search informs
+what to index and how to shape denormalized records, while the natural language
+query system remains free to reason over that indexed corpus in ways that go
+beyond Ascendix's saved-search and filter-builder UX.
+
 ## Goal
 
 When an admin changes Ascendix Search configuration, the connector should:
@@ -13,6 +18,14 @@ When an admin changes Ascendix Search configuration, the connector should:
 4. apply safe changes automatically
 5. require explicit approval for reindex-heavy changes until the workflow is
    proven
+
+## Non-Goals
+
+- Do not turn the NL search product into a strict Ascendix Search clone.
+- Do not require query-time behavior to mirror Ascendix saved searches or SOQL
+  builder flows.
+- Do not treat Ascendix result ordering, UI constraints, or exact phrasing as
+  the acceptance target for the connector.
 
 ## Current Foundation
 
@@ -25,6 +38,24 @@ The in-flight Phase 4 work already provides the core compiler pieces:
 
 The missing system piece is a control plane that reacts to admin config changes
 without relying on manual regeneration and redeploy.
+
+## Actual Metadata Model
+
+The demo org confirms that Ascendix Search config must be parsed from the live
+managed-package payload shape:
+
+- `ascendix_search__SearchSetting__c` stores config in `Name` plus
+  `ascendix_search__Value__c`
+- selected objects are chunked across rows named `Selected Objects`,
+  `Selected Objects1`, `Selected Objects2`, and so on
+- object descriptors inside that JSON include searchable flags, field-filter
+  flags, and object-level field lists
+- default layouts are stored as `Default Layout *` rows whose
+  `ascendix_search__Value__c` is a JSON array of result-column expressions
+- saved searches live in `ascendix_search__Search__c.ascendix_search__Template__c`
+
+Control-plane work should target this actual payload model so config refreshes,
+diffs, and validation logic remain package-version aware.
 
 ## Target Model
 
@@ -108,6 +139,13 @@ Use S3 for versioned artifacts and SSM for active pointers.
 2. the same compile, diff, classify flow executes
 3. operator can optionally apply the approved version
 
+Both paths should first normalize the raw Ascendix payload by:
+
+- ordering and concatenating `Selected Objects*` fragments
+- parsing object descriptors from `ascendix_search__Value__c`
+- parsing `Default Layout *` rows into per-object result-column fixtures
+- parsing `Search__c` templates into filter, relationship, and result fixtures
+
 ## Impact Classes
 
 - `none`
@@ -189,6 +227,13 @@ For each scenario, the system should record:
 - applied action
 - resulting active config version
 - search validation evidence
+
+That validation evidence should use Ascendix Search as a structural reference:
+
+- object scope parity from `Selected Objects*`
+- field allowlist parity from filtered object descriptors
+- default-column parity from `Default Layout *`
+- relationship-path parity from `Search__c` templates
 
 ## Recommended Delivery Order
 

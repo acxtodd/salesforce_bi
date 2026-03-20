@@ -408,13 +408,16 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    user asks to compare two cities, match preferences to listings, or combine
    data from multiple object types, emit all tool calls in a single turn.
 
-6. **Always cite source records by name and ID.** When presenting results,
-   reference the record name and Salesforce ID so the user can navigate to
-   the source record. For Task records, use the subject field as the name.
+6. **Cite records by name only — never show Salesforce IDs.** When presenting
+   results, reference records by their name (or subject for Tasks). Do NOT
+   include Salesforce record IDs (like a0Pfk000000CkTLEA0) in the response —
+   they are meaningless to users.
 
 7. **Format answers for quick scanning.** Lead with a concise summary sentence,
    then present details in a table or bullet list. For aggregations, state the
    number prominently. Do not restate the question or describe your methodology.
+   Do not use emojis in responses. Keep table columns to the most useful fields
+   — omit IDs and sparse/empty columns.
 
 8. **If no results found, say so clearly.** Do not fabricate or hallucinate
    data. If a search returns zero results, tell the user and suggest

@@ -1,129 +1,190 @@
 # AscendixIQ Salesforce Connector
 
-AI-powered search over Salesforce CRE data. Users ask natural language questions in a Salesforce Lightning Web Component and get streaming answers with source citations. Part of the **AscendixIQ** platform.
+AI-powered search over Salesforce CRE data. Users ask natural-language questions in a Salesforce Lightning Web Component and receive streaming answers with citations. The current connector architecture is Turbopuffer-backed retrieval plus Claude tool use, not the older Bedrock KB / OpenSearch RAG stack.
+
+## Current Status
+
+- Phases 0-3 are complete.
+- Phase 4 `Full Database Search` is the active workstream (`22/42` tasks complete).
+- Live searchable objects today: `Property`, `Lease`, `Availability`, `Account`, `Contact`.
+- Expansion objects in code/config: `Deal`, `Sale`, `Inquiry`, `Listing`, `Preference`, `Task`.
+- `Lead` and `ContentNote` remain deferred/config-only.
+- Legacy SearchStack / retrieve / answer / Step Functions ingestion code has been removed from the active CDK app. If those AWS resources still exist in the account, they require decommission deployment and stack cleanup.
+
+Authoritative status commands:
+
+```bash
+python3 scripts/task_manager.py phases
+python3 scripts/task_manager.py next
+```
 
 ## Architecture
 
-```
-Salesforce Org                          AWS (us-west-2)
-┌──────────────────┐                   ┌──────────────────────────────────────┐
-│  CRE Data        │  Bulk API (init)  │                                      │
-│  (Core +         │ ─────────────────>│  Bulk Loader                         │
-│   expansion      │  CDC (ongoing)    │    Denormalize (per YAML config)     │
-│   objects)       │ ─────────────────>│    Embed (Bedrock Titan v2)          │
-│                  │                   │    Upsert (SearchBackend protocol)   │
-│                  │                   │         │                            │
-│                  │                   │         ▼                            │
-│  LWC Search UI   │  NL Query        │  Turbopuffer (namespace per org)     │
-│  ┌────────────┐  │ ─────────────────>│    Dense vectors + BM25 + filters   │
-│  │ Ask a      │  │                   │    Cold on S3 (~$0.02/GB)           │
-│  │ question.. │  │  Streaming Answer │         │                            │
-│  │            │  │ <─────────────────│  Query Lambda                       │
-│  └────────────┘  │  + Citations      │    Claude Sonnet 4 (tool-use)       │
-│                  │                   │    ├── search_records (parallel)     │
-│                  │                   │    ├── aggregate_records             │
-│                  │                   │    └── poll sync (non-CDC objects)   │
-│                  │                   │         │                            │
-│                  │                   │    Streaming SSE + citations         │
-└──────────────────┘                   └──────────────────────────────────────┘
+```text
+Salesforce Org                              AWS (us-west-2)
+┌──────────────────┐                       ┌──────────────────────────────────────────┐
+│ CRE data         │  Bulk API seed        │ Bulk load / replay / poll sync          │
+│ (live +          │ ─────────────────────> │  - denormalize per YAML config          │
+│ expansion objs)  │                        │  - embed with Bedrock Titan v2          │
+│                  │  CDC via AppFlow       │  - upsert to Turbopuffer                │
+│                  │ ─────────────────────> │                                          │
+│ LWC search UI    │  /query via Apex       │ Query Lambda                             │
+│                  │ ─────────────────────> │  - Claude tool use                      │
+│                  │                        │  - search_records                       │
+│                  │  streaming SSE         │  - aggregate_records                    │
+│                  │ <───────────────────── │  - clarification options / citations    │
+└──────────────────┘                       │                                          │
+                                           │ Turbopuffer                              │
+                                           │  - org namespace                         │
+                                           │  - vector + metadata filtering           │
+                                           └──────────────────────────────────────────┘
 ```
 
-## How It Works
+## Active Runtime Surfaces
 
-1. **Denorm config generator** harvests Salesforce metadata (compact layouts, search layouts, page layouts, list views) to auto-determine which fields to embed and which parent fields to denormalize onto child records.
-   Ascendix Search admin config is an input signal for object scope, field
-   priority, and relationship hints, but it does not limit what the NL query
-   system can ask or answer once records are indexed.
-2. **Bulk loader** exports records via Salesforce Bulk API 2.0, denormalizes per config, embeds via Bedrock Titan v2, and upserts to Turbopuffer.
-3. **CDC sync** keeps the 5 live demo objects fresh — the current target path is Salesforce CDC -> AppFlow -> S3 -> EventBridge -> `cdc_sync` Lambda, which fetches the full record, denormalizes, embeds, and upserts changed records.
-4. **Poll sync** is the in-flight expansion path for non-CDC objects after their authoritative initial bulk seed.
-5. **Query Lambda** receives a natural language question, gives Claude two tools (`search_records`, `aggregate_records`), and streams the synthesized answer with citations.
+Primary runtime components:
 
-The LLM decides the query strategy — single search, parallel cross-object searches, or aggregations — by choosing which tools to call. No custom planner or intent router needed.
+- `lambda/query` — natural-language `/query` API, SSE streaming, citations, clarification options
+- `lambda/cdc_sync` — live CDC processor for the 5 CDC-managed objects
+- `lambda/poll_sync` — incremental sync path for non-CDC expansion objects after bulk seed
+- `lambda/ingest` — preserved because Salesforce batch export still points at `/ingest`
+- `lambda/schema_api` — `/schema/{object}` endpoint used by Salesforce schema cache client
+- `lambda/schema_discovery` and `lambda/schema_drift_checker` — metadata discovery and drift monitoring
+- `lambda/action` and `lambda/authz` — supporting Lambda surfaces used by the Salesforce integration
 
-## Current CDC Strategy
+Active CDK stacks:
 
-- Reuse the existing `AppFlow -> S3 -> EventBridge` transport and the new `lambda/cdc_sync` processor for the Turbopuffer-based connector.
-- Keep CDC as the primary freshness path for Property, Lease, Availability, Account, and Contact.
-- Expansion objects are moving toward `bulk load -> poll sync` rather than consuming scarce CDC scope.
-- Treat the older `/ingest` endpoint, `AISearchBatchExport`, and Step Functions ingestion chain as legacy or fallback infrastructure, not the primary path for new connector work.
-- Phase 2 code tasks merged (`1f7dd3f`, PR #4, 2026-03-16):
-  - `2.4.1` AppFlow props wired via deploy-time CfnDynamicReference
-  - `2.4.2` CDC object list aligned to 5-object POC scope (JWT_BEARER auth)
-  - `2.5.1` /query Lambda with SSE streaming + API key auth deployed
-- Remaining deploy/validate tasks:
-  - `2.4.3` deploy AppFlow flows, `2.4.4` validate real CDC delivery
-  - `2.5.2` deploy /query Lambda, `2.5.3` validate LWC observability
+- `DataStack`
+- `NetworkStack`
+- `IngestionStack`
+- `ApiStack`
+- `MonitoringStack`
 
-## Current Searchable Objects
+Retired from the active code path:
 
-| State | Objects |
-|-------|---------|
-| Live now | Property, Lease, Availability, Account, Contact |
-| In-flight expansion | Deal, Sale, Inquiry, Listing, Preference, Task |
-| Deferred/config-only | Lead, ContentNote |
+- `SearchStack`
+- `lambda/retrieve`
+- `lambda/answer`
+- Step Functions ingestion pipeline (`cdc_processor`, `validate`, `transform`, `chunking`, `enrich`, `embed`, `sync`, `graph_builder`)
+- OpenSearch Serverless / Bedrock Knowledge Base orchestration code
 
-## Key Design Decisions
+## Object Scope And Freshness
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Search backend | Turbopuffer (behind `SearchBackend` ABC) | Object-storage-native, namespace-per-tenant, cold orgs cost pennies |
-| Query orchestration | Claude tool-use | Replaces custom planner/decomposer/intent router with ~3 tool definitions |
-| Cross-object queries | Denormalized documents | Parent fields inlined on children at write time; no graph traversal needed |
-| Field selection | Metadata-driven (auto-generated YAML) | Salesforce compact/search/page layouts tell us what's important |
-| Ascendix Search role | Admin-intent signal, not product ceiling | Helps inform index scope, denorm, and validation without constraining NL search to Ascendix UI/query-builder behavior |
-| Permissions | Org-level auth in POC; per-user OAuth deferred to v1 | POC validates search quality and indexing scope before live Salesforce user-context work |
-| Multi-tenant | Namespace-per-org | Inactive orgs on S3 at ~$0.02/GB |
+### Live now
 
-Full spec: [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-connector-spec.md)
+| Object | Freshness path |
+|---|---|
+| Property | CDC via `AppFlow -> S3 -> EventBridge -> lambda/cdc_sync` |
+| Lease | CDC via `AppFlow -> S3 -> EventBridge -> lambda/cdc_sync` |
+| Availability | CDC via `AppFlow -> S3 -> EventBridge -> lambda/cdc_sync` |
+| Account | CDC via `AppFlow -> S3 -> EventBridge -> lambda/cdc_sync` |
+| Contact | CDC via `AppFlow -> S3 -> EventBridge -> lambda/cdc_sync` |
+
+Recent live namespace evidence recorded in Phase 4 task notes:
+
+- Property: 2,470
+- Lease: 483
+- Availability: 527
+- Account: 4,756
+- Contact: 6,625
+- Total: 14,861 documents
+
+### In flight
+
+| Object | Planned path | Notes |
+|---|---|---|
+| Deal | Bulk load seed + poll sync | Restores transaction scope |
+| Sale | Bulk load seed + poll sync | Small volume |
+| Inquiry | Bulk load seed + poll sync | Expansion object |
+| Listing | Bulk load seed + poll sync | Expansion object |
+| Preference | Bulk load seed + poll sync | Expansion object |
+| Task | Bulk load seed + poll sync | Requires object-specific validation |
+| Lead | Deferred | Config-only until records exist |
+| ContentNote | Deferred | Config-only until records exist |
+
+Important nuance: `denorm_config.yaml` and the prompt/tooling already support more than the 5 live CDC objects, but production coverage should not be described as complete until bulk-load counts, query validation, and incremental sync evidence exist.
+
+## Query Model
+
+The `/query` path is a tool-use loop, not a custom planner.
+
+The model can:
+
+- call `search_records`
+- call `aggregate_records`
+- ask for clarification when a grouped ranking is ambiguous
+- stream the final answer with citations and optional clarification pills
+
+Current guardrails:
+
+- broad help questions should return short onboarding-style answers, not capability dumps
+- ambiguous leaderboard / top-N requests should clarify instead of fabricating rankings
+- supported ranked outputs should come from grouped aggregate results with deterministic ordering
 
 ## Project Structure
 
-```
-├── lib/                            # Search backend
-│   ├── search_backend.py           # Vendor-agnostic ABC (search, aggregate, upsert, delete, warm)
-│   ├── turbopuffer_backend.py      # Turbopuffer implementation (only file that imports tpuf SDK)
-│   └── audit_writer.py             # S3 audit trail (AuditingBackend decorator + replay support)
+```text
+.
+├── bin/
+│   └── app.ts                         # CDK entrypoint
+├── lib/
+│   ├── api-stack.ts                   # API Gateway, /query, /ingest, /schema, auth/action Lambdas
+│   ├── data-stack.ts                  # Buckets, tables, shared data resources
+│   ├── ingestion-stack.ts             # CDC sync, poll sync, schema discovery, drift checker
+│   ├── monitoring-stack.ts            # Dashboards, alarms, active-service monitoring
+│   ├── network-stack.ts               # VPC, endpoints, security groups, shared networking
+│   ├── search_backend.py              # Backend abstraction
+│   ├── turbopuffer_backend.py         # Turbopuffer implementation
+│   ├── denormalize.py                 # Record flattening and document building
+│   ├── query_handler.py               # Query loop and SSE-friendly result shaping
+│   ├── tool_dispatch.py               # search_records / aggregate_records handlers
+│   ├── system_prompt.py               # Runtime prompt builder
+│   └── audit_writer.py                # Audit trail and replay support
+├── lambda/
+│   ├── action/
+│   ├── authz/
+│   ├── cdc_sync/
+│   ├── ingest/
+│   ├── poll_sync/
+│   ├── query/
+│   ├── schema_api/
+│   ├── schema_discovery/
+│   ├── schema_drift_checker/
+│   ├── common/
+│   └── layers/schema_discovery/
+├── salesforce/
+│   ├── classes/                       # Apex controllers, schema client, batch export
+│   ├── lwc/                           # ascendixAiSearch component
+│   ├── customMetadata/
+│   ├── namedCredentials/
+│   └── remoteSiteSettings/
 ├── scripts/
-│   ├── task_manager.py             # Task tracking CLI (manages tasks.json)
-│   ├── generate_denorm_config.py   # Metadata-driven field selection → YAML config
-│   ├── bundle_cdc_sync.sh          # CDK build bundler for cdc_sync Lambda
-│   ├── bundle_query.sh             # CDK build bundler for query Lambda
-│   ├── run_acceptance_tests.py     # Acceptance test runner
-│   ├── replay_from_audit.py        # Replay documents from S3 audit trail into any namespace
-│   ├── salesforce/                 # Apex scripts for Salesforce CLI (sf apex run)
-│   ├── one-off/                    # Historical utility scripts (backfills, audits, etc.)
-│   └── data/                       # Seed data and test fixtures
-├── lambda/                         # Lambda handlers (Python 3.11)
-│   ├── cdc_sync/                   # Current CDC processor for Turbopuffer sync
-│   ├── query/                      # Query Lambda (NL → tool-use → streaming SSE)
-│   ├── retrieve/                   # [legacy] Query processing
-│   ├── answer/                     # [legacy] Streaming answers
-│   ├── cdc_processor/              # [legacy] CDC event parsing for old ingestion workflow
-│   ├── transform/                  # Record transformation (adapting for denormalization)
-│   ├── embed/                      # Bedrock Titan v2 embeddings (reusing)
-│   ├── derived_views/              # [deprecated] Removal at Phase 4 gate
-│   └── ...                         # Other legacy Lambdas (graph, schema_discovery, etc.)
-├── salesforce/                     # Salesforce metadata & components
-│   ├── classes/                    # Apex (AscendixAISearchController — adapting)
-│   ├── lwc/                        # ascendixAiSearch LWC (adapting API contract)
-│   ├── customMetadata/             # IndexConfiguration__mdt, AI_Search_Config__mdt
-│   ├── namedCredentials/           # AWS API credentials
-│   └── ...                         # Flows, permission sets, objects, agentforce tools
+│   ├── generate_denorm_config.py      # Metadata-driven config generation
+│   ├── task_manager.py                # Task workflow CLI
+│   ├── run_poll_sync.py               # Poll sync runner
+│   ├── replay_from_audit.py           # Replay docs from audit bucket
+│   ├── bundle_*.sh                    # Lambda bundle scripts
+│   └── salesforce/                    # Salesforce CLI helpers
 ├── tests/
-│   ├── test_search_backend.py      # 28 tests (ABC, filters, integration)
-│   └── test_denorm_generator.py    # 51 tests (scoring, parents, YAML output)
+│   ├── test_cdc_sync.py
+│   ├── test_poll_sync.py
+│   ├── test_query_lambda.py
+│   ├── test_query_handler.py
+│   ├── test_tool_dispatch.py
+│   ├── test_system_prompt.py
+│   ├── test_leaderboard_guard.py
+│   ├── test_clarification_flow.py
+│   └── ...
 ├── docs/
-│   ├── specs/                      # Canonical product & design spec
-│   ├── architecture/               # Active architecture docs (5 files)
-│   ├── guides/                     # Onboarding, operator guide, setup (5 files)
-│   ├── testing/                    # Acceptance testing, security tests (3 files)
-│   ├── runbooks/                   # Operational runbooks
-│   ├── AscendixIQ_for_SFDC/       # Product documentation
-│   └── archive/                    # Stale docs (handoffs, analysis, deployment, etc.)
-├── tasks.json                      # Phase-based task tracking (use task_manager.py)
-├── TASK_TRACKING.md                # Task tracking guide
-└── denorm_config.yaml              # Generated denormalization config (after running generator)
+│   ├── architecture/
+│   ├── runbooks/
+│   ├── specs/
+│   ├── testing/
+│   └── archive/
+├── denorm_config.yaml
+├── tasks.json
+├── TASK_TRACKING.md
+└── README.md
 ```
 
 ## Getting Started
@@ -131,75 +192,54 @@ Full spec: [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-con
 ### Prerequisites
 
 - Python 3.11+
-- AWS CLI configured (`aws sts get-caller-identity`)
-- Turbopuffer API key (stored in `.env` as `TURBOPUFFER_API_KEY`)
+- Node.js for CDK / TypeScript builds
+- AWS CLI configured
 - Salesforce sandbox with Ascendix CRE package
+- Turbopuffer API key
+- Bedrock access for embeddings and query-time inference
 
-### Quick Start
+### Local Setup
 
 ```bash
-# 1. Set up environment
 cp .env.example .env
-# Edit .env with your Turbopuffer API key and Salesforce credentials
+# Fill in AWS / Salesforce / Turbopuffer settings
 
-# 2. Generate denormalization config from Salesforce metadata
+python3 scripts/task_manager.py phases
+python3 scripts/task_manager.py next
+```
+
+### Generate Denorm Config
+
+```bash
 python3 scripts/generate_denorm_config.py \
   --objects ascendix__Property__c ascendix__Lease__c ascendix__Availability__c \
   --output denorm_config.yaml
+```
 
-# Or use mock mode without Salesforce credentials:
+Mock mode is available when Salesforce credentials are not configured:
+
+```bash
 python3 scripts/generate_denorm_config.py --mock --output denorm_config.yaml
-
-# 3. Check current task progress
-python3 scripts/task_manager.py phases
-python3 scripts/task_manager.py next
 ```
 
 ### Run Tests
 
 ```bash
-# Unit tests (no credentials needed)
 python3 -m pytest tests/ -v
-
-# Including live Turbopuffer integration test
-TURBOPUFFER_API_KEY=your-key python3 -m pytest tests/ -v
 ```
 
-## Cost
-
-| Scenario | Old System | New Target |
-|----------|-----------|------------|
-| 1 org (dev) | $500-1,000/mo | $115-180/mo |
-| 10 orgs (3 active) | $500-1,000/mo | $300-500/mo |
-| 100 orgs (10 active) | Not viable | $600-1,200/mo |
-| Marginal cost per cold org | ~$50-100/mo | ~$1-5/mo |
-
-## Migration Status
-
-The project is migrating from a graph-enhanced RAG system (Bedrock KB + OpenSearch + DynamoDB graph + 6 CDK stacks) to a Turbopuffer + LLM tool-use architecture. The old system still exists in the repo and runs in parallel until the validation gate (Phase 3) passes.
+### Build CDK
 
 ```bash
-python3 scripts/task_manager.py phases
+npm run build
+npx cdk synth
 ```
 
-| Phase | Name | Status |
-|-------|------|--------|
-| 0 | Foundations | Completed |
-| 1 | Intelligence Layer | Completed |
-| 2 | Salesforce Integration | Completed (CDC E2E validated 2026-03-17) |
-| 3 | Validation Gate | In progress — LWC first smoke passed 2026-03-18; current live namespace rebuilt to 14,861 docs across Property, Lease, Availability, Account, and Contact; remaining: cost model, go/no-go, citation nav fix, record-context passthrough |
+## Audit Trail And Replay
 
-See [`TASK_TRACKING.md`](TASK_TRACKING.md) for task management commands and workflow.
-
-## Audit Trail & Replay
-
-Every bulk load writes each denormalized document to S3 alongside the Turbopuffer upsert. This enables debugging, diffing, and replaying without Salesforce or Bedrock credentials.
+Bulk load and sync flows can write denormalized documents to S3 before upsert. This makes diffing, replay, and postmortem validation possible without rerunning Salesforce export or Bedrock embedding.
 
 ```bash
-# View an indexed document
-aws s3 cp s3://salesforce-ai-search-audit-382211616288-us-west-2/documents/00Ddl000003yx57EAA/property/<record_id>.json - | python3 -m json.tool
-
-# Replay into a test namespace (no SF/Bedrock needed)
 python3 scripts/replay_from_audit.py \
   --bucket salesforce-ai-search-audit-382211616288-us-west-2 \
   --org-id 00Ddl000003yx57EAA \
@@ -207,14 +247,38 @@ python3 scripts/replay_from_audit.py \
   --dry-run
 ```
 
-Key pattern: `documents/{org_id}/{object_type}/{record_id}.json`. Config snapshots at `documents/{org_id}/_meta/`.
+Key layout:
+
+- `documents/{org_id}/{object_type}/{record_id}.json`
+- `documents/{org_id}/_meta/`
+- `replay/{org_id}/...`
+
+## Migration And Decommission Status
+
+The codebase is past the earlier graph-enhanced RAG design.
+
+What is true now:
+
+- Turbopuffer is the active search backend.
+- `/query` is the active query surface.
+- `retrieve` / `answer` / KB / AOSS orchestration has been removed from the active CDK app.
+- `/ingest` and `/schema` remain because Salesforce still uses them.
+- AWS decommission still requires deployment and stack deletion in environments where the legacy resources exist.
+
+Do not use old docs or removed directories as architecture truth unless a task explicitly targets historical cleanup.
 
 ## Documentation
 
-- [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-connector-spec.md) — Unified product & design spec (start here)
-- [`docs/architecture/object_scope_and_sync.md`](docs/architecture/object_scope_and_sync.md) — Current source of truth for searchable objects and sync ownership
-- [`docs/architecture/ascendix_search_signal_priority_and_validation.md`](docs/architecture/ascendix_search_signal_priority_and_validation.md) — How Ascendix Search should inform config without limiting NL search behavior
-- [`docs/turbopuffer/README.md`](docs/turbopuffer/README.md) — Turbopuffer reference library with repo-specific usage notes
-- [`TASK_TRACKING.md`](TASK_TRACKING.md) — Task tracking guide
-- `docs/guides/` — Onboarding, operator guide, AppFlow setup, quick start
-- `docs/architecture/` — CDC pipeline summary, CDK reference, infrastructure
+Start here:
+
+- [`docs/specs/salesforce-connector-spec.md`](docs/specs/salesforce-connector-spec.md)
+- [`docs/architecture/object_scope_and_sync.md`](docs/architecture/object_scope_and_sync.md)
+- [`TASK_TRACKING.md`](TASK_TRACKING.md)
+
+Useful operational docs:
+
+- [`docs/runbooks/poll_sync.md`](docs/runbooks/poll_sync.md)
+- [`docs/architecture/ascendix_search_signal_priority_and_validation.md`](docs/architecture/ascendix_search_signal_priority_and_validation.md)
+- [`docs/agent_prompt_export.md`](docs/agent_prompt_export.md)
+
+Treat `docs/archive/` as historical unless a task explicitly says otherwise.

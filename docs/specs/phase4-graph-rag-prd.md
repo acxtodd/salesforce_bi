@@ -1,5 +1,10 @@
 # Phase 4 PRD: Hybrid Graph-RAG & No-Code Configuration
 
+> Superseded historical spec. This document describes an older graph-RAG
+> direction that is not the active connector architecture. For current work,
+> use `docs/specs/salesforce-connector-spec.md`, `README.md`, and
+> `docs/architecture/object_scope_and_sync.md`.
+
 ## 1. Executive Summary
 This phase enhances the Salesforce AI Search system by introducing a "Hybrid Graph-RAG" architecture. By integrating AWS Neptune (Graph DB) alongside the existing OpenSearch (Vector DB), the system will gain the ability to answer complex structured queries involving **relationships**, **numeric ranges**, **dates**, and **aggregations**—capabilities that pure Vector RAG struggles with.
 

@@ -1792,14 +1792,19 @@
         {
           "id": "4.2",
           "title": "Fix Deal and Sale denorm configs against live org metadata",
-          "status": "pending",
+          "status": "skipped",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:09.986493+00:00",
-          "updatedAt": "2026-03-19T06:09:55.023784+00:00",
+          "updatedAt": "2026-03-20T06:16:58.139598+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T06:16:58.139445+00:00",
+              "note": "Merged into 4.6.5.1 — validate and fix Deal/Sale configs is now part of the restore-to-index umbrella (4.6.5)."
+            }
+          ],
           "description": "Replace placeholder fields in existing ascendix__Deal__c and ascendix__Sale__c config entries with actual org fields. Deal is missing DealType__c (renamed to TransactionType__c) and Stage__c. Sale is missing SaleType__c, Status__c, Description__c, PricePerSF__c, Size__c, CapRate__c, NOI__c. Validate every field in both configs via describe API before committing.",
           "depends_on": [
             "4.1"
@@ -2064,17 +2069,159 @@
         },
         {
           "id": "4.6.5",
-          "title": "Restore Deal/Sale to bulk-only extract",
+          "title": "Index all Ascendix Search-configured objects",
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T19:13:28.167493+00:00",
-          "updatedAt": "2026-03-19T19:13:28.167631+00:00",
+          "updatedAt": "2026-03-20T06:27:36.774580+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [],
-          "description": "Keep Deal and Sale out of the 5-slot CDC scope, but add them back to the active denorm bulk/root extract so the namespace contains Property, Lease, Availability, Deal, Sale, Account, and Contact. Rebuild and verify counts after the current Account/Contact rebuild completes.",
+          "description": "Umbrella: expand the AI search index to cover all 13 objects configured in Ascendix Search (ascendix_search__SearchSetting__c 'Selected Objects'). Use the Ascendix Search config — Default Layout result columns, Search__c templates (search fields, cross-object joins, result columns), and geo/map settings — as the configuration engine for denorm field selection. Objects: Property, Lease, Availability, Account, Contact (already indexed via CDC); Deal, Sale (inadvertently dropped); Inquiry, Listing, Preference (new CRE objects); Task (low volume); Lead, ContentNote (0 records, defer). ~24,600 total records.",
           "parent": "4.6"
+        },
+        {
+          "id": "4.6.5.1",
+          "title": "Build denorm config generator from Ascendix Search metadata",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T06:15:58.597571+00:00",
+          "updatedAt": "2026-03-20T06:59:29.978307+00:00",
+          "files_modified": [
+            "scripts/generate_denorm_config.py"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T06:57:37.682395+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-20T06:59:18.695372+00:00",
+              "note": "Extended FieldScore with ascendix_result_appearances and ascendix_filter_appearances. Added _harvest_ascendix_search method to SalesforceHarvester that queries Search__c and SearchSetting__c. Added --discover-objects and --no-ascendix-search CLI flags. Reuses TemplateParser from signal_harvester.py."
+            },
+            {
+              "timestamp": "2026-03-20T06:59:29.978310+00:00",
+              "note": "Task completed"
+            }
+          ],
+          "description": "Extend scripts/generate_denorm_config.py to incorporate Ascendix Search metadata as a supplementary signal. The existing generator already derives fields from Salesforce metadata (compact layouts, search layouts, page layouts, describe API) — this is the primary source. Ascendix Search config adds two things: (1) Object scope: read ascendix_search__SearchSetting__c 'Selected Objects' for the authoritative list of searchable objects. (2) Field supplements: read 'Default Layout' result columns and ascendix_search__Search__c template fields (search criteria, cross-object joins, result columns with labels) to boost or include fields that users explicitly configured for search. Relationships and standard fields (Name, Description, lookups) come from describe by default. The Ascendix Search config handles exceptions and additions the generic metadata approach would miss. Cross-reference all fields against sf sobject describe to validate. Absorbs former task 4.2.",
+          "parent": "4.6.5",
+          "acceptance_criteria": [
+            "Object scope derived from Ascendix Search Selected Objects config (currently 13 objects, 10 with data)",
+            "Primary field selection uses existing metadata approach (describe API, compact/search/page layouts, relationships)",
+            "Ascendix Search Default Layout and Search__c template fields supplement the field list — boosting fields users explicitly search/filter/display on",
+            "Search__c template cross-object joins (sectionsList with relationship paths) supplement parent relationship configs",
+            "Every field in output validated against live sf sobject describe — no placeholders or renamed fields",
+            "Generates valid denorm_config.yaml entries for all objects with records"
+          ],
+          "startedAt": "2026-03-20T06:57:37.682249+00:00",
+          "completedAt": "2026-03-20T06:59:29.978160+00:00"
+        },
+        {
+          "id": "4.6.5.2",
+          "title": "Generate and commit denorm configs for all searchable objects",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T06:16:18.910761+00:00",
+          "updatedAt": "2026-03-20T06:59:30.028318+00:00",
+          "files_modified": [
+            "denorm_config.yaml",
+            "lib/denormalize.py"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T06:57:37.745466+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-20T06:59:18.745084+00:00",
+              "note": "Updated denorm_config.yaml from 5 to 11 objects. Added Deal, Sale, Inquiry, Listing, Preference, Task with embed_fields, metadata_fields, and parent configs. Lead and ContentNote deferred as comments."
+            },
+            {
+              "timestamp": "2026-03-20T06:59:30.028320+00:00",
+              "note": "Task completed"
+            }
+          ],
+          "description": "Run the Ascendix Search-driven config generator for all 10 objects with data. Review output for correctness — embed_fields should include text/semantic fields, metadata_fields should include numeric/date/picklist filterable fields, parents should reflect the cross-object joins from Search__c templates. Commit updated denorm_config.yaml with all objects. Update header comment.",
+          "parent": "4.6.5",
+          "depends_on": [
+            "4.6.5.1"
+          ],
+          "acceptance_criteria": [
+            "denorm_config.yaml contains validated configs for all searchable objects with data (Property, Lease, Availability, Account, Contact, Deal, Sale, Inquiry, Listing, Preference, Task)",
+            "Parent relationships match cross-object joins from Ascendix Search templates",
+            "Header comment documents the full object scope and data source"
+          ],
+          "startedAt": "2026-03-20T06:57:37.745340+00:00",
+          "completedAt": "2026-03-20T06:59:30.028194+00:00"
+        },
+        {
+          "id": "4.6.5.3",
+          "title": "Update system prompt and tool scope for all searchable objects",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T06:16:34.367642+00:00",
+          "updatedAt": "2026-03-20T06:59:30.076267+00:00",
+          "files_modified": [
+            "lib/system_prompt.py",
+            "lib/tool_dispatch.py",
+            "lambda/query/index.py"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T06:57:37.805391+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-20T06:59:18.793552+00:00",
+              "note": "Made build_system_prompt and build_tool_definitions fully dynamic from config. Added _CURATED_FIELD_DESCRIPTIONS for existing 5 objects, auto-generates for new objects. Added semantic aliases for deal, sale, inquiry, listing, preference, task in tool_dispatch.py. Updated query Lambda to use dynamic prompt/tools."
+            },
+            {
+              "timestamp": "2026-03-20T06:59:30.076269+00:00",
+              "note": "Task completed"
+            }
+          ],
+          "description": "Update system_prompt.py and tool_dispatch.py to cover all indexed objects. Remove 'Deal and Sale are out of scope' instruction. Add field reference tables for Deal, Sale, Inquiry, Listing, Preference, Task. Update object_type enum in search_records/aggregate_records. Use Search__c template resultColumns labels as the human-readable field names in the prompt. Update tests.",
+          "parent": "4.6.5",
+          "depends_on": [
+            "4.6.5.2"
+          ],
+          "acceptance_criteria": [
+            "System prompt lists all indexed objects and their searchable field names",
+            "object_type enum in tool definitions includes all indexed objects",
+            "Field reference tables use human-readable labels from Ascendix Search config",
+            "Tests updated and passing"
+          ],
+          "startedAt": "2026-03-20T06:57:37.805163+00:00",
+          "completedAt": "2026-03-20T06:59:30.076136+00:00"
+        },
+        {
+          "id": "4.6.5.4",
+          "title": "Bulk load all new objects and verify index",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T06:16:45.620424+00:00",
+          "updatedAt": "2026-03-20T06:28:23.730575+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Run bulk_load.py for all newly-added objects (Deal, Sale, Inquiry, Listing, Preference, Task). Verify record counts in Turbopuffer match Salesforce. Run sample search queries across object types. Existing 5 objects (Property, Lease, Availability, Account, Contact) should not need reload unless config changed materially.",
+          "parent": "4.6.5",
+          "depends_on": [
+            "4.6.5.2"
+          ],
+          "acceptance_criteria": [
+            "All new objects present in Turbopuffer with record counts matching Salesforce",
+            "Sample cross-object queries return results (e.g. deals for a client, listings in a market, preferences matching an availability)"
+          ]
         },
         {
           "id": "4.7",
@@ -2090,6 +2237,374 @@
           "description": "Run validate_data.py across the full corpus. Check: per-object record counts match Salesforce, parent fields populated for objects with parent configs, metadata filters work for numeric/date fields, search returns results for each object type. Add new acceptance test cases for cross-object queries: 'find contacts at properties in Dallas', 'show deals related to ACME Corp', 'what leases are expiring this quarter'. Smoke-test via LWC search interface.",
           "depends_on": [
             "4.6"
+          ]
+        },
+        {
+          "id": "4.8",
+          "title": "Poll sync for non-CDC objects",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T06:17:05.073720+00:00",
+          "updatedAt": "2026-03-20T06:28:31.714784+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Scheduled + on-demand Lambda to poll Salesforce for changes to objects not on CDC. CDC covers 5 objects (Property, Lease, Availability, Account, Contact). All remaining indexed objects (Deal, Sale, Inquiry, Listing, Preference, Task) use poll sync. Uses LastModifiedDate watermarks in SSM Parameter Store. Reuses existing denorm/embed/upsert path. On-demand invocation is the primary mode for this demo environment; EventBridge schedule is configurable and off by default.",
+          "depends_on": [
+            "4.6.5"
+          ]
+        },
+        {
+          "id": "4.8.1",
+          "title": "Implement poll sync Lambda",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T06:17:18.993891+00:00",
+          "updatedAt": "2026-03-20T06:59:30.127627+00:00",
+          "files_modified": [
+            "lambda/poll_sync/index.py",
+            "scripts/poll_sync.py",
+            "scripts/bundle_poll_sync.sh",
+            "tests/test_poll_sync.py",
+            "lib/denormalize.py"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T06:57:37.868978+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-20T06:59:18.843333+00:00",
+              "note": "Implemented lambda/poll_sync/index.py with composite watermark (ts|id) pagination, SSM storage, batch embed/upsert. Added scripts/poll_sync.py CLI wrapper, scripts/bundle_poll_sync.sh, tests/test_poll_sync.py (13 tests). Also added where_clause param to lib/denormalize.py:build_soql."
+            },
+            {
+              "timestamp": "2026-03-20T06:59:30.127629+00:00",
+              "note": "Task completed"
+            }
+          ],
+          "description": "New lambda/poll_sync/ handler. On invocation: (1) read poll-eligible object list from POLL_OBJECTS env var (comma-separated SObject API names, e.g. ascendix__Deal__c,ascendix__Sale__c); (2) for each object, read last-sync watermark from SSM param /salesforce-ai-search/poll-watermark/{object} (default to epoch if missing); (3) query Salesforce: SELECT ... FROM {object} WHERE LastModifiedDate > {watermark}; (4) for each changed record, denormalize + embed + upsert to Turbopuffer (reuse denorm/embed/upsert from bulk_load path); (5) write new watermark = max(LastModifiedDate) back to SSM; (6) emit CloudWatch metrics (records_synced per object). Support an optional event payload field 'objects' to override POLL_OBJECTS for on-demand single-object runs. Support 'full_sync: true' in event payload to ignore watermark and re-index all records for specified objects.",
+          "parent": "4.8",
+          "acceptance_criteria": [
+            "Lambda reads poll-eligible objects from POLL_OBJECTS env var and supports event payload override via 'objects' field",
+            "Per-object watermark read/write from SSM Parameter Store at /salesforce-ai-search/poll-watermark/{object}",
+            "Only records with LastModifiedDate > watermark are fetched, denormalized, embedded, and upserted",
+            "full_sync event payload flag bypasses watermark and re-indexes all records for specified objects",
+            "CloudWatch metric emitted with records_synced count per object per invocation",
+            "Unit tests covering: incremental sync, full_sync override, empty changeset (no records modified), watermark update logic"
+          ],
+          "startedAt": "2026-03-20T06:57:37.868819+00:00",
+          "completedAt": "2026-03-20T06:59:30.127479+00:00"
+        },
+        {
+          "id": "4.8.2",
+          "title": "Add CDK infra: EventBridge schedule, IAM, on-demand CLI",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T06:17:34.317783+00:00",
+          "updatedAt": "2026-03-20T06:59:30.176641+00:00",
+          "files_modified": [
+            "lib/ingestion-stack.ts"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T06:57:37.930410+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-20T06:59:18.893384+00:00",
+              "note": "Added PollSyncLambda to lib/ingestion-stack.ts with IAM role (Bedrock, SSM read/write, CloudWatch, KMS), 5min timeout, 1024MB. Added optional EventBridge scheduled rule via pollSyncSchedule CDK context param. Added CfnOutput for function ARN."
+            },
+            {
+              "timestamp": "2026-03-20T06:59:30.176644+00:00",
+              "note": "Task completed"
+            }
+          ],
+          "description": "CDK changes in ingestion-stack.ts: (1) poll_sync Lambda definition with env vars (POLL_OBJECTS, NAMESPACE, denorm config path, SSM prefix); (2) IAM: ssm:GetParameter/PutParameter for /salesforce-ai-search/poll-watermark/*, plus existing Salesforce + Turbopuffer + Bedrock permissions; (3) EventBridge scheduled rule with configurable rate (default: disabled; can be enabled via CDK context param poll_sync_schedule, e.g. 'rate(1 day)' or 'cron(0 2 * * ? *)'); (4) CLI wrapper script scripts/poll_sync.py for on-demand invocation via aws lambda invoke with optional --objects and --full-sync flags. On-demand is the primary invocation mode for demo.",
+          "parent": "4.8",
+          "depends_on": [
+            "4.8.1"
+          ],
+          "acceptance_criteria": [
+            "poll_sync Lambda defined in CDK with correct env vars and IAM permissions",
+            "EventBridge schedule configurable via CDK context param; disabled by default",
+            "scripts/poll_sync.py CLI invokes Lambda on-demand with --objects and --full-sync flags",
+            "IAM grants ssm:GetParameter/PutParameter scoped to /salesforce-ai-search/poll-watermark/*"
+          ],
+          "startedAt": "2026-03-20T06:57:37.930276+00:00",
+          "completedAt": "2026-03-20T06:59:30.176500+00:00"
+        },
+        {
+          "id": "4.8.3",
+          "title": "Deploy and validate poll sync end-to-end",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T06:17:44.398936+00:00",
+          "updatedAt": "2026-03-20T06:17:49.608780+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Deploy poll_sync Lambda via CDK. Seed initial watermarks by running with full_sync=true for Deal and Sale. Then modify a Deal record in Salesforce, trigger on-demand poll via scripts/poll_sync.py, and verify the change appears in Turbopuffer. Confirm CloudWatch metrics are emitted.",
+          "parent": "4.8",
+          "depends_on": [
+            "4.8.2"
+          ],
+          "acceptance_criteria": [
+            "poll_sync Lambda deployed and invocable on-demand via scripts/poll_sync.py",
+            "Initial full_sync run indexes all Deal and Sale records with correct counts",
+            "After modifying a Deal in Salesforce, on-demand poll picks up the change and Turbopuffer reflects the update",
+            "CloudWatch records_synced metric emitted per invocation"
+          ]
+        },
+        {
+          "id": "4.9",
+          "title": "Systematize Ascendix Search config refresh",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:13:40.870049+00:00",
+          "updatedAt": "2026-03-20T07:14:10.010937+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Build a config control plane so admin changes in Ascendix Search (Selected Objects, Default Layout, saved searches, relationship paths, result columns) can be detected, compiled into runtime artifacts, classified by impact, and applied without relying on ad hoc manual regeneration. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "depends_on": [
+            "4.6.5",
+            "4.8"
+          ],
+          "acceptance_criteria": [
+            "A versioned compiled config artifact exists per org and is derived from Ascendix Search source config plus Salesforce metadata.",
+            "Admin config changes are detected, diffed, and classified into no-op, prompt-only, field-scope, relationship, or object-scope impacts.",
+            "Safe changes can be applied without code redeploy, and reindex-heavy changes route through an explicit apply workflow.",
+            "End-to-end validation proves field add, object add, relationship change, and prompt-only change scenarios against the live control-plane flow."
+          ]
+        },
+        {
+          "id": "4.9.1",
+          "title": "Extract a reusable Ascendix Search config compiler",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:14:18.385687+00:00",
+          "updatedAt": "2026-03-20T07:15:47.308948+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Refactor the current generator work into library-grade compile entrypoints that can be invoked by automation instead of only by the CLI. Reuse the Ascendix Search harvesting already added in scripts/generate_denorm_config.py. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "parent": "4.9",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "acceptance_criteria": [
+            "Compiler logic is callable as library code without shelling out to the CLI.",
+            "Compiled output includes object scope, denorm config, and query-scope inputs derived from Ascendix Search plus Salesforce metadata."
+          ]
+        },
+        {
+          "id": "4.9.2",
+          "title": "Add versioned config artifact storage and active pointers",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:14:25.124044+00:00",
+          "updatedAt": "2026-03-20T07:15:47.406178+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Persist source snapshots, compiled config artifacts, diff/apply records, and active-version pointers so runtime can consume a versioned contract instead of depending only on the bundled repo YAML. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "parent": "4.9",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "depends_on": [
+            "4.9.1"
+          ],
+          "acceptance_criteria": [
+            "Versioned source, compiled, and apply artifacts are persisted per org with stable naming.",
+            "An active-version pointer and last-known-good metadata can be resolved without reading repo-local YAML."
+          ]
+        },
+        {
+          "id": "4.9.3",
+          "title": "Implement config_refresh Lambda and local CLI",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:14:32.073616+00:00",
+          "updatedAt": "2026-03-20T07:15:47.502648+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Create an automated refresh entrypoint that snapshots Ascendix Search config, compiles a candidate runtime config, and writes the resulting artifacts on a schedule or on-demand. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "parent": "4.9",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "depends_on": [
+            "4.9.1",
+            "4.9.2"
+          ],
+          "acceptance_criteria": [
+            "config_refresh can run on a schedule and on demand, producing a candidate compiled config artifact.",
+            "CLI and Lambda paths share the same compile logic and write the same artifact shape."
+          ]
+        },
+        {
+          "id": "4.9.4",
+          "title": "Add config diffing and impact classification",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:14:42.535179+00:00",
+          "updatedAt": "2026-03-20T07:15:47.600685+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Compare candidate compiled config against the active version and classify changes into none, prompt-only, field-scope, relationship, or object-scope impacts so apply behavior is explicit. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "parent": "4.9",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "depends_on": [
+            "4.9.2",
+            "4.9.3"
+          ],
+          "acceptance_criteria": [
+            "Diff output identifies added or removed objects, field-scope changes, relationship-path changes, and prompt-only changes.",
+            "Impact classification is persisted alongside the candidate config and is consumable by apply logic and operators."
+          ]
+        },
+        {
+          "id": "4.9.5",
+          "title": "Add runtime config loading to query Lambda",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:14:46.123383+00:00",
+          "updatedAt": "2026-03-20T07:15:47.697844+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Teach the /query runtime to load the active compiled config from control-plane storage with safe fallback, so prompt and tool scope can change without a code redeploy. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "parent": "4.9",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "depends_on": [
+            "4.9.2",
+            "4.9.4"
+          ],
+          "acceptance_criteria": [
+            "Query Lambda loads active config from control-plane storage with fallback to last-known-good and bundled config.",
+            "Prompt and tool scope can change from config refresh without shipping a new Lambda bundle."
+          ]
+        },
+        {
+          "id": "4.9.6",
+          "title": "Add runtime config loading to poll sync",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:14:49.915308+00:00",
+          "updatedAt": "2026-03-20T07:15:47.793113+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Teach poll_sync to use the active compiled config artifact so new objects, field changes, and relationship changes can be honored by sync without shipping a new bundled YAML first. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "parent": "4.9",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "depends_on": [
+            "4.9.2",
+            "4.9.4"
+          ],
+          "acceptance_criteria": [
+            "poll_sync loads active config from control-plane storage with safe fallback behavior.",
+            "Poll-managed object and field-scope changes are honored by sync after config publish without editing bundled YAML."
+          ]
+        },
+        {
+          "id": "4.9.7",
+          "title": "Implement targeted reindex apply workflow",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:14:53.427845+00:00",
+          "updatedAt": "2026-03-20T07:15:47.892151+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "For field-scope, relationship, and object-scope config changes, add an explicit apply path that performs the required targeted seed or reindex work before promoting the candidate config to active. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "parent": "4.9",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "depends_on": [
+            "4.9.4",
+            "4.9.5",
+            "4.9.6"
+          ],
+          "acceptance_criteria": [
+            "Apply workflow performs the required targeted seed or reindex work before promoting a candidate config to active.",
+            "Object add, object remove, field-scope, and relationship-scope changes each have explicit apply behavior and recorded evidence."
+          ]
+        },
+        {
+          "id": "4.9.8",
+          "title": "Add runbook and operator approval flow",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:14:56.986959+00:00",
+          "updatedAt": "2026-03-20T07:15:47.990769+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Document and implement the operator-facing flow for detecting config changes, reviewing impact, approving reindex-heavy applies, and rolling back to the last known good config version. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "parent": "4.9",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "depends_on": [
+            "4.9.7"
+          ],
+          "acceptance_criteria": [
+            "A runbook documents detect, review, approve, apply, and rollback steps for config refresh operations.",
+            "Operator-facing approval state distinguishes auto-applied prompt-only changes from approval-required reindex changes."
+          ]
+        },
+        {
+          "id": "4.9.9",
+          "title": "Validate end-to-end admin config refresh scenarios",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T07:15:03.232121+00:00",
+          "updatedAt": "2026-03-20T07:15:48.084083+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Prove the full control-plane loop against real Ascendix Search admin changes: field add, object add, relationship-path change, and prompt-only change. Record the resulting active config versions and search validation evidence. See docs/architecture/ascendix_search_config_refresh_plan.md.",
+          "parent": "4.9",
+          "references": [
+            "docs/architecture/ascendix_search_config_refresh_plan.md"
+          ],
+          "depends_on": [
+            "4.9.7",
+            "4.9.8"
+          ],
+          "acceptance_criteria": [
+            "Field add, object add, relationship-path change, and prompt-only change scenarios are validated end to end against the control-plane flow.",
+            "Validation records the detected diff, impact classification, applied action, resulting active version, and search verification evidence for each scenario."
           ]
         }
       ]
@@ -2107,9 +2622,12 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 8,
+      "4.": 10,
       "4.3.": 2,
-      "4.6.": 6
+      "4.6.": 6,
+      "4.6.5.": 5,
+      "4.8.": 4,
+      "4.9.": 10
     }
   }
 }

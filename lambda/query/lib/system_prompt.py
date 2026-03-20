@@ -301,7 +301,19 @@ Tool call:
     filters={"property_city": "Dallas", "cap_rate_gte": 6}
   )
 
-**6. Multi-object: inquiries matching a market**
+**6. Multi-state search — _in operator for set membership**
+User: "List all companies that own office property in Texas, Oklahoma and Louisiana"
+Tool call:
+  search_records(
+    object_type="Property",
+    filters={"state_in": ["TX", "OK", "LA"]},
+    text_query="office",
+    limit=50
+  )
+Note: Use _in for multi-value filters (states, cities, classes). Extract owner_account_name
+from results to answer "which companies" questions — no separate Account search needed.
+
+**7. Multi-object: inquiries matching a market**
 User: "Find active inquiries for office space in the Houston market"
 Tool call:
   search_records(
@@ -309,7 +321,7 @@ Tool call:
     filters={"market": "Houston", "property_type": "Office", "active": true}
   )
 
-**7. Multi-object: client preferences vs available listings**
+**8. Cross-object: client preferences vs available listings**
 User: "What listings match preferences for Class A office over 5,000 SF?"
 Tool calls (parallel):
   search_records(
@@ -323,7 +335,7 @@ Tool calls (parallel):
   )
 Note: For cross-object matching, search both object types in parallel and synthesize.
 
-**8. Aggregation with grouping**
+**9. Aggregation with grouping**
 User: "How many properties do we have by class in Dallas?"
 Tool call:
   aggregate_records(
@@ -333,7 +345,7 @@ Tool call:
     group_by="property_class"
   )
 
-**9. Comparison — parallel aggregates**
+**10. Comparison — parallel aggregates**
 User: "Compare average asking rates for Class A properties in Dallas vs Houston"
 Tool calls (parallel):
   aggregate_records(

@@ -2754,6 +2754,52 @@
           "completedAt": "2026-03-20T08:17:42.182390+00:00"
         },
         {
+          "id": "4.11",
+          "title": "Fix click-to-record navigation in LWC search results",
+          "status": "completed",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-20T09:22:20.499434+00:00",
+          "updatedAt": "2026-03-20T09:51:24.718694+00:00",
+          "files_modified": [
+            "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.js"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-20T09:24:02.536869+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-20T09:25:02.645082+00:00",
+              "note": "Replaced NavigationMixin.Navigate with direct /lightning/r/{recordId}/view URL in navigateToRecord() and navigateToRecordWithObjectType(). Always opens in new tab. Committed and pushed. Needs SF deploy (sf project deploy) to take effect."
+            },
+            {
+              "timestamp": "2026-03-20T09:25:02.694888+00:00",
+              "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-20T09:33:03.481821+00:00",
+              "note": "Root cause was deeper than NavigationMixin: lightning-formatted-rich-text strips data-* attributes and custom classes from <a> tags, so the href=# + click-interception approach silently fails. Fixed by replacing href=# with direct /lightning/r/{recordId}/view URLs and target=_blank. Links now survive sanitization. Deployed to sandbox."
+            },
+            {
+              "timestamp": "2026-03-20T09:37:11.055674+00:00",
+              "note": "Second fix: lightning-formatted-rich-text also strips relative URLs (no protocol). Changed from /lightning/r/{id}/view to window.location.origin + /lightning/r/{id}/view to produce absolute https:// URLs that survive sanitization. Deployed."
+            },
+            {
+              "timestamp": "2026-03-20T09:51:24.669126+00:00",
+              "note": "Verified working by user. Root cause chain: (1) NavigationMixin fails in custom Lightning App context, (2) href=# with data-* click interception fails because lightning-formatted-rich-text strips data-* and custom classes, (3) relative URLs /lightning/r/{id}/view stripped because rich-text only allows absolute http/https URLs. Final fix: window.location.origin + /lightning/r/{id}/view produces absolute URLs that survive sanitization and open records in new tab."
+            },
+            {
+              "timestamp": "2026-03-20T09:51:24.718697+00:00",
+              "note": "Task completed"
+            }
+          ],
+          "description": "Fix click-to-record navigation in LWC search results. Citations have valid recordIds but NavigationMixin.Navigate opens a blank Ascendix Search window because the LWC runs inside a custom Lightning App that lacks record page definitions for all object types. Fix: replace NavigationMixin with direct URL construction (window.open /lightning/r/{recordId}/view) which works regardless of app context.",
+          "startedAt": "2026-03-20T09:24:02.536722+00:00",
+          "completedAt": "2026-03-20T09:51:24.718562+00:00"
+        },
+        {
           "id": "4.12",
           "title": "Clean up help-response and answer readability in the LWC search UI",
           "status": "pending",

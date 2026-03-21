@@ -37,6 +37,27 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     currentUserId = null;
     streamingChunkBuffer = '';
     lastRequestBody = null;
+    @track selectedModelId = '';
+    @track lastModelUsed = '';
+
+    get modelOptions() {
+        return [
+            { label: 'Default (Sonnet 4.6)', value: '' },
+            { label: 'Claude Sonnet 4.6', value: 'us.anthropic.claude-sonnet-4-6' },
+            { label: 'Claude Sonnet 4.5', value: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' },
+            { label: 'Claude Sonnet 4', value: 'us.anthropic.claude-sonnet-4-20250514-v1:0' },
+            { label: 'Claude Haiku 4.5', value: 'us.anthropic.claude-haiku-4-5-20251001-v1:0' },
+            { label: 'Amazon Nova Pro', value: 'us.amazon.nova-pro-v1:0' },
+            { label: 'Amazon Nova Lite', value: 'us.amazon.nova-lite-v1:0' },
+            { label: 'Mistral Large 3', value: 'mistral.mistral-large-3-675b-instruct' },
+            { label: 'Mistral Pixtral Large', value: 'us.mistral.pixtral-large-2502-v1:0' },
+            { label: 'Cohere Command R+', value: 'cohere.command-r-plus-v1:0' },
+        ];
+    }
+
+    handleModelChange(event) {
+        this.selectedModelId = event.detail.value;
+    }
 
     renderedCallback() {
         this.ensureFilterAttributes();
@@ -480,7 +501,8 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             const requestBody = {
                 query: this.queryText,
                 sessionId: this.sessionId,
-                ...(this.recordId ? { recordId: this.recordId } : {})
+                ...(this.recordId ? { recordId: this.recordId } : {}),
+                ...(this.selectedModelId ? { modelId: this.selectedModelId } : {})
             };
 
             // Store for retry
@@ -519,6 +541,11 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
 
                 // Simulate streaming by displaying answer in chunks
                 await this.simulateStreaming(answerText);
+
+                // Capture model used for display
+                if (response.modelId) {
+                    this.lastModelUsed = response.modelId;
+                }
 
                 // Process clarification options if present
                 if (response.clarificationOptions) {

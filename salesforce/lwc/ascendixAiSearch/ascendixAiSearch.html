@@ -24,10 +24,18 @@
                 </div>
             </template>
 
-            <!-- Submit Button -->
-            <div class="slds-m-top_small">
-                <lightning-button variant="brand" label="Search" title="Submit query" onclick={handleSubmit}
-                    disabled={isSubmitDisabled} icon-name="utility:search" class="submit-button"></lightning-button>
+            <!-- Model Selector + Submit Button -->
+            <div class="slds-m-top_small slds-grid slds-grid_vertical-align-end slds-wrap">
+                <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-p-right_small">
+                    <lightning-combobox name="modelSelector" label="Model" value={selectedModelId}
+                        options={modelOptions} onchange={handleModelChange}
+                        variant="label-hidden" placeholder="Model: Default"
+                        dropdown-alignment="auto"></lightning-combobox>
+                </div>
+                <div class="slds-col">
+                    <lightning-button variant="brand" label="Search" title="Submit query" onclick={handleSubmit}
+                        disabled={isSubmitDisabled} icon-name="utility:search" class="submit-button"></lightning-button>
+                </div>
             </div>
 
             <!-- Error Message Display -->
@@ -113,6 +121,13 @@
                                 </div>
                             </div>
                         </template>
+                    </template>
+
+                    <!-- Model Badge -->
+                    <template if:true={lastModelUsed}>
+                        <div class="slds-m-top_x-small">
+                            <span class="slds-badge slds-badge_lightest" style="font-size: 0.7rem;">{lastModelUsed}</span>
+                        </div>
                     </template>
 
                     <!-- Clarification Options -->

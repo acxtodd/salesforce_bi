@@ -20,6 +20,9 @@ public with sharing class AscendixAISearchController {
             if (requestBody.containsKey('recordId') && requestBody.get('recordId') != null) {
                 newPayload.put('record_id', (String) requestBody.get('recordId'));
             }
+            if (requestBody.containsKey('modelId') && requestBody.get('modelId') != null) {
+                newPayload.put('model_id', (String) requestBody.get('modelId'));
+            }
 
             HttpRequest req = new HttpRequest();
             req.setEndpoint(QUERY_CREDENTIAL + '/query');
@@ -120,6 +123,9 @@ public with sharing class AscendixAISearchController {
                          // If citations came in the done block
                         if (data.containsKey('citations')) {
                              result.put('citations', data.get('citations'));
+                        }
+                        if (data.containsKey('model_id')) {
+                            result.put('modelId', data.get('model_id'));
                         }
                     }
                 } catch (Exception e) {

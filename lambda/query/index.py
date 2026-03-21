@@ -178,6 +178,7 @@ def handler(event: dict, context: Any) -> dict:
     org_id = body.get("org_id")
     session_id = body.get("session_id", "")
     record_id = body.get("record_id", "")
+    model_id_override = body.get("model_id", "")
 
     errors: list[str] = []
     if not question or not isinstance(question, str) or not question.strip():
@@ -223,12 +224,13 @@ def handler(event: dict, context: Any) -> dict:
     sse_parts: list[str] = []
 
     try:
+        effective_model = model_id_override.strip() if model_id_override else _MODEL_ID
         qh = QueryHandler(
             bedrock_client=bedrock_client,
             backend=backend,
             namespace=namespace,
             field_registry=_FIELD_REGISTRY,
-            model_id=_MODEL_ID,
+            model_id=effective_model,
             system_prompt=_SYSTEM_PROMPT,
             tool_definitions=_TOOL_DEFINITIONS,
         )
@@ -272,6 +274,7 @@ def handler(event: dict, context: Any) -> dict:
         format_sse("done", {
             "tool_calls": result.tool_calls_made,
             "turns": result.turns,
+            "model_id": effective_model,
         })
     )
 

@@ -51,7 +51,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             { label: 'Amazon Nova Lite', value: 'us.amazon.nova-lite-v1:0' },
             { label: 'Mistral Large 3', value: 'mistral.mistral-large-3-675b-instruct' },
             { label: 'Mistral Pixtral Large', value: 'us.mistral.pixtral-large-2502-v1:0' },
-            { label: 'Cohere Command R+', value: 'cohere.command-r-plus-v1:0' },
+            { label: 'MiniMax M2.5', value: 'minimax.minimax-m2.5' },
         ];
     }
 

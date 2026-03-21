@@ -47,7 +47,7 @@ MODELS = [
     ("Amazon Nova Pro", "us.amazon.nova-pro-v1:0"),
     ("Amazon Nova Lite", "us.amazon.nova-lite-v1:0"),
     ("Mistral Large 3", "mistral.mistral-large-3-675b-instruct"),
-    ("Cohere Command R+", "cohere.command-r-plus-v1:0"),
+    ("MiniMax M2.5", "minimax.minimax-m2.5"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -67,75 +67,89 @@ class TestQuery:
 QUERIES = [
     # --- Simple: single object, direct filter ---
     TestQuery(
-        name="Simple property search",
-        query="Show me Class A office properties in Dallas",
+        name="Property lookup by city",
+        query="Show me all properties in Austin, Texas",
         difficulty="simple",
         expected_tool="search_records",
-        expected_keywords=["dallas", "class a"],
+        expected_keywords=["austin"],
     ),
     TestQuery(
-        name="Simple count",
-        query="How many properties do we have in Houston?",
+        name="Count with filter",
+        query="How many active leases do we have?",
         difficulty="simple",
         expected_tool="aggregate_records",
-        expected_keywords=["houston"],
+        expected_keywords=[],
     ),
     TestQuery(
-        name="Simple lease search",
-        query="Find leases over 50,000 SF",
+        name="Contact search",
+        query="Find contacts at CBRE",
         difficulty="simple",
         expected_tool="search_records",
-        expected_keywords=["lease", "50"],
+        expected_keywords=["cbre"],
+    ),
+    TestQuery(
+        name="Availability with rent filter",
+        query="Show availabilities with asking rent under $25 per square foot",
+        difficulty="simple",
+        expected_tool="search_records",
+        expected_keywords=["rent"],
     ),
 
-    # --- Medium: filters + aggregation + sorting ---
+    # --- Medium: multi-filter, aggregation, sorting ---
     TestQuery(
-        name="Grouped aggregation",
-        query="Show the top 5 markets by deal count",
+        name="Top deals by fee",
+        query="What are the top 10 deals by company fee in the Dallas market?",
         difficulty="medium",
         expected_tool="aggregate_records",
-        expected_keywords=["top", "market"],
+        expected_keywords=["deal", "dallas"],
     ),
     TestQuery(
-        name="Filtered aggregate with sort",
-        query="What are the top 10 deals by our fee in the Dallas market?",
+        name="Breakdown by property class",
+        query="Break down our properties by class in Houston",
         difficulty="medium",
         expected_tool="aggregate_records",
-        expected_keywords=["deal", "dallas", "fee"],
+        expected_keywords=["houston", "class"],
     ),
     TestQuery(
-        name="Cross-field search",
-        query="Find all availabilities in Class A properties in Dallas with asking rent under $30 PSF",
+        name="Lease comps with multiple filters",
+        query="Find lease comps in Dallas CBD for office space over 10,000 SF signed in the last 12 months",
         difficulty="medium",
         expected_tool="search_records",
-        expected_keywords=["availability", "dallas"],
+        expected_keywords=["dallas", "lease"],
+    ),
+    TestQuery(
+        name="Task search with status filter",
+        query="Show me all open tasks related to Aarden Equity",
+        difficulty="medium",
+        expected_tool="search_records",
+        expected_keywords=["aarden"],
     ),
 
-    # --- Hard: multi-object, complex reasoning ---
+    # --- Hard: multi-object, reasoning, advisory ---
     TestQuery(
-        name="Cross-object comparison",
-        query="Compare the total deal volume in Dallas vs Houston",
+        name="Cross-city comparison",
+        query="Compare total deal volume in Dallas vs Houston vs Austin",
         difficulty="hard",
         expected_tool="both",
-        expected_keywords=["dallas", "houston"],
+        expected_keywords=["dallas", "houston", "austin"],
     ),
     TestQuery(
-        name="Multi-filter reasoning",
-        query="Which brokers have the most deals where CBRE or Colliers is involved in any capacity?",
+        name="Multi-object broker activity",
+        query="Show all deals, leases, and inquiries involving Colliers in any role",
         difficulty="hard",
         expected_tool="search_records",
-        expected_keywords=["cbre", "colliers"],
+        expected_keywords=["colliers"],
     ),
     TestQuery(
-        name="Advisory meta-question",
-        query="How would I find deals where a specific company is involved as buyer, seller, or broker?",
+        name="Advisory with runnable suggestion",
+        query="How would I find which properties have the most availability right now?",
         difficulty="hard",
         expected_tool="none",
-        expected_keywords=["search", "filter"],
+        expected_keywords=["availability", "property"],
     ),
     TestQuery(
-        name="Ambiguous requiring clarification",
-        query="Show me the top brokers",
+        name="Ambiguous leaderboard",
+        query="Who are the top performing brokers?",
         difficulty="hard",
         expected_tool="aggregate_records",
         expected_keywords=[],  # Should emit clarification options
@@ -356,7 +370,7 @@ MODEL_COSTS = {
     "us.amazon.nova-pro-v1:0": (0.0008, 0.0032),
     "us.amazon.nova-lite-v1:0": (0.00006, 0.00024),
     "mistral.mistral-large-3-675b-instruct": (0.002, 0.006),
-    "cohere.command-r-plus-v1:0": (0.003, 0.015),
+    "minimax.minimax-m2.5": (0.0011, 0.0044),
 }
 
 

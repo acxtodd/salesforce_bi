@@ -96,6 +96,7 @@ export class ApiStack extends cdk.Stack {
             `arn:aws:bedrock:*::foundation-model/amazon.nova-*`,
             `arn:aws:bedrock:*::foundation-model/cohere.*`,
             `arn:aws:bedrock:*::foundation-model/mistral.*`,
+            `arn:aws:bedrock:*::foundation-model/minimax.*`,
           ],
         }),
       );

@@ -48,6 +48,8 @@ MODELS = [
     ("Amazon Nova Lite", "us.amazon.nova-lite-v1:0"),
     ("Mistral Large 3", "mistral.mistral-large-3-675b-instruct"),
     ("MiniMax M2.5", "minimax.minimax-m2.5"),
+    ("DeepSeek V3.2", "deepseek.v3.2"),
+    ("GLM-5", "zai.glm-5"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -65,37 +67,23 @@ class TestQuery:
 
 
 QUERIES = [
-    # --- Simple: single object, direct filter ---
+    # --- Simple: baseline tool-use competence ---
     TestQuery(
-        name="Property lookup by city",
-        query="Show me all properties in Austin, Texas",
+        name="Property search with filter",
+        query="Show me Class A office properties in Dallas over 100,000 SF",
         difficulty="simple",
         expected_tool="search_records",
-        expected_keywords=["austin"],
-    ),
-    TestQuery(
-        name="Count with filter",
-        query="How many active leases do we have?",
-        difficulty="simple",
-        expected_tool="aggregate_records",
-        expected_keywords=[],
-    ),
-    TestQuery(
-        name="Contact search",
-        query="Find contacts at CBRE",
-        difficulty="simple",
-        expected_tool="search_records",
-        expected_keywords=["cbre"],
+        expected_keywords=["dallas", "class a"],
     ),
     TestQuery(
         name="Availability with rent filter",
-        query="Show availabilities with asking rent under $25 per square foot",
+        query="Show availabilities with asking rent under $25 per square foot in Houston",
         difficulty="simple",
         expected_tool="search_records",
-        expected_keywords=["rent"],
+        expected_keywords=["rent", "houston"],
     ),
 
-    # --- Medium: multi-filter, aggregation, sorting ---
+    # --- Medium: aggregation, sorting, multi-filter ---
     TestQuery(
         name="Top deals by fee",
         query="What are the top 10 deals by company fee in the Dallas market?",
@@ -104,28 +92,21 @@ QUERIES = [
         expected_keywords=["deal", "dallas"],
     ),
     TestQuery(
-        name="Breakdown by property class",
-        query="Break down our properties by class in Houston",
-        difficulty="medium",
-        expected_tool="aggregate_records",
-        expected_keywords=["houston", "class"],
-    ),
-    TestQuery(
         name="Lease comps with multiple filters",
-        query="Find lease comps in Dallas CBD for office space over 10,000 SF signed in the last 12 months",
+        query="Find lease comps in Dallas for office space over 10,000 SF signed in the last 12 months",
         difficulty="medium",
         expected_tool="search_records",
         expected_keywords=["dallas", "lease"],
     ),
     TestQuery(
-        name="Task search with status filter",
+        name="Task search with context",
         query="Show me all open tasks related to Aarden Equity",
         difficulty="medium",
         expected_tool="search_records",
         expected_keywords=["aarden"],
     ),
 
-    # --- Hard: multi-object, reasoning, advisory ---
+    # --- Hard: multi-object, parallel calls, reasoning ---
     TestQuery(
         name="Cross-city comparison",
         query="Compare total deal volume in Dallas vs Houston vs Austin",
@@ -146,13 +127,6 @@ QUERIES = [
         difficulty="hard",
         expected_tool="none",
         expected_keywords=["availability", "property"],
-    ),
-    TestQuery(
-        name="Ambiguous leaderboard",
-        query="Who are the top performing brokers?",
-        difficulty="hard",
-        expected_tool="aggregate_records",
-        expected_keywords=[],  # Should emit clarification options
     ),
 ]
 
@@ -371,6 +345,8 @@ MODEL_COSTS = {
     "us.amazon.nova-lite-v1:0": (0.00006, 0.00024),
     "mistral.mistral-large-3-675b-instruct": (0.002, 0.006),
     "minimax.minimax-m2.5": (0.0011, 0.0044),
+    "deepseek.v3.2": (0.0003, 0.0008),
+    "zai.glm-5": (0.0005, 0.002),
 }
 
 

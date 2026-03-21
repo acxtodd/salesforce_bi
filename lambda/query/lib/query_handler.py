@@ -53,7 +53,14 @@ def extract_clarifications(answer: str) -> tuple[str, list[dict]]:
 
     Returns ``(clean_answer, options)`` where *clean_answer* has the markers
     stripped and *options* is a list of ``{"label": ..., "query": ...}`` dicts.
+
+    Also catches conversational follow-up offers like "Would you like me to
+    search for X?" and converts them into clickable options, since the LWC
+    is single-turn and users cannot reply with free text.
     """
+    # First, convert conversational follow-ups into CLARIFY markers
+    answer = _convert_followup_offers(answer)
+
     options: list[dict] = []
     for match in _CLARIFY_RE.finditer(answer):
         options.append({
@@ -62,6 +69,51 @@ def extract_clarifications(answer: str) -> tuple[str, list[dict]]:
         })
     clean = _CLARIFY_RE.sub("", answer).strip()
     return clean, options
+
+
+# Patterns that match conversational follow-up offers
+_FOLLOWUP_RE = re.compile(
+    r"(?:Would you like me to|Shall I|Do you want me to|I can also|Want me to)"
+    r"\s+(.+?\?)",
+    re.IGNORECASE,
+)
+
+
+def _convert_followup_offers(answer: str) -> str:
+    """Convert 'Would you like me to X?' sentences into [CLARIFY:] markers."""
+    matches = list(_FOLLOWUP_RE.finditer(answer))
+    if not matches:
+        return answer
+
+    for match in reversed(matches):  # Reverse to preserve positions
+        full_sentence = match.group(0)
+        offer_text = match.group(1).rstrip("?").strip()
+
+        # Build a reasonable label and query from the offer
+        # e.g., "search for deals involving AscendixRE" -> label + query
+        label = offer_text[:60]  # Truncate long labels
+        # Capitalize first letter for the query
+        query = offer_text[0].upper() + offer_text[1:] if offer_text else offer_text
+
+        clarify_marker = f"\n[CLARIFY:{label}|{query}]"
+
+        # Find the full sentence boundaries (go back to start of sentence)
+        start = answer.rfind("\n", 0, match.start())
+        if start == -1:
+            # Check for sentence start
+            start = answer.rfind(". ", 0, match.start())
+            if start != -1:
+                start += 2
+            else:
+                start = match.start()
+        else:
+            start += 1
+
+        end = match.end()
+        # Replace the sentence with the clarify marker
+        answer = answer[:start] + clarify_marker + answer[end:]
+
+    return answer
 
 
 # ---------------------------------------------------------------------------

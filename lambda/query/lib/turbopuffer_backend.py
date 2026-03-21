@@ -1,0 +1,538 @@
+"""Turbopuffer implementation of the SearchBackend protocol.
+
+This is the *only* module in the project that imports the ``turbopuffer``
+SDK.  All other application code talks to ``SearchBackend`` from
+``lib.search_backend``.
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+from turbopuffer import Turbopuffer
+
+from lib.search_backend import SearchBackend
+
+# -- Filter-dict → Turbopuffer-tuple translation ----------------------------
+
+# Mapping of dict-key suffixes to Turbopuffer comparison operators.
+_SUFFIX_TO_OP: list[tuple[str, str]] = [
+    ("_gte", "Gte"),
+    ("_lte", "Lte"),
+    ("_gt", "Gt"),
+    ("_lt", "Lt"),
+    ("_in", "In"),
+    ("_ne", "NotEq"),
+]
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_TURBOPUFFER_API_KEY_ENV = "TURBOPUFFER_API_KEY"
+_TURBOPUFFER_API_KEY_SECRET = "salesforce-ai-search/turbopuffer-api-key"
+_DEFAULT_AWS_REGION = "us-west-2"
+
+
+def _parse_env_assignment(line: str) -> tuple[str, str] | None:
+    """Parse a simple .env-style KEY=VALUE assignment."""
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#") or "=" not in stripped:
+        return None
+    if stripped.startswith("export "):
+        stripped = stripped[len("export ") :].strip()
+    key, value = stripped.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if not key:
+        return None
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+    return key, value
+
+
+def _load_dotenv_value(env_path: Path, key: str) -> str | None:
+    """Read a single key from a repo-local .env file if present."""
+    if not env_path.exists():
+        return None
+    for line in env_path.read_text().splitlines():
+        parsed = _parse_env_assignment(line)
+        if parsed and parsed[0] == key and parsed[1]:
+            return parsed[1]
+    return None
+
+
+def _secret_string_value(secret_string: str) -> str | None:
+    """Return the API key from a plain-text or JSON Secrets Manager payload."""
+    stripped = secret_string.strip()
+    if not stripped:
+        return None
+    if stripped.startswith("{"):
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError:
+            return stripped
+        for candidate in ("TURBOPUFFER_API_KEY", "api_key", "value", "token"):
+            value = payload.get(candidate)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+    return stripped
+
+
+def _aws_region() -> str:
+    """Resolve AWS region for local Secrets Manager reads."""
+    return (
+        os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or _DEFAULT_AWS_REGION
+    )
+
+
+def _resolve_turbopuffer_api_key(
+    *,
+    project_root: Path | None = None,
+    secrets_client: Any | None = None,
+) -> str | None:
+    """Resolve the API key from env, repo .env, or AWS Secrets Manager."""
+    api_key = os.environ.get(_TURBOPUFFER_API_KEY_ENV)
+    if api_key:
+        return api_key
+
+    env_path = (project_root or _PROJECT_ROOT) / ".env"
+    api_key = _load_dotenv_value(env_path, _TURBOPUFFER_API_KEY_ENV)
+    if api_key:
+        return api_key
+
+    try:
+        if secrets_client is None:
+            import boto3
+
+            secrets_client = boto3.client(
+                "secretsmanager",
+                region_name=_aws_region(),
+            )
+        response = secrets_client.get_secret_value(
+            SecretId=_TURBOPUFFER_API_KEY_SECRET
+        )
+    except Exception:
+        return None
+
+    secret_string = response.get("SecretString")
+    if not isinstance(secret_string, str):
+        return None
+    return _secret_string_value(secret_string)
+
+
+def _parse_filter_key(key: str) -> tuple[str, str]:
+    """Return ``(field_name, operator)`` for a filter dict key.
+
+    >>> _parse_filter_key("total_sf_gte")
+    ('total_sf', 'Gte')
+    >>> _parse_filter_key("city")
+    ('city', 'Eq')
+    """
+    for suffix, op in _SUFFIX_TO_OP:
+        if key.endswith(suffix):
+            return key[: -len(suffix)], op
+    return key, "Eq"
+
+
+def translate_filters(filters: dict | None) -> tuple | None:
+    """Convert a plain dict of filters into Turbopuffer filter tuples.
+
+    ``None`` / empty dict → ``None`` (no filtering).
+
+    A single-condition dict produces a bare condition tuple; multiple
+    conditions are wrapped in ``('And', (...))``.
+    """
+    if not filters:
+        return None
+
+    conditions: list[tuple] = []
+    for key, value in filters.items():
+        field, op = _parse_filter_key(key)
+        conditions.append((field, op, value))
+
+    if len(conditions) == 1:
+        return conditions[0]
+    return ("And", tuple(conditions))
+
+
+# -- Backend implementation --------------------------------------------------
+
+
+class TurbopufferBackend(SearchBackend):
+    """SearchBackend backed by the Turbopuffer vector database.
+
+    Local workflows resolve the API key from process env, repo ``.env``,
+    or AWS Secrets Manager before constructing the SDK client.
+    """
+
+    def __init__(self, region: str = "gcp-us-central1") -> None:
+        api_key = _resolve_turbopuffer_api_key()
+        self._client = Turbopuffer(api_key=api_key, region=region)
+        self._telemetry_events: list[dict[str, Any]] = []
+
+    # -- helpers -------------------------------------------------------------
+
+    def _ns(self, namespace: str):
+        """Return a Turbopuffer namespace handle."""
+        return self._client.namespace(namespace)
+
+    def _ensure_telemetry_buffer(self) -> list[dict[str, Any]]:
+        """Initialize telemetry storage for tests that bypass __init__."""
+        if not hasattr(self, "_telemetry_events"):
+            self._telemetry_events = []
+        return self._telemetry_events
+
+    @staticmethod
+    def _serialize_tpuf_obj(value: Any) -> Any:
+        """Convert SDK models and tuples into JSON-friendly structures."""
+        if isinstance(value, tuple):
+            return [TurbopufferBackend._serialize_tpuf_obj(v) for v in value]
+        if isinstance(value, list):
+            return [TurbopufferBackend._serialize_tpuf_obj(v) for v in value]
+        if isinstance(value, dict):
+            return {
+                k: TurbopufferBackend._serialize_tpuf_obj(v)
+                for k, v in value.items()
+            }
+        if hasattr(value, "model_dump"):
+            return value.model_dump(exclude_none=True)
+        if hasattr(value, "to_dict"):
+            return value.to_dict()
+        return value
+
+    def _record_telemetry(
+        self,
+        *,
+        operation: str,
+        namespace: str,
+        request: dict[str, Any],
+        response: Any,
+        result_count: int | None = None,
+    ) -> None:
+        """Capture billing/performance metadata from Turbopuffer responses."""
+        self._ensure_telemetry_buffer().append(
+            {
+                "operation": operation,
+                "namespace": namespace,
+                "request": self._serialize_tpuf_obj(request),
+                "result_count": result_count,
+                "billing": self._serialize_tpuf_obj(getattr(response, "billing", None)),
+                "performance": self._serialize_tpuf_obj(
+                    getattr(response, "performance", None)
+                ),
+            }
+        )
+
+    def drain_telemetry(self) -> list[dict[str, Any]]:
+        """Return and clear captured telemetry events."""
+        events = list(self._ensure_telemetry_buffer())
+        self._telemetry_events.clear()
+        return events
+
+    # -- SearchBackend interface ---------------------------------------------
+
+    # -- row conversion helpers ----------------------------------------------
+
+    @staticmethod
+    def _row_to_dict(
+        row: Any,
+        include_attributes: list[str] | bool | None,
+    ) -> dict[str, Any]:
+        """Convert a single SDK row to a plain dict."""
+        return_all = include_attributes is True
+        doc: dict[str, Any] = {"id": row.id, "dist": getattr(row, "$dist", None)}
+        if return_all:
+            extras = getattr(row, "model_extra", {}) or {}
+            for attr_name, val in extras.items():
+                if attr_name != "$dist" and val is not None:
+                    doc[attr_name] = val
+        elif include_attributes:
+            for attr in include_attributes:
+                doc[attr] = getattr(row, attr, None)
+        return doc
+
+    # -- SearchBackend interface ---------------------------------------------
+
+    def search(
+        self,
+        namespace: str,
+        *,
+        vector: list[float] | None = None,
+        text_query: str | None = None,
+        text_field: str = "text",
+        filters: dict | None = None,
+        top_k: int = 10,
+        include_attributes: list[str] | None = None,
+    ) -> list[dict]:
+        if vector is None and text_query is None:
+            raise ValueError("At least one of 'vector' or 'text_query' must be provided")
+
+        # Hybrid case: Turbopuffer doesn't support Sum(BM25, ANN) in a single
+        # query.  Use multi_query + RRF (Reciprocal Rank Fusion) instead.
+        if vector is not None and text_query is not None:
+            return self._hybrid_search(
+                namespace,
+                vector=vector,
+                text_query=text_query,
+                text_field=text_field,
+                filters=filters,
+                top_k=top_k,
+                include_attributes=include_attributes,
+            )
+
+        # Single-signal path: BM25-only or ANN-only
+        if text_query is not None:
+            rank_by: tuple = (text_field, "BM25", text_query)
+        else:
+            rank_by = ("vector", "ANN", vector)
+
+        # Build kwargs ----------------------------------------------------
+        kwargs: dict[str, Any] = {
+            "rank_by": rank_by,
+            "top_k": top_k,
+        }
+
+        tpuf_filters = translate_filters(filters)
+        if tpuf_filters is not None:
+            kwargs["filters"] = tpuf_filters
+
+        if include_attributes is True:
+            kwargs["include_attributes"] = True
+        elif include_attributes is not None:
+            kwargs["include_attributes"] = include_attributes
+
+        # Execute ---------------------------------------------------------
+        result = self._ns(namespace).query(**kwargs)
+        self._record_telemetry(
+            operation="search",
+            namespace=namespace,
+            request=kwargs,
+            response=result,
+            result_count=len(result.rows or []),
+        )
+
+        return [
+            self._row_to_dict(row, include_attributes) for row in result.rows
+        ]
+
+    def _hybrid_search(
+        self,
+        namespace: str,
+        *,
+        vector: list[float],
+        text_query: str,
+        text_field: str = "text",
+        filters: dict | None = None,
+        top_k: int = 10,
+        include_attributes: list[str] | None = None,
+    ) -> list[dict]:
+        """Run BM25 + ANN via multi_query and fuse with RRF."""
+        shared: dict[str, Any] = {"top_k": top_k}
+
+        tpuf_filters = translate_filters(filters)
+        if tpuf_filters is not None:
+            shared["filters"] = tpuf_filters
+
+        if include_attributes is True:
+            shared["include_attributes"] = True
+        elif include_attributes is not None:
+            shared["include_attributes"] = include_attributes
+
+        bm25_query = {"rank_by": (text_field, "BM25", text_query), **shared}
+        ann_query = {"rank_by": ("vector", "ANN", vector), **shared}
+
+        response = self._ns(namespace).multi_query(queries=[bm25_query, ann_query])
+        raw_counts = [len(result.rows or []) for result in response.results]
+
+        bm25_rows = response.results[0].rows or []
+        ann_rows = response.results[1].rows or []
+
+        # RRF: score = sum(1 / (k + rank)) across lists, k=60 is standard
+        k = 60
+        scores: dict[str, float] = defaultdict(float)
+        row_map: dict[str, Any] = {}
+
+        for rank, row in enumerate(bm25_rows):
+            scores[row.id] += 1.0 / (k + rank + 1)
+            row_map[row.id] = row
+        for rank, row in enumerate(ann_rows):
+            scores[row.id] += 1.0 / (k + rank + 1)
+            row_map[row.id] = row  # ANN row overwrites; attrs are the same
+
+        ranked_ids = sorted(scores, key=scores.get, reverse=True)[:top_k]
+        self._record_telemetry(
+            operation="hybrid_search",
+            namespace=namespace,
+            request={"queries": [bm25_query, ann_query]},
+            response=response,
+            result_count=len(ranked_ids),
+        )
+        self._telemetry_events[-1]["raw_result_counts"] = raw_counts
+
+        return [
+            {**self._row_to_dict(row_map[rid], include_attributes), "dist": scores[rid]}
+            for rid in ranked_ids
+        ]
+
+    def aggregate(
+        self,
+        namespace: str,
+        *,
+        filters: dict | None = None,
+        aggregate: str = "count",
+        aggregate_field: str | None = None,
+        group_by: str | None = None,
+    ) -> dict:
+        if aggregate in ("sum", "avg") and aggregate_field is None:
+            raise ValueError(f"aggregate_field is required for '{aggregate}'")
+
+        # Turbopuffer has no native server-side aggregation, so we fetch
+        # matching rows and compute in Python.
+        attrs_to_fetch: list[str] = ["name"]
+        if aggregate_field:
+            attrs_to_fetch.append(aggregate_field)
+        if group_by:
+            attrs_to_fetch.append(group_by)
+        # Deduplicate while preserving order.
+        attrs_to_fetch = list(dict.fromkeys(attrs_to_fetch))
+
+        # Turbopuffer requires rank_by for every query. For aggregations we
+        # want a broad scan over all matching docs regardless of text. BM25 on
+        # common stopwords can return a non-empty but incomplete subset, which
+        # is unacceptable for count verification. Prefer ANN with a zero vector
+        # and only fall back to BM25 if ANN fails for dimensionality/runtime
+        # reasons.
+        tpuf_filters = translate_filters(filters)
+
+        base_kwargs: dict[str, Any] = {"top_k": 10_000}
+        if tpuf_filters is not None:
+            base_kwargs["filters"] = tpuf_filters
+        if attrs_to_fetch:
+            base_kwargs["include_attributes"] = attrs_to_fetch
+
+        # Attempt 1: zero-vector ANN scan using our indexed embedding size.
+        try:
+            query_request = {"rank_by": ("vector", "ANN", [0.0] * 1024), **base_kwargs}
+            result = self._ns(namespace).query(
+                **query_request,
+            )
+        except Exception:
+            # Attempt 2: smaller vector dimension for defensive compatibility.
+            try:
+                query_request = {"rank_by": ("vector", "ANN", [0.0] * 8), **base_kwargs}
+                result = self._ns(namespace).query(
+                    **query_request,
+                )
+            except Exception:
+                # Attempt 3: BM25 broad scan as a last resort. This is less
+                # complete than ANN, but still better than failing outright.
+                query_request = {
+                    "rank_by": ("text", "BM25", "a the is of and to in for"),
+                    **base_kwargs,
+                }
+                result = self._ns(namespace).query(
+                    **query_request,
+                )
+        self._record_telemetry(
+            operation="aggregate_query",
+            namespace=namespace,
+            request=query_request,
+            response=result,
+            result_count=len(result.rows or []),
+        )
+
+        # Compute aggregation locally ------------------------------------
+        if group_by:
+            groups: dict[str, dict] = defaultdict(lambda: {"_values": [], "_record_id": None, "_record_name": None})
+            for row in result.rows:
+                key = str(getattr(row, group_by, "__none__"))
+                if aggregate_field:
+                    val = getattr(row, aggregate_field, None)
+                    if val is not None:
+                        groups[key]["_values"].append(val)
+                    else:
+                        groups[key].setdefault("_values", [])
+                else:
+                    groups[key]["_values"].append(1)
+                # Capture first record ID per group for citation linking
+                if groups[key]["_record_id"] is None:
+                    groups[key]["_record_id"] = row.id
+                    groups[key]["_record_name"] = getattr(row, "name", None) or key
+
+            out_groups: dict[str, dict] = {}
+            records: list[dict] = []
+            for key, info in groups.items():
+                values = info["_values"]
+                out_groups[key] = self._compute_agg(aggregate, values)
+                if info["_record_id"]:
+                    records.append({"id": info["_record_id"], "name": info["_record_name"]})
+            return {"groups": out_groups, "_records": records}
+
+        # Un-grouped
+        values: list = []
+        for row in result.rows:
+            if aggregate_field:
+                val = getattr(row, aggregate_field, None)
+                if val is not None:
+                    values.append(val)
+            else:
+                values.append(1)
+
+        return self._compute_agg(aggregate, values)
+
+    @staticmethod
+    def _compute_agg(aggregate: str, values: list) -> dict:
+        if aggregate == "count":
+            return {"count": len(values)}
+        elif aggregate == "sum":
+            return {"sum": sum(values)}
+        elif aggregate == "avg":
+            return {"avg": sum(values) / len(values) if values else 0}
+        else:
+            raise ValueError(f"Unsupported aggregate: {aggregate}")
+
+    def upsert(
+        self,
+        namespace: str,
+        *,
+        documents: list[dict],
+        distance_metric: str = "cosine_distance",
+        schema: dict | None = None,
+    ) -> None:
+        if not documents:
+            return
+        kwargs: dict[str, Any] = {
+            "distance_metric": distance_metric,
+            "upsert_rows": documents,
+        }
+        if schema:
+            kwargs["schema"] = schema
+        self._ns(namespace).write(**kwargs)
+
+    def delete(self, namespace: str, *, ids: list[str]) -> None:
+        if not ids:
+            return
+        self._ns(namespace).write(deletes=ids)
+
+    def warm(self, namespace: str) -> None:
+        """Issue a lightweight query to warm the namespace cache."""
+        try:
+            response = self._ns(namespace).query(
+                rank_by=("text", "BM25", " "),
+                top_k=1,
+            )
+            self._record_telemetry(
+                operation="warm",
+                namespace=namespace,
+                request={"rank_by": ("text", "BM25", " "), "top_k": 1},
+                response=response,
+                result_count=len(response.rows or []),
+            )
+        except Exception:
+            # Warm is best-effort — swallow errors (e.g. empty namespace).
+            pass

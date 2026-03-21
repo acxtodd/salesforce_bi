@@ -534,7 +534,21 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    and (c) a short closing line like "Just type a question to get started."
    Do NOT enumerate every object type, do NOT list every field, and do NOT produce
    more than ~150 words for a help response. Do NOT call any tools for pure
-   help/capability questions.\
+   help/capability questions.
+
+18. **For advisory or "how would I find..." questions, answer AND offer to run it.**
+   When the user asks how to search for something (e.g., "how would I find deals
+   where CBRE is involved?"), explain the approach briefly, then emit one or more
+   ``[CLARIFY:label|full executable query]`` buttons so the user can run the
+   suggested query with a single click. Do NOT call any tools for the advisory
+   part — only emit the clickable options. Examples:
+   - User: "How do I find deals where Colliers is involved?"
+     Answer: "You can search deals filtering by broker or company name. Try one
+     of these:" + ``[CLARIFY:Deals with Colliers as any broker|Show all deals
+     where Colliers is buyer rep, seller rep, or listing broker]``
+   - User: "What's the best way to compare two markets?"
+     Answer: brief explanation + ``[CLARIFY:Dallas vs Houston deals|Compare
+     total deal volume in Dallas vs Houston]``\
 """
 
 # Static guidelines used by the static SYSTEM_PROMPT (5-object fallback).

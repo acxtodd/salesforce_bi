@@ -229,7 +229,7 @@ export class ApiStack extends cdk.Stack {
         AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
         DENORM_CONFIG_PATH: "denorm_config.yaml",
         BEDROCK_MODEL_ID:
-          "us.anthropic.claude-sonnet-4-6",
+          "us.anthropic.claude-haiku-4-5-20251001-v1:0",
         TURBOPUFFER_API_KEY: turbopufferApiKeySecret.secretValue.unsafeUnwrap(),
         LOG_LEVEL: "INFO",
         // Reuse same API key secret as answer Lambda for auth parity

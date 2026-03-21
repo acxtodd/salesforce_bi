@@ -42,7 +42,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
 
     get modelOptions() {
         return [
-            { label: 'Default (Sonnet 4.6)', value: '' },
+            { label: 'Default (Haiku 4.5)', value: '' },
             { label: 'Claude Sonnet 4.6', value: 'us.anthropic.claude-sonnet-4-6' },
             { label: 'Claude Sonnet 4.5', value: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' },
             { label: 'Claude Sonnet 4', value: 'us.anthropic.claude-sonnet-4-20250514-v1:0' },

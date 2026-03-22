@@ -310,6 +310,16 @@ class TestSystemPrompt:
         """Static prompt includes the Inquiry few-shot example."""
         assert "Inquiry" in SYSTEM_PROMPT
 
+    def test_has_property_market_few_shot_example(self):
+        """Static prompt includes an explicit Property market-filter example."""
+        assert "Dallas-Fort Worth market" in SYSTEM_PROMPT
+        assert 'filters={"market": "Dallas-Fort Worth"}' in SYSTEM_PROMPT
+
+    def test_preserves_market_geography_grain(self):
+        """Prompt tells the model not to silently replace market with city."""
+        assert "Preserve the user's geography grain" in SYSTEM_PROMPT
+        assert "use market/submarket filters" in SYSTEM_PROMPT
+
 
 # =========================================================================
 # 2. TOOL_DEFINITIONS structure
@@ -486,6 +496,11 @@ class TestBuildSystemPrompt:
         result = build_system_prompt(SAMPLE_CONFIG)
         assert "Guidelines" in result
         assert "denormalized" in result.lower() or "denorm" in result.lower()
+
+    def test_includes_market_grain_guidance(self):
+        result = build_system_prompt(SAMPLE_CONFIG)
+        assert "Preserve the user's geography grain" in result
+        assert 'filters={"market": "Dallas-Fort Worth"}' in result
 
     def test_includes_grouped_ranking_guard(self):
         result = build_system_prompt(SAMPLE_CONFIG_11)

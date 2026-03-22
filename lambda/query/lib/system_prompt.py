@@ -254,7 +254,18 @@ Tool call:
   )
 Note: "office" is qualitative → text_query. "Dallas", "A", and 100000 are structured → filters.
 
-**2. Lease comp search — cross-object denormalized fields**
+**2. Property search — explicit market filter when user says market**
+User: "Show me office properties in the Dallas-Fort Worth market"
+Tool call:
+  search_records(
+    object_type="Property",
+    filters={"market": "Dallas-Fort Worth"},
+    text_query="office"
+  )
+Note: Preserve the user's geography grain. If they explicitly ask for a market or
+submarket, use market/submarket filters instead of silently narrowing to city.
+
+**3. Lease comp search — cross-object denormalized fields**
 User: "What lease comps exist in Dallas CBD for office space in the last 12 months over 10,000 SF?"
 Tool call:
   search_records(
@@ -269,7 +280,7 @@ Tool call:
   )
 Note: Use denormalized property_city/property_type on Lease directly — no separate Property search needed.
 
-**3. Availability search — rent range fields**
+**4. Availability search — rent range fields**
 User: "Find available office spaces in Houston with rent under $30 PSF"
 Tool call:
   search_records(
@@ -283,7 +294,7 @@ Tool call:
   )
 Note: Asking rates use rent_low/rent_high range fields. There is no single asking-rate field.
 
-**4. Deal pipeline search — broker and party filters**
+**5. Deal pipeline search — broker and party filters**
 User: "Show me Transwestern's closed deals this year over $50,000 in fees"
 Tool call:
   search_records(
@@ -293,7 +304,7 @@ Tool call:
   )
 Note: Broker names are in text (BM25 match). Structured values go in filters.
 
-**5. Sale comp search**
+**6. Sale comp search**
 User: "Find sale comps in Dallas with cap rate above 6%"
 Tool call:
   search_records(
@@ -301,7 +312,7 @@ Tool call:
     filters={"property_city": "Dallas", "cap_rate_gte": 6}
   )
 
-**6. Multi-state search — _in operator for set membership**
+**7. Multi-state search — _in operator for set membership**
 User: "List all companies that own office property in Texas, Oklahoma and Louisiana"
 Tool call:
   search_records(
@@ -313,7 +324,7 @@ Tool call:
 Note: Use _in for multi-value filters (states, cities, classes). Extract owner_account_name
 from results to answer "which companies" questions — no separate Account search needed.
 
-**7. Multi-object: inquiries matching a market**
+**8. Multi-object: inquiries matching a market**
 User: "Find active inquiries for office space in the Houston market"
 Tool call:
   search_records(
@@ -321,7 +332,7 @@ Tool call:
     filters={"market": "Houston", "property_type": "Office", "active": true}
   )
 
-**8. Cross-object: client preferences vs available listings**
+**9. Cross-object: client preferences vs available listings**
 User: "What listings match preferences for Class A office over 5,000 SF?"
 Tool calls (parallel):
   search_records(
@@ -335,7 +346,7 @@ Tool calls (parallel):
   )
 Note: For cross-object matching, search both object types in parallel and synthesize.
 
-**9. Aggregation with grouping**
+**10. Aggregation with grouping**
 User: "How many properties do we have by class in Dallas?"
 Tool call:
   aggregate_records(
@@ -345,7 +356,7 @@ Tool call:
     group_by="property_class"
   )
 
-**10. Comparison — parallel aggregates**
+**11. Comparison — parallel aggregates**
 User: "Compare average asking rates for Class A properties in Dallas vs Houston"
 Tool calls (parallel):
   aggregate_records(
@@ -362,7 +373,7 @@ Tool calls (parallel):
   )
 Note: For comparison queries, always use parallel tool calls to minimize latency.\
 
-**11. Ambiguous leaderboard — ask a constrained clarification with clickable options**
+**12. Ambiguous leaderboard — ask a constrained clarification with clickable options**
 User: "Name the top ten brokers in our system by deal size"
 Assistant:
   This query is ambiguous across two axes — metric and broker role. Here are the
@@ -377,7 +388,7 @@ them — never leave one axis open. The system is stateless, so clicking an opti
 resubmits the full query with no memory of the original. Do not guess when
 multiple valid interpretations exist.
 
-**12. Supported grouped ranking — use aggregate with sort and top_n**
+**13. Supported grouped ranking — use aggregate with sort and top_n**
 User: "Show the top 5 markets by deal count this year"
 Tool call:
   aggregate_records(
@@ -433,6 +444,9 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    "office", "medical", "CBD", "Class A", broker/company names.
    Put exact values in filters: city names, numeric ranges, dates, picklist
    values. Combine both when the question has both types.
+   Preserve the user's geography grain: if they explicitly say "market" or
+   "submarket", use market/submarket filters rather than silently replacing
+   them with city/state filters.
 
 4. **Use denormalized parent fields to avoid multi-step queries.** Many objects
    include parent fields so you can filter without a separate search:

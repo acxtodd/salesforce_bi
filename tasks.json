@@ -3144,6 +3144,27 @@
           "completedAt": "2026-03-20T10:55:40.552567+00:00"
         }
       ]
+    },
+    {
+      "phase": 99,
+      "name": "Backlog",
+      "description": "Future enhancements and capability expansions",
+      "status": "pending",
+      "tasks": [
+        {
+          "id": "99.1",
+          "title": "Conversational context on record pages",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-22T10:39:44.783501+00:00",
+          "updatedAt": "2026-03-22T10:39:44.783962+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Add multi-turn chat history to the LWC when embedded on a record page. Session persists until user navigates away or clicks Clear. Enables natural follow-up conversations (e.g., 'tell me about this record' → follow-up suggestions → user clicks one → context carries forward). Global search tab stays single-turn. Implementation: LWC accumulates messages array, Lambda accepts full conversation history for Bedrock Converse, session resets on recordId change. Watch token cost growth and 29s Lambda timeout on long conversations."
+        }
+      ]
     }
   ],
   "backlog": [],
@@ -3165,7 +3186,8 @@
       "4.8.": 4,
       "4.9.": 11,
       "4.12.": 6,
-      "4.13.": 2
+      "4.13.": 2,
+      "99.": 2
     }
   }
 }

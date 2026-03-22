@@ -5,12 +5,54 @@ import callAnswerEndpoint from '@salesforce/apex/AscendixAISearchController.call
 import callActionEndpoint from '@salesforce/apex/AscendixAISearchController.callActionEndpoint';
 import getCurrentUserId from '@salesforce/apex/AscendixAISearchController.getCurrentUserId';
 
+const MAX_CONVERSATION_TURNS = 10;
+const MAX_CONVERSATION_CHARS = 15000;
+const MAX_CONVERSATION_QUERY_CHARS = 500;
+const MAX_CONVERSATION_ANSWER_CHARS = 2000;
+
 export default class AscendixAiSearch extends NavigationMixin(LightningElement) {
 
-    @api recordId; // Current record ID for context
+    constructor() {
+        super();
+        this._recordId = null;
+        this.queryText = '';
+        this.answer = '';
+        this.citations = [];
+        this.conversationHistory = [];
+        this.isStreaming = false;
+        this.showAnswerSection = false;
+        this.showCitationsDrawer = false;
+        this.showCitationPreview = false;
+        this.selectedCitation = null;
+        this.errorMessage = '';
+        this.showRetryButton = false;
+        this.clarificationOptions = [];
+        this.selectedFilters = {
+            region: null,
+            businessUnit: null,
+            quarter: null
+        };
+        this.showActionPreview = false;
+        this.actionPreviewData = null;
+        this.isExecutingAction = false;
+        this.actionResultMessage = '';
+        this.actionResultRecordIds = [];
+        this.sessionId = null;
+        this.currentAbortController = null;
+        this.currentUserId = null;
+        this.streamingChunkBuffer = '';
+        this.lastRequestBody = null;
+        this.lastExchange = null;
+        this._pendingPriorContext = null;
+        this.selectedModelId = '';
+        this.lastModelUsed = '';
+    }
+
+    _recordId = null;
     @track queryText = '';
     @api answer = '';
     @track citations = [];
+    @track conversationHistory = [];
     @track isStreaming = false;
     @track showAnswerSection = false;
     @track showCitationsDrawer = false;
@@ -41,6 +83,23 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     _pendingPriorContext = null;
     @track selectedModelId = '';
     @track lastModelUsed = '';
+    requestSequence = 0;
+    activeRequestToken = null;
+
+    @api
+    get recordId() {
+        return this._recordId;
+    }
+
+    set recordId(value) {
+        const normalizedValue = value || null;
+        const previousRecordId = this._recordId;
+        this._recordId = normalizedValue;
+
+        if (previousRecordId && previousRecordId !== normalizedValue) {
+            this._resetConversation();
+        }
+    }
 
     get modelOptions() {
         return [
@@ -114,6 +173,14 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
 
     get hasClarificationOptions() {
         return this.clarificationOptions && this.clarificationOptions.length > 0;
+    }
+
+    get isRecordPage() {
+        return !!this._recordId;
+    }
+
+    get showConversationThread() {
+        return this.isRecordPage && Array.isArray(this.conversationHistory) && this.conversationHistory.length > 0;
     }
 
     get formattedAnswer() {
@@ -379,7 +446,9 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.answer = '';
         this.citations = [];
         this.clarificationOptions = [];
-        this.lastExchange = null;
+        if (!this.isRecordPage) {
+            this.lastExchange = null;
+        }
         this.errorMessage = '';
         this.showRetryButton = false;
         this.showAnswerSection = true;
@@ -389,12 +458,18 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.streamAnswer();
     }
 
+    handleClearChat() {
+        this._resetConversation();
+    }
+
     handleClarificationClick(event) {
         const query = event.currentTarget.dataset.query;
         if (query) {
-            this._pendingPriorContext = this.lastExchange
-                ? { query: this.lastExchange.query, answer: this.lastExchange.answer }
-                : null;
+            this._pendingPriorContext = this.isRecordPage
+                ? null
+                : (this.lastExchange
+                    ? { query: this.lastExchange.query, answer: this.lastExchange.answer }
+                    : null);
             this.queryText = query;
             this.clarificationOptions = [];
             this.handleSubmit();
@@ -409,11 +484,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             this.isStreaming = true;
             this.showAnswerSection = true;
 
-            this.callAnswerEndpoint(this.lastRequestBody)
-                .catch(error => this.handleError(error))
-                .finally(() => {
-                    this.isStreaming = false;
-                });
+            this.runAnswerRequest(this.lastRequestBody);
         }
     }
 
@@ -498,37 +569,43 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
 
     // Core functionality methods
     async streamAnswer() {
+        const requestBody = {
+            query: this.queryText,
+            sessionId: this.sessionId,
+            ...(this.recordId ? { recordId: this.recordId } : {}),
+            ...(this.selectedModelId ? { modelId: this.selectedModelId } : {}),
+            ...(this.isRecordPage && this.conversationHistory.length > 0
+                ? { conversationHistory: this.buildConversationHistoryPayload() }
+                : {}),
+            ...(this._pendingPriorContext ? { priorContext: this._pendingPriorContext } : {})
+        };
+
+        // Store for retry
+        this.lastRequestBody = requestBody;
+        this._pendingPriorContext = null;
+
+        await this.runAnswerRequest(requestBody);
+    }
+
+    async runAnswerRequest(requestBody) {
+        const requestToken = this.beginRequest();
+
         try {
-            // Create abort controller for this request if supported
-            if (typeof AbortController !== 'undefined') {
-                this.currentAbortController = new AbortController();
-            } else {
-                this.currentAbortController = null;
-            }
-
-            const requestBody = {
-                query: this.queryText,
-                sessionId: this.sessionId,
-                ...(this.recordId ? { recordId: this.recordId } : {}),
-                ...(this.selectedModelId ? { modelId: this.selectedModelId } : {}),
-                ...(this._pendingPriorContext ? { priorContext: this._pendingPriorContext } : {})
-            };
-
-            // Store for retry
-            this.lastRequestBody = requestBody;
-            this._pendingPriorContext = null;
-
-            await this.callAnswerEndpoint(requestBody);
-
+            await this.callAnswerEndpoint(requestBody, requestToken);
         } catch (error) {
-            this.handleError(error);
+            if (this.isActiveRequest(requestToken)) {
+                this.handleError(error);
+            }
         } finally {
-            this.isStreaming = false;
-            this.currentAbortController = null;
+            if (this.isActiveRequest(requestToken)) {
+                this.isStreaming = false;
+                this.currentAbortController = null;
+                this.activeRequestToken = null;
+            }
         }
     }
 
-    async callAnswerEndpoint(requestBody) {
+    async callAnswerEndpoint(requestBody, requestToken) {
         try {
             // Since Salesforce doesn't support true SSE streaming in LWC,
             // we'll simulate streaming by chunking the response
@@ -541,7 +618,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             const response = await callAnswerEndpoint({ requestBodyJson });
 
             // Process the response
-            if (response) {
+            if (response && this.isActiveRequest(requestToken)) {
                 // Extract answer and citations
                 const answerText = response.answer || '';
                 const citationsData = response.citations || [];
@@ -550,7 +627,10 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                 this.processCitations(citationsData);
 
                 // Simulate streaming by displaying answer in chunks
-                await this.simulateStreaming(answerText);
+                await this.simulateStreaming(answerText, requestToken);
+                if (!this.isActiveRequest(requestToken)) {
+                    return;
+                }
 
                 // Capture model used for display
                 if (response.modelId) {
@@ -564,6 +644,17 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                         label: opt.label,
                         query: opt.query
                     }));
+                }
+
+                if (this.isRecordPage) {
+                    this.conversationHistory = [
+                        ...this.conversationHistory,
+                        {
+                            id: `exchange-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                            query: requestBody.query,
+                            answer: answerText
+                        }
+                    ];
                 }
 
                 this.lastExchange = {
@@ -584,12 +675,16 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         }
     }
 
-    async simulateStreaming(fullText) {
+    async simulateStreaming(fullText, requestToken = null) {
         // Simulate streaming by revealing text in chunks
         const chunkSize = 10; // words per chunk
         const words = fullText.split(' ');
 
         for (let i = 0; i < words.length; i += chunkSize) {
+            if (requestToken && !this.isActiveRequest(requestToken)) {
+                return;
+            }
+
             const chunk = words.slice(i, i + chunkSize).join(' ');
             this.answer += (this.answer ? ' ' : '') + chunk;
 
@@ -806,6 +901,94 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     // Helper methods
     generateSessionId() {
         return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    beginRequest() {
+        this.invalidateActiveRequest(false);
+
+        if (typeof AbortController !== 'undefined') {
+            this.currentAbortController = new AbortController();
+        } else {
+            this.currentAbortController = null;
+        }
+
+        this.requestSequence += 1;
+        this.activeRequestToken = this.requestSequence;
+        return this.activeRequestToken;
+    }
+
+    invalidateActiveRequest(clearStreamingState = true) {
+        this.activeRequestToken = null;
+
+        if (this.currentAbortController) {
+            this.currentAbortController.abort();
+            this.currentAbortController = null;
+        }
+
+        if (clearStreamingState) {
+            this.isStreaming = false;
+        }
+    }
+
+    isActiveRequest(requestToken) {
+        return requestToken !== null && requestToken === this.activeRequestToken;
+    }
+
+    trimConversationText(text, maxLength) {
+        const trimmed = typeof text === 'string' ? text.trim() : '';
+        if (!trimmed) return '';
+        if (trimmed.length <= maxLength) return trimmed;
+        return trimmed.slice(0, maxLength) + '...';
+    }
+
+    buildConversationHistoryPayload() {
+        const normalizedReversed = [];
+        let totalChars = 0;
+
+        for (let i = this.conversationHistory.length - 1; i >= 0; i -= 1) {
+            const exchange = this.conversationHistory[i] || {};
+            const query = this.trimConversationText(exchange.query, MAX_CONVERSATION_QUERY_CHARS);
+            const answer = this.trimConversationText(exchange.answer, MAX_CONVERSATION_ANSWER_CHARS);
+
+            if (!query || !answer) {
+                continue;
+            }
+
+            const exchangeChars = query.length + answer.length;
+            if (totalChars + exchangeChars > MAX_CONVERSATION_CHARS) {
+                break;
+            }
+
+            normalizedReversed.push({ query, answer });
+            totalChars += exchangeChars;
+
+            if (normalizedReversed.length >= MAX_CONVERSATION_TURNS) {
+                break;
+            }
+        }
+
+        normalizedReversed.reverse();
+        return normalizedReversed;
+    }
+
+    _resetConversation() {
+        this.invalidateActiveRequest();
+        this.conversationHistory = [];
+        this.answer = '';
+        this.citations = [];
+        this.clarificationOptions = [];
+        this.lastExchange = null;
+        this.lastRequestBody = null;
+        this._pendingPriorContext = null;
+        this.errorMessage = '';
+        this.showRetryButton = false;
+        this.showAnswerSection = false;
+        this.queryText = '';
+        this.sessionId = this.generateSessionId();
+        this.streamingChunkBuffer = '';
+        this.lastModelUsed = '';
+        this.showCitationsDrawer = false;
+        this.showCitationPreview = false;
     }
 
     getUserId() {

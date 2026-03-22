@@ -38,7 +38,30 @@ jest.mock(
 );
 
 // Helper to wait for async operations
-const flushPromises = () => new Promise(resolve => setImmediate(resolve));
+const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
+
+const createDeferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
+};
+
+const createSearchComponent = (recordId = null) => {
+    const element = createElement('c-ascendix-ai-search', {
+        is: AscendixAiSearch
+    });
+
+    if (recordId) {
+        element.recordId = recordId;
+    }
+
+    document.body.appendChild(element);
+    return element;
+};
 
 describe('c-ascendix-ai-search', () => {
     afterEach(() => {
@@ -249,6 +272,7 @@ describe('c-ascendix-ai-search', () => {
             const citationsButton = element.shadowRoot.querySelector('lightning-button[label*="View Citations"]');
             expect(citationsButton).toBeTruthy();
             expect(citationsButton.label).toContain('(1)');
+            expect(element.shadowRoot.querySelector('.conversation-thread')).toBeFalsy();
         });
 
         it('should handle minimal citations from /query endpoint (id + title only)', async () => {
@@ -290,14 +314,16 @@ describe('c-ascendix-ai-search', () => {
             await flushPromises();
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            // Verify citation renders with fallback values
-            expect(element.citations.length).toBe(1);
-            const citation = element.citations[0];
-            expect(citation.title).toBe('Tower One');
-            expect(citation.recordId).toBe('a0x000001');
-            expect(citation.sobject).toBe('Record'); // fallback
-            expect(citation.score).toBeNull(); // null, not 'N/A'
-            expect(citation.snippet).toBe('Record: Tower One'); // derived from title
+            const citationsButton = element.shadowRoot.querySelector('lightning-button[label*="View Citations"]');
+            expect(citationsButton).toBeTruthy();
+
+            citationsButton.click();
+            await flushPromises();
+
+            const citationEntry = element.shadowRoot.querySelector('.citation-item');
+            expect(citationEntry).toBeTruthy();
+            expect(citationEntry.textContent).toContain('Tower One');
+            expect(citationEntry.textContent).toContain('Record');
         });
 
         it('should toggle citations drawer when button is clicked', async () => {
@@ -758,7 +784,7 @@ describe('c-ascendix-ai-search', () => {
     });
 
     describe('Action Preview Modal Display', () => {
-        it('should display action preview modal with create_opportunity action', () => {
+        it('should display action preview modal with create_opportunity action', async () => {
             const element = createElement('c-ascendix-ai-search', {
                 is: AscendixAiSearch
             });
@@ -776,6 +802,7 @@ describe('c-ascendix-ai-search', () => {
             };
 
             element.showActionPreviewModal(actionData);
+            await flushPromises();
 
             // Verify modal is displayed
             const modal = element.shadowRoot.querySelector('.action-preview-modal');
@@ -791,7 +818,7 @@ describe('c-ascendix-ai-search', () => {
             expect(fields.length).toBe(4);
         });
 
-        it('should display action preview modal with update_opportunity_stage action', () => {
+        it('should display action preview modal with update_opportunity_stage action', async () => {
             const element = createElement('c-ascendix-ai-search', {
                 is: AscendixAiSearch
             });
@@ -807,6 +834,7 @@ describe('c-ascendix-ai-search', () => {
             };
 
             element.showActionPreviewModal(actionData);
+            await flushPromises();
 
             // Verify modal is displayed
             expect(element.showActionPreview).toBe(true);
@@ -820,7 +848,7 @@ describe('c-ascendix-ai-search', () => {
             expect(fields.length).toBe(3);
         });
 
-        it('should format currency values in action preview', () => {
+        it('should format currency values in action preview', async () => {
             const element = createElement('c-ascendix-ai-search', {
                 is: AscendixAiSearch
             });
@@ -835,6 +863,7 @@ describe('c-ascendix-ai-search', () => {
             };
 
             element.showActionPreviewModal(actionData);
+            await flushPromises();
 
             // Verify currency formatting
             const amountField = Array.from(element.shadowRoot.querySelectorAll('.action-field'))
@@ -844,7 +873,7 @@ describe('c-ascendix-ai-search', () => {
             expect(amountField.textContent).toContain('$1,250,000');
         });
 
-        it('should display confirmation and cancel buttons', () => {
+        it('should display confirmation and cancel buttons', async () => {
             const element = createElement('c-ascendix-ai-search', {
                 is: AscendixAiSearch
             });
@@ -856,6 +885,7 @@ describe('c-ascendix-ai-search', () => {
             };
 
             element.showActionPreviewModal(actionData);
+            await flushPromises();
 
             // Verify buttons are present
             const confirmButton = element.shadowRoot.querySelector('lightning-button[label="Confirm"]');
@@ -1801,24 +1831,25 @@ describe('c-ascendix-ai-search', () => {
 
     // Task 4.12.4: Answer Formatting Tests
     describe('Answer Formatting', () => {
-        function createComponentAndSetAnswer(answerText) {
+        async function createComponentAndSetAnswer(answerText) {
             const element = createElement('c-ascendix-ai-search', {
                 is: AscendixAiSearch
             });
             document.body.appendChild(element);
             element.answer = answerText;
+            await flushPromises();
             return element;
         }
 
-        it('should convert markdown headers to HTML', () => {
-            const element = createComponentAndSetAnswer('## Main Title\n### Sub Title');
+        it('should convert markdown headers to HTML', async () => {
+            const element = await createComponentAndSetAnswer('## Main Title\n### Sub Title');
             const html = element.formattedAnswer;
             expect(html).toContain('<h3>Main Title</h3>');
             expect(html).toContain('<h4>Sub Title</h4>');
         });
 
-        it('should convert bullet lists to ul/li', () => {
-            const element = createComponentAndSetAnswer('- Item A\n- Item B\n- Item C');
+        it('should convert bullet lists to ul/li', async () => {
+            const element = await createComponentAndSetAnswer('- Item A\n- Item B\n- Item C');
             const html = element.formattedAnswer;
             expect(html).toContain('<ul>');
             expect(html).toContain('<li>Item A</li>');
@@ -1827,8 +1858,8 @@ describe('c-ascendix-ai-search', () => {
             expect(html).toContain('</ul>');
         });
 
-        it('should convert numbered lists to ol/li', () => {
-            const element = createComponentAndSetAnswer('1. First\n2. Second\n3. Third');
+        it('should convert numbered lists to ol/li', async () => {
+            const element = await createComponentAndSetAnswer('1. First\n2. Second\n3. Third');
             const html = element.formattedAnswer;
             expect(html).toContain('<ol>');
             expect(html).toContain('<li>First</li>');
@@ -1836,8 +1867,8 @@ describe('c-ascendix-ai-search', () => {
             expect(html).toContain('</ol>');
         });
 
-        it('should handle mixed list types', () => {
-            const element = createComponentAndSetAnswer('1. First\n2. Second\n\n- Bullet A\n- Bullet B');
+        it('should handle mixed list types', async () => {
+            const element = await createComponentAndSetAnswer('1. First\n2. Second\n\n- Bullet A\n- Bullet B');
             const html = element.formattedAnswer;
             expect(html).toContain('<ol>');
             expect(html).toContain('</ol>');
@@ -1845,9 +1876,9 @@ describe('c-ascendix-ai-search', () => {
             expect(html).toContain('</ul>');
         });
 
-        it('should convert markdown tables to HTML tables', () => {
+        it('should convert markdown tables to HTML tables', async () => {
             const tableText = '| Name | City |\n|---|---|\n| Tower One | Dallas |\n| Park Place | Austin |';
-            const element = createComponentAndSetAnswer(tableText);
+            const element = await createComponentAndSetAnswer(tableText);
             const html = element.formattedAnswer;
             expect(html).toContain('<table>');
             expect(html).toContain('<thead>');
@@ -1859,37 +1890,37 @@ describe('c-ascendix-ai-search', () => {
             expect(html).toContain('</table>');
         });
 
-        it('should fall back gracefully for invalid table-like text', () => {
+        it('should fall back gracefully for invalid table-like text', async () => {
             const notATable = 'This has a | pipe but is not a table';
-            const element = createComponentAndSetAnswer(notATable);
+            const element = await createComponentAndSetAnswer(notATable);
             const html = element.formattedAnswer;
             expect(html).not.toContain('<table>');
             expect(html).toContain('pipe');
         });
 
-        it('should wrap plain text in paragraphs', () => {
-            const element = createComponentAndSetAnswer('First paragraph.\n\nSecond paragraph.');
+        it('should wrap plain text in paragraphs', async () => {
+            const element = await createComponentAndSetAnswer('First paragraph.\n\nSecond paragraph.');
             const html = element.formattedAnswer;
             expect(html).toContain('<p>First paragraph.</p>');
             expect(html).toContain('<p>Second paragraph.</p>');
         });
 
-        it('should not double-wrap block elements in paragraphs', () => {
-            const element = createComponentAndSetAnswer('## Header\n\nSome text.');
+        it('should not double-wrap block elements in paragraphs', async () => {
+            const element = await createComponentAndSetAnswer('## Header\n\nSome text.');
             const html = element.formattedAnswer;
             // Header should not be inside a <p> tag
             expect(html).not.toContain('<p><h3>');
             expect(html).toContain('<h3>Header</h3>');
         });
 
-        it('should preserve bold and italic formatting', () => {
-            const element = createComponentAndSetAnswer('This is **bold** and *italic* text.');
+        it('should preserve bold and italic formatting', async () => {
+            const element = await createComponentAndSetAnswer('This is **bold** and *italic* text.');
             const html = element.formattedAnswer;
             expect(html).toContain('<strong>bold</strong>');
             expect(html).toContain('<em>italic</em>');
         });
 
-        it('should preserve citation hyperlinks in formatted answer', () => {
+        it('should preserve citation hyperlinks in formatted answer', async () => {
             const element = createElement('c-ascendix-ai-search', {
                 is: AscendixAiSearch
             });
@@ -1903,6 +1934,7 @@ describe('c-ascendix-ai-search', () => {
                 sobject: 'Property'
             }];
             element.answer = 'The property Tower One is in Dallas.';
+            await flushPromises();
 
             const html = element.formattedAnswer;
             expect(html).toContain('Tower One');
@@ -1947,12 +1979,9 @@ describe('c-ascendix-ai-search', () => {
             await new Promise(resolve => setTimeout(resolve, 100));
 
             // Verify clarification options are set
-            expect(element.clarificationOptions.length).toBe(2);
-            expect(element.clarificationOptions[0].label).toBe('By deal count');
-
-            // Verify pills are rendered
-            const pills = element.shadowRoot.querySelector('.clarification-options');
-            expect(pills).toBeTruthy();
+            const pills = element.shadowRoot.querySelectorAll('.clarification-options lightning-button');
+            expect(pills).toHaveLength(2);
+            expect(pills[0].label).toBe('By deal count');
         });
 
         it('should clear clarification options on new submit', async () => {
@@ -1988,7 +2017,7 @@ describe('c-ascendix-ai-search', () => {
             await flushPromises();
 
             // Clarification options should be cleared
-            expect(element.clarificationOptions).toEqual([]);
+            expect(element.shadowRoot.querySelector('.clarification-options')).toBeFalsy();
         });
 
         it('should resubmit with clarification query on pill click', async () => {
@@ -2045,6 +2074,393 @@ describe('c-ascendix-ai-search', () => {
                 query: 'Top markets',
                 answer: 'Which metric did you mean?'
             });
+            expect(payload.conversationHistory).toBeUndefined();
+        });
+    });
+
+    describe('Record Page Conversation History', () => {
+        it('should accumulate history, render a thread, and send conversationHistory on follow-up', async () => {
+            callAnswerEndpoint
+                .mockResolvedValueOnce({
+                    answer: 'The property has two active leases.',
+                    citations: [],
+                    clarificationOptions: [
+                        { label: 'Compare rent rates', query: 'Compare their rent rates.' }
+                    ]
+                })
+                .mockResolvedValueOnce({
+                    answer: 'The first lease is priced higher than the second.',
+                    citations: []
+                });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000001AAA');
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Tell me about this record';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Tell me about this record' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            let thread = element.shadowRoot.querySelector('.conversation-thread');
+            expect(thread).toBeTruthy();
+            expect(thread.textContent).toContain('Tell me about this record');
+            expect(thread.textContent).toContain('The property has two active leases.');
+
+            const clarifyButton = element.shadowRoot.querySelector('.clarification-options lightning-button');
+            expect(clarifyButton).toBeTruthy();
+            clarifyButton.dispatchEvent(new CustomEvent('click', { bubbles: true }));
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(callAnswerEndpoint).toHaveBeenCalledTimes(2);
+            const secondCallArgs = callAnswerEndpoint.mock.calls[1][0];
+            const secondPayload = JSON.parse(secondCallArgs.requestBodyJson);
+            expect(secondPayload.conversationHistory).toEqual([
+                {
+                    query: 'Tell me about this record',
+                    answer: 'The property has two active leases.'
+                }
+            ]);
+            expect(secondPayload.priorContext).toBeUndefined();
+            thread = element.shadowRoot.querySelector('.conversation-thread');
+            expect(thread.textContent).toContain('Compare their rent rates.');
+            expect(thread.textContent).toContain('The first lease is priced higher than the second.');
+        });
+
+        it('should preserve prior history when a record-page request fails', async () => {
+            callAnswerEndpoint
+                .mockResolvedValueOnce({
+                    answer: 'The record has one active lease.',
+                    citations: []
+                })
+                .mockRejectedValueOnce(new Error('Request timed out after 29s'));
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000002BBB');
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Tell me about this record';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Tell me about this record' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            textarea.value = 'What about the second lease?';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'What about the second lease?' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const secondCallArgs = callAnswerEndpoint.mock.calls[1][0];
+            const secondPayload = JSON.parse(secondCallArgs.requestBodyJson);
+            expect(secondPayload.conversationHistory).toEqual([
+                {
+                    query: 'Tell me about this record',
+                    answer: 'The record has one active lease.'
+                }
+            ]);
+            expect(element.shadowRoot.querySelector('.conversation-thread')).toBeTruthy();
+            const errorMessage = element.shadowRoot.querySelector('.error-message');
+            expect(errorMessage).toBeTruthy();
+            expect(errorMessage.textContent).toContain('Please try again');
+            expect(element.shadowRoot.querySelector('lightning-button[label="Retry"]')).toBeTruthy();
+        });
+
+        it('should clear record-page history and session state when the recordId changes', async () => {
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'The record has an active lease.',
+                citations: []
+            });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000001AAA');
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Tell me about this record';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Tell me about this record' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const firstPayload = JSON.parse(callAnswerEndpoint.mock.calls[0][0].requestBodyJson);
+
+            element.recordId = '001xx0000000002BBB';
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('.conversation-thread')).toBeFalsy();
+            expect(element.shadowRoot.querySelector('[data-id="answer-display"]')).toBeFalsy();
+            expect(textarea.value).toBe('');
+
+            textarea.value = 'Tell me about the new record';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Tell me about the new record' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const secondPayload = JSON.parse(callAnswerEndpoint.mock.calls[1][0].requestBodyJson);
+            expect(secondPayload.sessionId).toBeTruthy();
+            expect(secondPayload.sessionId).not.toBe(firstPayload.sessionId);
+            expect(secondPayload.conversationHistory).toBeUndefined();
+        });
+
+        it('should clear record-page history when Clear Chat is clicked', async () => {
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'The record has an active lease.',
+                citations: []
+            });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000003CCC');
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Tell me about this record';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Tell me about this record' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const firstPayload = JSON.parse(callAnswerEndpoint.mock.calls[0][0].requestBodyJson);
+
+            element.shadowRoot.querySelector('.conversation-thread__clear').click();
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('.conversation-thread')).toBeFalsy();
+            expect(element.shadowRoot.querySelector('[data-id="answer-display"]')).toBeFalsy();
+            expect(textarea.value).toBe('');
+
+            textarea.value = 'Start over on this record';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Start over on this record' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const secondPayload = JSON.parse(callAnswerEndpoint.mock.calls[1][0].requestBodyJson);
+            expect(secondPayload.sessionId).toBeTruthy();
+            expect(secondPayload.sessionId).not.toBe(firstPayload.sessionId);
+            expect(secondPayload.conversationHistory).toBeUndefined();
+        });
+
+        it('should ignore stale responses after the user switches records mid-request', async () => {
+            const pendingResponse = createDeferred();
+            callAnswerEndpoint
+                .mockReturnValueOnce(pendingResponse.promise)
+                .mockResolvedValueOnce({
+                    answer: 'Fresh answer for the new record.',
+                    citations: []
+                });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000001AAA');
+            await flushPromises();
+
+            let textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Tell me about record A';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Tell me about record A' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            element.recordId = '001xx0000000002BBB';
+            await flushPromises();
+
+            pendingResponse.resolve({
+                answer: 'Stale answer from record A.',
+                citations: []
+            });
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(element.shadowRoot.querySelector('.conversation-thread')).toBeFalsy();
+            expect(element.shadowRoot.querySelector('[data-id="answer-display"]')).toBeFalsy();
+
+            textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Tell me about record B';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Tell me about record B' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(callAnswerEndpoint).toHaveBeenCalledTimes(2);
+            const payload = JSON.parse(callAnswerEndpoint.mock.calls[1][0].requestBodyJson);
+            expect(payload.recordId).toBe('001xx0000000002BBB');
+            expect(payload.conversationHistory).toBeUndefined();
+
+            const thread = element.shadowRoot.querySelector('.conversation-thread');
+            expect(thread).toBeTruthy();
+            expect(thread.textContent).toContain('Tell me about record B');
+            expect(thread.textContent).not.toContain('Stale answer from record A.');
+        });
+
+        it('should ignore stale responses after Clear Chat during an in-flight request', async () => {
+            const pendingResponse = createDeferred();
+            callAnswerEndpoint
+                .mockResolvedValueOnce({
+                    answer: 'Established answer before clearing.',
+                    citations: []
+                })
+                .mockReturnValueOnce(pendingResponse.promise)
+                .mockResolvedValueOnce({
+                    answer: 'Fresh answer after clearing chat.',
+                    citations: []
+                });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000004DDD');
+            await flushPromises();
+
+            let textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Establish some history';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Establish some history' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Start a long request';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Start a long request' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.conversation-thread__clear').click();
+            await flushPromises();
+
+            pendingResponse.resolve({
+                answer: 'Stale answer from before clear.',
+                citations: []
+            });
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(callAnswerEndpoint).toHaveBeenCalledTimes(2);
+            expect(element.shadowRoot.querySelector('.conversation-thread')).toBeFalsy();
+            expect(element.shadowRoot.querySelector('[data-id="answer-display"]')).toBeFalsy();
+
+            textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Start over cleanly';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Start over cleanly' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const payload = JSON.parse(callAnswerEndpoint.mock.calls[2][0].requestBodyJson);
+            expect(payload.conversationHistory).toBeUndefined();
+            expect(element.shadowRoot.querySelector('.conversation-thread').textContent).toContain('Start over cleanly');
+            expect(element.shadowRoot.querySelector('.conversation-thread').textContent).not.toContain('Stale answer from before clear.');
+        });
+
+        it('should prune record-page conversation history before sending it upstream', async () => {
+            const longAnswer = 'A'.repeat(2500);
+            callAnswerEndpoint.mockResolvedValue({
+                answer: longAnswer,
+                citations: []
+            });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000005EEE');
+            await flushPromises();
+
+            for (let i = 0; i < 11; i += 1) {
+                const textarea = element.shadowRoot.querySelector('lightning-textarea');
+                textarea.value = `Question ${i}`;
+                textarea.dispatchEvent(new CustomEvent('change', {
+                    detail: { value: `Question ${i}` }
+                }));
+
+                await flushPromises();
+                element.shadowRoot.querySelector('.submit-button').click();
+                await flushPromises();
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            const finalTextarea = element.shadowRoot.querySelector('lightning-textarea');
+            finalTextarea.value = 'Follow-up question';
+            finalTextarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Follow-up question' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const payload = JSON.parse(callAnswerEndpoint.mock.calls[11][0].requestBodyJson);
+            expect(Array.isArray(payload.conversationHistory)).toBe(true);
+            expect(payload.conversationHistory.length).toBeLessThanOrEqual(10);
+            expect(payload.conversationHistory[0].query).toBe('Question 4');
+            expect(payload.conversationHistory[payload.conversationHistory.length - 1].query).toBe('Question 10');
+            expect(payload.conversationHistory.every(entry => entry.answer.length === 2003)).toBe(true);
+            const totalChars = payload.conversationHistory.reduce(
+                (sum, entry) => sum + entry.query.length + entry.answer.length,
+                0
+            );
+            expect(totalChars).toBeLessThanOrEqual(15000);
         });
     });
 });

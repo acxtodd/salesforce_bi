@@ -923,3 +923,62 @@ class TestPriorContext:
             bedrock_without_context.converse.call_args[1]["messages"]
             == bedrock_with_none.converse.call_args[1]["messages"]
         )
+
+
+class TestConversationHistory:
+    """Conversation history is replayed in order before the active question."""
+
+    def test_builds_multi_turn_message_history(self):
+        bedrock = MagicMock()
+        captured_messages: list[list[dict]] = []
+
+        def _capture(**kwargs):
+            captured_messages.append(deepcopy(kwargs["messages"]))
+            return _end_turn_response("Answer.")
+
+        bedrock.converse.side_effect = _capture
+
+        handler = _make_handler(bedrock)
+        handler.query(
+            "Compare their rent rates",
+            conversation_history=[
+                {"query": "Tell me about this record", "answer": "It is a Class A property."},
+                {"query": "What leases are active?", "answer": "Two leases are active."},
+            ],
+        )
+
+        assert captured_messages[0] == [
+            {"role": "user", "content": [{"text": "Tell me about this record"}]},
+            {"role": "assistant", "content": [{"text": "It is a Class A property."}]},
+            {"role": "user", "content": [{"text": "What leases are active?"}]},
+            {"role": "assistant", "content": [{"text": "Two leases are active."}]},
+            {"role": "user", "content": [{"text": "Compare their rent rates"}]},
+        ]
+
+    def test_conversation_history_takes_precedence_over_prior_context(self):
+        bedrock = MagicMock()
+        captured_messages: list[list[dict]] = []
+
+        def _capture(**kwargs):
+            captured_messages.append(deepcopy(kwargs["messages"]))
+            return _end_turn_response("Answer.")
+
+        bedrock.converse.side_effect = _capture
+
+        handler = _make_handler(bedrock)
+        handler.query(
+            "Compare their rent rates",
+            prior_context={
+                "query": "Legacy prior context",
+                "answer": "Should be ignored.",
+            },
+            conversation_history=[
+                {"query": "Tell me about this record", "answer": "It is a Class A property."},
+            ],
+        )
+
+        assert captured_messages[0] == [
+            {"role": "user", "content": [{"text": "Tell me about this record"}]},
+            {"role": "assistant", "content": [{"text": "It is a Class A property."}]},
+            {"role": "user", "content": [{"text": "Compare their rent rates"}]},
+        ]

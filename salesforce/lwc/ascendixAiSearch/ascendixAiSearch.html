@@ -83,6 +83,34 @@
                 </div>
             </template>
 
+            <!-- Record Page Conversation Thread -->
+            <template if:true={showConversationThread}>
+                <section class="conversation-thread slds-m-top_large" role="region"
+                    aria-label="Record page conversation history">
+                    <div class="conversation-thread__header">
+                        <div class="conversation-thread__title">Conversation</div>
+                        <lightning-button variant="neutral" label="Clear Chat" title="Clear conversation history"
+                            onclick={handleClearChat} class="conversation-thread__clear"></lightning-button>
+                    </div>
+
+                    <div class="conversation-thread__body">
+                        <template for:each={conversationHistory} for:item="exchange">
+                            <article key={exchange.id} class="conversation-exchange">
+                                <div class="conversation-bubble conversation-bubble_user">
+                                    <div class="conversation-bubble__label">You</div>
+                                    <div class="conversation-bubble__text">{exchange.query}</div>
+                                </div>
+
+                                <div class="conversation-bubble conversation-bubble_assistant">
+                                    <div class="conversation-bubble__label">Assistant</div>
+                                    <div class="conversation-bubble__text">{exchange.answer}</div>
+                                </div>
+                            </article>
+                        </template>
+                    </div>
+                </section>
+            </template>
+
             <!-- Streaming Answer Display Container -->
             <template if:true={showAnswerSection}>
                 <div class="slds-m-top_large answer-container" role="region" aria-labelledby="answer-heading"

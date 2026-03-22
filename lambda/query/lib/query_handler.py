@@ -206,6 +206,7 @@ class QueryHandler:
         question: str,
         *,
         prior_context: dict[str, str] | None = None,
+        conversation_history: list[dict[str, str]] | None = None,
     ) -> QueryResult:
         """Execute a user question through the Claude tool-use loop.
 
@@ -213,9 +214,29 @@ class QueryHandler:
         and execution metadata.
         """
         messages: list[dict[str, Any]] = []
-        if prior_context:
-            messages.append({"role": "user", "content": [{"text": prior_context["query"]}]})
-            messages.append({"role": "assistant", "content": [{"text": prior_context["answer"]}]})
+        if conversation_history is not None:
+            history = conversation_history
+        elif prior_context:
+            history = [prior_context]
+        else:
+            history = []
+
+        for exchange in history:
+            if not isinstance(exchange, dict):
+                continue
+
+            exchange_query = exchange.get("query")
+            exchange_answer = exchange.get("answer")
+            if not isinstance(exchange_query, str) or not isinstance(exchange_answer, str):
+                continue
+
+            exchange_query = exchange_query.strip()
+            exchange_answer = exchange_answer.strip()
+            if not exchange_query or not exchange_answer:
+                continue
+
+            messages.append({"role": "user", "content": [{"text": exchange_query}]})
+            messages.append({"role": "assistant", "content": [{"text": exchange_answer}]})
         messages.append({"role": "user", "content": [{"text": question}]})
 
         tool_calls_made = 0

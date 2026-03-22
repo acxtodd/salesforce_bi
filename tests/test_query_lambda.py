@@ -534,20 +534,115 @@ class TestAnswerChunking:
 
 
 # ---------------------------------------------------------------------------
-# 11. Prior context extraction and forwarding
+# 11. Conversation history extraction and forwarding
 # ---------------------------------------------------------------------------
 
-class TestPriorContext:
+class TestConversationHistory:
 
     @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
     @patch(f"{_PATCH_PREFIX}.QueryHandler")
-    def test_prior_context_passed_to_query_handler(self, MockQH, MockBackend, mock_boto3):
+    def test_conversation_history_passed_to_query_handler(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        history = [
+            {"query": "Tell me about this record", "answer": "It is a Class A property."},
+            {"query": "What leases are active?", "answer": "Two leases are active."},
+        ]
+
+        _invoke({
+            "question": "Compare their rent rates",
+            "org_id": "00Ddl000003yx57EAA",
+            "conversation_history": history,
+        })
+
+        mock_qh_instance.query.assert_called_once_with(
+            "Compare their rent rates",
+            conversation_history=history,
+        )
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_conversation_history_trims_and_caps_most_recent_turns(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        history = []
+        for idx in range(12):
+            history.append({
+                "query": f"Question {idx}",
+                "answer": f"Answer {idx}",
+            })
+
+        _invoke({
+            "question": "Summarize the thread",
+            "org_id": "00Ddl000003yx57EAA",
+            "conversation_history": history,
+        })
+
+        forwarded = mock_qh_instance.query.call_args.kwargs["conversation_history"]
+        assert len(forwarded) == 10
+        assert forwarded[0]["query"] == "Question 2"
+        assert forwarded[-1]["query"] == "Question 11"
+        assert forwarded[0]["answer"] == "Answer 2"
+        assert forwarded[-1]["answer"] == "Answer 11"
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_conversation_history_trims_entry_text(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+        long_query = "q" * 1000
+        long_answer = "a" * 5000
+
+        _invoke({
+            "question": "Summarize the thread",
+            "org_id": "00Ddl000003yx57EAA",
+            "conversation_history": [
+                {"query": long_query, "answer": long_answer},
+            ],
+        })
+
+        forwarded = mock_qh_instance.query.call_args.kwargs["conversation_history"]
+        assert len(forwarded) == 1
+        assert len(forwarded[0]["query"]) == 503
+        assert len(forwarded[0]["answer"]) == 2003
+        assert forwarded[0]["query"].endswith("...")
+        assert forwarded[0]["answer"].endswith("...")
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_malformed_conversation_history_entries_are_dropped(self, MockQH, MockBackend, mock_boto3):
         mock_qh_instance = MockQH.return_value
         mock_qh_instance.query.return_value = _make_query_result()
 
         _invoke({
-            "question": "Top 5 markets by deal count",
+            "question": "Find offices",
+            "org_id": "00Ddl000003yx57EAA",
+            "conversation_history": [
+                {"query": "   ", "answer": " "},
+                {"query": "Valid question", "answer": "Valid answer"},
+                {"query": "Broken entry"},
+                "not a dict",
+            ],
+        })
+
+        forwarded = mock_qh_instance.query.call_args.kwargs["conversation_history"]
+        assert forwarded == [{"query": "Valid question", "answer": "Valid answer"}]
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_prior_context_still_upgrades_when_history_missing(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Find offices",
             "org_id": "00Ddl000003yx57EAA",
             "prior_context": {
                 "query": "Top markets",
@@ -556,17 +651,19 @@ class TestPriorContext:
         })
 
         mock_qh_instance.query.assert_called_once_with(
-            "Top 5 markets by deal count",
-            prior_context={
-                "query": "Top markets",
-                "answer": "Which metric did you mean?",
-            },
+            "Find offices",
+            conversation_history=[
+                {
+                    "query": "Top markets",
+                    "answer": "Which metric did you mean?",
+                }
+            ],
         )
 
     @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
     @patch(f"{_PATCH_PREFIX}.QueryHandler")
-    def test_no_prior_context_passes_none(self, MockQH, MockBackend, mock_boto3):
+    def test_no_history_passes_none(self, MockQH, MockBackend, mock_boto3):
         mock_qh_instance = MockQH.return_value
         mock_qh_instance.query.return_value = _make_query_result()
 
@@ -574,113 +671,32 @@ class TestPriorContext:
 
         mock_qh_instance.query.assert_called_once_with(
             "Find offices",
-            prior_context=None,
+            conversation_history=None,
         )
 
     @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
     @patch(f"{_PATCH_PREFIX}.QueryHandler")
-    def test_malformed_prior_context_dropped(self, MockQH, MockBackend, mock_boto3):
+    def test_invalid_history_falls_back_to_prior_context(self, MockQH, MockBackend, mock_boto3):
         mock_qh_instance = MockQH.return_value
         mock_qh_instance.query.return_value = _make_query_result()
 
         _invoke({
             "question": "Find offices",
             "org_id": "00Ddl000003yx57EAA",
-            "prior_context": {"query": "Top markets"},
+            "conversation_history": "not a list",
+            "prior_context": {
+                "query": "Top markets",
+                "answer": "Which metric did you mean?",
+            },
         })
 
         mock_qh_instance.query.assert_called_once_with(
             "Find offices",
-            prior_context=None,
-        )
-
-    @patch(f"{_PATCH_PREFIX}.boto3")
-    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
-    @patch(f"{_PATCH_PREFIX}.QueryHandler")
-    def test_non_string_prior_context_fields_dropped(self, MockQH, MockBackend, mock_boto3):
-        mock_qh_instance = MockQH.return_value
-        mock_qh_instance.query.return_value = _make_query_result()
-
-        _invoke({
-            "question": "Find offices",
-            "org_id": "00Ddl000003yx57EAA",
-            "prior_context": {"query": {}, "answer": []},
-        })
-
-        mock_qh_instance.query.assert_called_once_with(
-            "Find offices",
-            prior_context=None,
-        )
-
-    @patch(f"{_PATCH_PREFIX}.boto3")
-    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
-    @patch(f"{_PATCH_PREFIX}.QueryHandler")
-    def test_non_dict_prior_context_dropped(self, MockQH, MockBackend, mock_boto3):
-        mock_qh_instance = MockQH.return_value
-        mock_qh_instance.query.return_value = _make_query_result()
-
-        _invoke({
-            "question": "Find offices",
-            "org_id": "00Ddl000003yx57EAA",
-            "prior_context": "just a string",
-        })
-
-        mock_qh_instance.query.assert_called_once_with(
-            "Find offices",
-            prior_context=None,
-        )
-
-    @patch(f"{_PATCH_PREFIX}.boto3")
-    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
-    @patch(f"{_PATCH_PREFIX}.QueryHandler")
-    def test_long_answer_truncated(self, MockQH, MockBackend, mock_boto3):
-        mock_qh_instance = MockQH.return_value
-        mock_qh_instance.query.return_value = _make_query_result()
-        long_answer = "a" * 5000
-
-        _invoke({
-            "question": "Find offices",
-            "org_id": "00Ddl000003yx57EAA",
-            "prior_context": {"query": "Top markets", "answer": long_answer},
-        })
-
-        forwarded = mock_qh_instance.query.call_args.kwargs["prior_context"]
-        assert len(forwarded["answer"]) == 2003
-        assert forwarded["answer"].endswith("...")
-
-    @patch(f"{_PATCH_PREFIX}.boto3")
-    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
-    @patch(f"{_PATCH_PREFIX}.QueryHandler")
-    def test_long_query_truncated(self, MockQH, MockBackend, mock_boto3):
-        mock_qh_instance = MockQH.return_value
-        mock_qh_instance.query.return_value = _make_query_result()
-        long_query = "q" * 1000
-
-        _invoke({
-            "question": "Find offices",
-            "org_id": "00Ddl000003yx57EAA",
-            "prior_context": {"query": long_query, "answer": "Prior answer"},
-        })
-
-        forwarded = mock_qh_instance.query.call_args.kwargs["prior_context"]
-        assert len(forwarded["query"]) == 503
-        assert forwarded["query"].endswith("...")
-
-    @patch(f"{_PATCH_PREFIX}.boto3")
-    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
-    @patch(f"{_PATCH_PREFIX}.QueryHandler")
-    def test_whitespace_only_fields_dropped(self, MockQH, MockBackend, mock_boto3):
-        mock_qh_instance = MockQH.return_value
-        mock_qh_instance.query.return_value = _make_query_result()
-
-        _invoke({
-            "question": "Find offices",
-            "org_id": "00Ddl000003yx57EAA",
-            "prior_context": {"query": "   ", "answer": " "},
-        })
-
-        mock_qh_instance.query.assert_called_once_with(
-            "Find offices",
-            prior_context=None,
+            conversation_history=[
+                {
+                    "query": "Top markets",
+                    "answer": "Which metric did you mean?",
+                }
+            ],
         )

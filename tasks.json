@@ -3195,10 +3195,10 @@
         {
           "id": "4.15",
           "title": "Conversational context on record pages",
-          "status": "in_progress",
+          "status": "review",
           "owner": "Todd Terry",
           "createdAt": "2026-03-22T10:39:44.783501+00:00",
-          "updatedAt": "2026-03-22T15:50:22.813156+00:00",
+          "updatedAt": "2026-03-22T15:51:04.999161+00:00",
           "files_modified": [
             "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html",
             "salesforce/lwc/ascendixAiSearch/__tests__/ascendixAiSearch.test.js",
@@ -3223,6 +3223,10 @@
             {
               "timestamp": "2026-03-22T15:50:03.340745+00:00",
               "note": "Implemented record-page conversational context in isolated worktree; backend validation added for conversation_history sliding window, LWC record-page thread/Clear Chat/reset behavior landed, full Python suite passed (668 passed, 1 skipped), and targeted LWC clarification/record-page/citation submission tests passed via sfdx-lwc-jest."
+            },
+            {
+              "timestamp": "2026-03-22T15:51:05.000546+00:00",
+              "note": "Open PR #8 ready for review: https://github.com/acxtodd/salesforce_bi/pull/8"
             }
           ],
           "description": "Add multi-turn chat history to the LWC when embedded on a record page. Session persists until user navigates away or clicks Clear. Enables natural follow-up conversations (e.g., 'tell me about this record' → follow-up suggestions → user clicks one → context carries forward). Global search tab stays single-turn. Implementation: LWC accumulates messages array, Lambda accepts full conversation history for Bedrock Converse, session resets on recordId change. Watch token cost growth and 29s Lambda timeout on long conversations.",

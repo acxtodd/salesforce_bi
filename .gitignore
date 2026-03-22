@@ -62,3 +62,7 @@ temp_check*/
 
 # Large binaries
 *.pptx
+
+# Lambda bundle artifacts
+lambda/poll_sync/.bundle/
+lambda/cdc_sync/.bundle/

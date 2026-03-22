@@ -40,6 +40,16 @@ jest.mock(
 // Helper to wait for async operations
 const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
 
+const createDeferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
+};
+
 const createSearchComponent = (recordId = null) => {
     const element = createElement('c-ascendix-ai-search', {
         is: AscendixAiSearch
@@ -2270,6 +2280,187 @@ describe('c-ascendix-ai-search', () => {
             expect(secondPayload.sessionId).toBeTruthy();
             expect(secondPayload.sessionId).not.toBe(firstPayload.sessionId);
             expect(secondPayload.conversationHistory).toBeUndefined();
+        });
+
+        it('should ignore stale responses after the user switches records mid-request', async () => {
+            const pendingResponse = createDeferred();
+            callAnswerEndpoint
+                .mockReturnValueOnce(pendingResponse.promise)
+                .mockResolvedValueOnce({
+                    answer: 'Fresh answer for the new record.',
+                    citations: []
+                });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000001AAA');
+            await flushPromises();
+
+            let textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Tell me about record A';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Tell me about record A' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            element.recordId = '001xx0000000002BBB';
+            await flushPromises();
+
+            pendingResponse.resolve({
+                answer: 'Stale answer from record A.',
+                citations: []
+            });
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(element.shadowRoot.querySelector('.conversation-thread')).toBeFalsy();
+            expect(element.shadowRoot.querySelector('[data-id="answer-display"]')).toBeFalsy();
+
+            textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Tell me about record B';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Tell me about record B' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(callAnswerEndpoint).toHaveBeenCalledTimes(2);
+            const payload = JSON.parse(callAnswerEndpoint.mock.calls[1][0].requestBodyJson);
+            expect(payload.recordId).toBe('001xx0000000002BBB');
+            expect(payload.conversationHistory).toBeUndefined();
+
+            const thread = element.shadowRoot.querySelector('.conversation-thread');
+            expect(thread).toBeTruthy();
+            expect(thread.textContent).toContain('Tell me about record B');
+            expect(thread.textContent).not.toContain('Stale answer from record A.');
+        });
+
+        it('should ignore stale responses after Clear Chat during an in-flight request', async () => {
+            const pendingResponse = createDeferred();
+            callAnswerEndpoint
+                .mockResolvedValueOnce({
+                    answer: 'Established answer before clearing.',
+                    citations: []
+                })
+                .mockReturnValueOnce(pendingResponse.promise)
+                .mockResolvedValueOnce({
+                    answer: 'Fresh answer after clearing chat.',
+                    citations: []
+                });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000004DDD');
+            await flushPromises();
+
+            let textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Establish some history';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Establish some history' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Start a long request';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Start a long request' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.conversation-thread__clear').click();
+            await flushPromises();
+
+            pendingResponse.resolve({
+                answer: 'Stale answer from before clear.',
+                citations: []
+            });
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(callAnswerEndpoint).toHaveBeenCalledTimes(2);
+            expect(element.shadowRoot.querySelector('.conversation-thread')).toBeFalsy();
+            expect(element.shadowRoot.querySelector('[data-id="answer-display"]')).toBeFalsy();
+
+            textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Start over cleanly';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Start over cleanly' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const payload = JSON.parse(callAnswerEndpoint.mock.calls[2][0].requestBodyJson);
+            expect(payload.conversationHistory).toBeUndefined();
+            expect(element.shadowRoot.querySelector('.conversation-thread').textContent).toContain('Start over cleanly');
+            expect(element.shadowRoot.querySelector('.conversation-thread').textContent).not.toContain('Stale answer from before clear.');
+        });
+
+        it('should prune record-page conversation history before sending it upstream', async () => {
+            const longAnswer = 'A'.repeat(2500);
+            callAnswerEndpoint.mockResolvedValue({
+                answer: longAnswer,
+                citations: []
+            });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createSearchComponent('001xx0000000005EEE');
+            await flushPromises();
+
+            for (let i = 0; i < 11; i += 1) {
+                const textarea = element.shadowRoot.querySelector('lightning-textarea');
+                textarea.value = `Question ${i}`;
+                textarea.dispatchEvent(new CustomEvent('change', {
+                    detail: { value: `Question ${i}` }
+                }));
+
+                await flushPromises();
+                element.shadowRoot.querySelector('.submit-button').click();
+                await flushPromises();
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            const finalTextarea = element.shadowRoot.querySelector('lightning-textarea');
+            finalTextarea.value = 'Follow-up question';
+            finalTextarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Follow-up question' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const payload = JSON.parse(callAnswerEndpoint.mock.calls[11][0].requestBodyJson);
+            expect(Array.isArray(payload.conversationHistory)).toBe(true);
+            expect(payload.conversationHistory.length).toBeLessThanOrEqual(10);
+            expect(payload.conversationHistory[0].query).toBe('Question 4');
+            expect(payload.conversationHistory[payload.conversationHistory.length - 1].query).toBe('Question 10');
+            expect(payload.conversationHistory.every(entry => entry.answer.length === 2003)).toBe(true);
+            const totalChars = payload.conversationHistory.reduce(
+                (sum, entry) => sum + entry.query.length + entry.answer.length,
+                0
+            );
+            expect(totalChars).toBeLessThanOrEqual(15000);
         });
     });
 });

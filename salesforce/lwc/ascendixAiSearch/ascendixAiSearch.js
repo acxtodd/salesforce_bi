@@ -5,6 +5,11 @@ import callAnswerEndpoint from '@salesforce/apex/AscendixAISearchController.call
 import callActionEndpoint from '@salesforce/apex/AscendixAISearchController.callActionEndpoint';
 import getCurrentUserId from '@salesforce/apex/AscendixAISearchController.getCurrentUserId';
 
+const MAX_CONVERSATION_TURNS = 10;
+const MAX_CONVERSATION_CHARS = 15000;
+const MAX_CONVERSATION_QUERY_CHARS = 500;
+const MAX_CONVERSATION_ANSWER_CHARS = 2000;
+
 export default class AscendixAiSearch extends NavigationMixin(LightningElement) {
 
     constructor() {
@@ -78,6 +83,8 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     _pendingPriorContext = null;
     @track selectedModelId = '';
     @track lastModelUsed = '';
+    requestSequence = 0;
+    activeRequestToken = null;
 
     @api
     get recordId() {
@@ -477,11 +484,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             this.isStreaming = true;
             this.showAnswerSection = true;
 
-            this.callAnswerEndpoint(this.lastRequestBody)
-                .catch(error => this.handleError(error))
-                .finally(() => {
-                    this.isStreaming = false;
-                });
+            this.runAnswerRequest(this.lastRequestBody);
         }
     }
 
@@ -566,45 +569,43 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
 
     // Core functionality methods
     async streamAnswer() {
+        const requestBody = {
+            query: this.queryText,
+            sessionId: this.sessionId,
+            ...(this.recordId ? { recordId: this.recordId } : {}),
+            ...(this.selectedModelId ? { modelId: this.selectedModelId } : {}),
+            ...(this.isRecordPage && this.conversationHistory.length > 0
+                ? { conversationHistory: this.buildConversationHistoryPayload() }
+                : {}),
+            ...(this._pendingPriorContext ? { priorContext: this._pendingPriorContext } : {})
+        };
+
+        // Store for retry
+        this.lastRequestBody = requestBody;
+        this._pendingPriorContext = null;
+
+        await this.runAnswerRequest(requestBody);
+    }
+
+    async runAnswerRequest(requestBody) {
+        const requestToken = this.beginRequest();
+
         try {
-            // Create abort controller for this request if supported
-            if (typeof AbortController !== 'undefined') {
-                this.currentAbortController = new AbortController();
-            } else {
-                this.currentAbortController = null;
-            }
-
-            const requestBody = {
-                query: this.queryText,
-                sessionId: this.sessionId,
-                ...(this.recordId ? { recordId: this.recordId } : {}),
-                ...(this.selectedModelId ? { modelId: this.selectedModelId } : {}),
-                ...(this.isRecordPage && this.conversationHistory.length > 0
-                    ? {
-                        conversationHistory: this.conversationHistory.map(exchange => ({
-                            query: exchange.query,
-                            answer: exchange.answer
-                        }))
-                    }
-                    : {}),
-                ...(this._pendingPriorContext ? { priorContext: this._pendingPriorContext } : {})
-            };
-
-            // Store for retry
-            this.lastRequestBody = requestBody;
-            this._pendingPriorContext = null;
-
-            await this.callAnswerEndpoint(requestBody);
-
+            await this.callAnswerEndpoint(requestBody, requestToken);
         } catch (error) {
-            this.handleError(error);
+            if (this.isActiveRequest(requestToken)) {
+                this.handleError(error);
+            }
         } finally {
-            this.isStreaming = false;
-            this.currentAbortController = null;
+            if (this.isActiveRequest(requestToken)) {
+                this.isStreaming = false;
+                this.currentAbortController = null;
+                this.activeRequestToken = null;
+            }
         }
     }
 
-    async callAnswerEndpoint(requestBody) {
+    async callAnswerEndpoint(requestBody, requestToken) {
         try {
             // Since Salesforce doesn't support true SSE streaming in LWC,
             // we'll simulate streaming by chunking the response
@@ -617,7 +618,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             const response = await callAnswerEndpoint({ requestBodyJson });
 
             // Process the response
-            if (response) {
+            if (response && this.isActiveRequest(requestToken)) {
                 // Extract answer and citations
                 const answerText = response.answer || '';
                 const citationsData = response.citations || [];
@@ -626,7 +627,10 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                 this.processCitations(citationsData);
 
                 // Simulate streaming by displaying answer in chunks
-                await this.simulateStreaming(answerText);
+                await this.simulateStreaming(answerText, requestToken);
+                if (!this.isActiveRequest(requestToken)) {
+                    return;
+                }
 
                 // Capture model used for display
                 if (response.modelId) {
@@ -671,12 +675,16 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         }
     }
 
-    async simulateStreaming(fullText) {
+    async simulateStreaming(fullText, requestToken = null) {
         // Simulate streaming by revealing text in chunks
         const chunkSize = 10; // words per chunk
         const words = fullText.split(' ');
 
         for (let i = 0; i < words.length; i += chunkSize) {
+            if (requestToken && !this.isActiveRequest(requestToken)) {
+                return;
+            }
+
             const chunk = words.slice(i, i + chunkSize).join(' ');
             this.answer += (this.answer ? ' ' : '') + chunk;
 
@@ -895,7 +903,76 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 
+    beginRequest() {
+        this.invalidateActiveRequest(false);
+
+        if (typeof AbortController !== 'undefined') {
+            this.currentAbortController = new AbortController();
+        } else {
+            this.currentAbortController = null;
+        }
+
+        this.requestSequence += 1;
+        this.activeRequestToken = this.requestSequence;
+        return this.activeRequestToken;
+    }
+
+    invalidateActiveRequest(clearStreamingState = true) {
+        this.activeRequestToken = null;
+
+        if (this.currentAbortController) {
+            this.currentAbortController.abort();
+            this.currentAbortController = null;
+        }
+
+        if (clearStreamingState) {
+            this.isStreaming = false;
+        }
+    }
+
+    isActiveRequest(requestToken) {
+        return requestToken !== null && requestToken === this.activeRequestToken;
+    }
+
+    trimConversationText(text, maxLength) {
+        const trimmed = typeof text === 'string' ? text.trim() : '';
+        if (!trimmed) return '';
+        if (trimmed.length <= maxLength) return trimmed;
+        return trimmed.slice(0, maxLength) + '...';
+    }
+
+    buildConversationHistoryPayload() {
+        const normalizedReversed = [];
+        let totalChars = 0;
+
+        for (let i = this.conversationHistory.length - 1; i >= 0; i -= 1) {
+            const exchange = this.conversationHistory[i] || {};
+            const query = this.trimConversationText(exchange.query, MAX_CONVERSATION_QUERY_CHARS);
+            const answer = this.trimConversationText(exchange.answer, MAX_CONVERSATION_ANSWER_CHARS);
+
+            if (!query || !answer) {
+                continue;
+            }
+
+            const exchangeChars = query.length + answer.length;
+            if (totalChars + exchangeChars > MAX_CONVERSATION_CHARS) {
+                break;
+            }
+
+            normalizedReversed.push({ query, answer });
+            totalChars += exchangeChars;
+
+            if (normalizedReversed.length >= MAX_CONVERSATION_TURNS) {
+                break;
+            }
+        }
+
+        normalizedReversed.reverse();
+        return normalizedReversed;
+    }
+
     _resetConversation() {
+        this.invalidateActiveRequest();
         this.conversationHistory = [];
         this.answer = '';
         this.citations = [];

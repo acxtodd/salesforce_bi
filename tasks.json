@@ -3198,7 +3198,7 @@
           "status": "review",
           "owner": "Todd Terry",
           "createdAt": "2026-03-22T10:39:44.783501+00:00",
-          "updatedAt": "2026-03-22T15:51:04.999161+00:00",
+          "updatedAt": "2026-03-22T16:19:34.940892+00:00",
           "files_modified": [
             "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html",
             "salesforce/lwc/ascendixAiSearch/__tests__/ascendixAiSearch.test.js",
@@ -3227,6 +3227,10 @@
             {
               "timestamp": "2026-03-22T15:51:05.000546+00:00",
               "note": "Open PR #8 ready for review: https://github.com/acxtodd/salesforce_bi/pull/8"
+            },
+            {
+              "timestamp": "2026-03-22T16:19:34.940689+00:00",
+              "note": "Addressed QA review findings: stale in-flight record-page responses are now invalidated on Clear Chat and record navigation, and the LWC now prunes conversationHistory client-side before serialization. Re-ran targeted LWC suite covering submissions, citations, clarifications, record-page history, stale-response suppression, and client-side pruning via sfdx-lwc-jest (20 passed)."
             }
           ],
           "description": "Add multi-turn chat history to the LWC when embedded on a record page. Session persists until user navigates away or clicks Clear. Enables natural follow-up conversations (e.g., 'tell me about this record' → follow-up suggestions → user clicks one → context carries forward). Global search tab stays single-turn. Implementation: LWC accumulates messages array, Lambda accepts full conversation history for Bedrock Converse, session resets on recordId change. Watch token cost growth and 29s Lambda timeout on long conversations.",

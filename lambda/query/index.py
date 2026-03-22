@@ -182,6 +182,25 @@ def handler(event: dict, context: Any) -> dict:
     record_name = body.get("record_name", "")
     model_id_override = body.get("model_id", "")
 
+    prior_context = body.get("prior_context")
+    if prior_context:
+        if (
+            not isinstance(prior_context, dict)
+            or not isinstance(prior_context.get("query"), str)
+            or not isinstance(prior_context.get("answer"), str)
+            or not prior_context["query"].strip()
+            or not prior_context["answer"].strip()
+        ):
+            prior_context = None
+        else:
+            pc_query = prior_context["query"].strip()
+            pc_answer = prior_context["answer"].strip()
+            if len(pc_query) > 500:
+                pc_query = pc_query[:500] + "..."
+            if len(pc_answer) > 2000:
+                pc_answer = pc_answer[:2000] + "..."
+            prior_context = {"query": pc_query, "answer": pc_answer}
+
     errors: list[str] = []
     if not question or not isinstance(question, str) or not question.strip():
         errors.append("question is required")
@@ -249,7 +268,7 @@ def handler(event: dict, context: Any) -> dict:
                 f"[The user is viewing Salesforce record {record_id}.] "
                 f"{question}"
             )
-        result: QueryResult = qh.query(effective_question)
+        result: QueryResult = qh.query(effective_question, prior_context=prior_context)
     except Exception as exc:
         logger.exception("QueryHandler failed")
         return {

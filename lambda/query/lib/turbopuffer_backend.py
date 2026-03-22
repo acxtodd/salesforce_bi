@@ -393,7 +393,7 @@ class TurbopufferBackend(SearchBackend):
 
         # Turbopuffer has no native server-side aggregation, so we fetch
         # matching rows and compute in Python.
-        attrs_to_fetch: list[str] = ["name"]
+        attrs_to_fetch: list[str] = []
         if aggregate_field:
             attrs_to_fetch.append(aggregate_field)
         if group_by:
@@ -448,7 +448,7 @@ class TurbopufferBackend(SearchBackend):
 
         # Compute aggregation locally ------------------------------------
         if group_by:
-            groups: dict[str, dict] = defaultdict(lambda: {"_values": [], "_record_id": None, "_record_name": None})
+            groups: dict[str, dict] = defaultdict(lambda: {"_values": []})
             for row in result.rows:
                 key = str(getattr(row, group_by, "__none__"))
                 if aggregate_field:
@@ -459,19 +459,12 @@ class TurbopufferBackend(SearchBackend):
                         groups[key].setdefault("_values", [])
                 else:
                     groups[key]["_values"].append(1)
-                # Capture first record ID per group for citation linking
-                if groups[key]["_record_id"] is None:
-                    groups[key]["_record_id"] = row.id
-                    groups[key]["_record_name"] = getattr(row, "name", None) or key
 
             out_groups: dict[str, dict] = {}
-            records: list[dict] = []
             for key, info in groups.items():
                 values = info["_values"]
                 out_groups[key] = self._compute_agg(aggregate, values)
-                if info["_record_id"]:
-                    records.append({"id": info["_record_id"], "name": info["_record_name"]})
-            return {"groups": out_groups, "_records": records}
+            return {"groups": out_groups}
 
         # Un-grouped
         values: list = []

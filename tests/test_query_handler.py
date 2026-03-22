@@ -856,3 +856,64 @@ class TestEdgeCases:
         # Should not crash -- the error is handled gracefully.
         assert result.turns == 2
         assert result.tool_calls_made == 1
+
+
+# =========================================================================
+# 10. Prior context (Task 4.14)
+# =========================================================================
+
+class TestPriorContext:
+    """Verify prior_context builds multi-turn message history."""
+
+    def test_no_prior_context_single_user_message(self):
+        """Without prior_context, first call to converse starts with one user message.
+
+        NOTE: messages is a mutable list passed by reference.  After converse
+        returns end_turn, the handler appends the assistant message to the same
+        list.  So by inspection time the list has 2 entries (user + assistant).
+        We verify the first entry is the user question.
+        """
+        bedrock = MagicMock()
+        bedrock.converse.return_value = _end_turn_response("Answer.")
+        handler = _make_handler(bedrock)
+        handler.query("Hello")
+
+        final_messages = bedrock.converse.call_args_list[0][1]["messages"]
+        # 1 user + 1 assistant (appended after converse returned)
+        assert len(final_messages) == 2
+        assert final_messages[0]["role"] == "user"
+        assert final_messages[0]["content"][0]["text"] == "Hello"
+
+    def test_prior_context_builds_three_message_history(self):
+        """With prior_context dict, converse is called with 3 initial messages.
+
+        After the call, the assistant response is appended (total 4).
+        """
+        bedrock = MagicMock()
+        bedrock.converse.return_value = _end_turn_response("Follow-up answer.")
+        handler = _make_handler(bedrock)
+        handler.query(
+            "Show by deal count",
+            prior_context={"query": "Top markets", "answer": "Which metric?"},
+        )
+
+        final_messages = bedrock.converse.call_args_list[0][1]["messages"]
+        # 3 initial + 1 assistant appended after converse returned
+        assert len(final_messages) == 4
+        assert final_messages[0]["role"] == "user"
+        assert final_messages[0]["content"][0]["text"] == "Top markets"
+        assert final_messages[1]["role"] == "assistant"
+        assert final_messages[1]["content"][0]["text"] == "Which metric?"
+        assert final_messages[2]["role"] == "user"
+        assert final_messages[2]["content"][0]["text"] == "Show by deal count"
+
+    def test_prior_context_none_same_as_absent(self):
+        """prior_context=None produces single user message (same as no arg)."""
+        bedrock = MagicMock()
+        bedrock.converse.return_value = _end_turn_response("Answer.")
+        handler = _make_handler(bedrock)
+        handler.query("Hello", prior_context=None)
+
+        final_messages = bedrock.converse.call_args_list[0][1]["messages"]
+        assert len(final_messages) == 2
+        assert final_messages[0]["role"] == "user"

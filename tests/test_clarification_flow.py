@@ -87,3 +87,29 @@ class TestQueryResultClarifications:
         qr = QueryResult(answer="hello", clarification_options=opts)
         assert len(qr.clarification_options) == 1
         assert qr.clarification_options[0]["label"] == "A"
+
+
+# ---------------------------------------------------------------------------
+# Regression: clarify pill queries are self-contained (Task 4.14)
+# ---------------------------------------------------------------------------
+
+
+class TestClarifyPillsAreFullQueries:
+    """Verify that CLARIFY query values are complete, self-contained queries."""
+
+    def test_clarify_pills_are_full_executable_queries(self):
+        answers = [
+            "Which metric?\n[CLARIFY:By deal count|Show top 5 markets by deal count]",
+            "Which ranking?\n[CLARIFY:Tenant reps by deal value|Top 10 tenant rep brokers by gross deal value]",
+        ]
+        expected_queries = [
+            "Show top 5 markets by deal count",
+            "Top 10 tenant rep brokers by gross deal value",
+        ]
+        for answer, expected in zip(answers, expected_queries):
+            _, options = extract_clarifications(answer)
+            assert len(options) == 1
+            query = options[0]["query"]
+            assert query == expected
+            # A self-contained query should have at least 3 words
+            assert len(query.split()) >= 3, f"Query too short to be self-contained: {query}"

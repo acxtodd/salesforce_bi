@@ -531,3 +531,150 @@ class TestAnswerChunking:
     def test_no_split_points(self):
         chunks = _mod._split_answer_into_chunks("No punctuation ending here")
         assert chunks == ["No punctuation ending here"]
+
+
+# ---------------------------------------------------------------------------
+# 11. Prior context pass-through (Task 4.14)
+# ---------------------------------------------------------------------------
+
+class TestPriorContext:
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_prior_context_passed_to_query_handler(self, MockQH, MockBackend, mock_boto3):
+        """Dict with query+answer is forwarded to qh.query()."""
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Show by deal count",
+            "org_id": "00Ddl000003yx57EAA",
+            "prior_context": {"query": "Top markets", "answer": "Which metric?"},
+        })
+
+        call_kwargs = mock_qh_instance.query.call_args
+        assert call_kwargs[1]["prior_context"] == {"query": "Top markets", "answer": "Which metric?"}
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_no_prior_context_passes_none(self, MockQH, MockBackend, mock_boto3):
+        """Absent field passes None."""
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({"question": "Find offices", "org_id": "00Ddl000003yx57EAA"})
+
+        call_kwargs = mock_qh_instance.query.call_args
+        assert call_kwargs[1]["prior_context"] is None
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_malformed_prior_context_dropped(self, MockQH, MockBackend, mock_boto3):
+        """Missing answer key -> None."""
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Q",
+            "org_id": "org1",
+            "prior_context": {"query": "Top markets"},
+        })
+
+        call_kwargs = mock_qh_instance.query.call_args
+        assert call_kwargs[1]["prior_context"] is None
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_non_string_prior_context_fields_dropped(self, MockQH, MockBackend, mock_boto3):
+        """{"query": {}, "answer": []} -> None."""
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Q",
+            "org_id": "org1",
+            "prior_context": {"query": {}, "answer": []},
+        })
+
+        call_kwargs = mock_qh_instance.query.call_args
+        assert call_kwargs[1]["prior_context"] is None
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_non_dict_prior_context_dropped(self, MockQH, MockBackend, mock_boto3):
+        """"just a string" -> None."""
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Q",
+            "org_id": "org1",
+            "prior_context": "just a string",
+        })
+
+        call_kwargs = mock_qh_instance.query.call_args
+        assert call_kwargs[1]["prior_context"] is None
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_long_answer_truncated(self, MockQH, MockBackend, mock_boto3):
+        """5000-char answer -> 2003 chars."""
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        long_answer = "x" * 5000
+        _invoke({
+            "question": "Q",
+            "org_id": "org1",
+            "prior_context": {"query": "short", "answer": long_answer},
+        })
+
+        call_kwargs = mock_qh_instance.query.call_args
+        pc = call_kwargs[1]["prior_context"]
+        assert pc is not None
+        assert len(pc["answer"]) == 2003
+        assert pc["answer"].endswith("...")
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_long_query_truncated(self, MockQH, MockBackend, mock_boto3):
+        """1000-char query -> 503 chars."""
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        long_query = "q" * 1000
+        _invoke({
+            "question": "Q",
+            "org_id": "org1",
+            "prior_context": {"query": long_query, "answer": "short"},
+        })
+
+        call_kwargs = mock_qh_instance.query.call_args
+        pc = call_kwargs[1]["prior_context"]
+        assert pc is not None
+        assert len(pc["query"]) == 503
+        assert pc["query"].endswith("...")
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_whitespace_only_fields_dropped(self, MockQH, MockBackend, mock_boto3):
+        """{"query": "  ", "answer": " "} -> None."""
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Q",
+            "org_id": "org1",
+            "prior_context": {"query": "  ", "answer": " "},
+        })
+
+        call_kwargs = mock_qh_instance.query.call_args
+        assert call_kwargs[1]["prior_context"] is None

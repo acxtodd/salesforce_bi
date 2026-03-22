@@ -3142,6 +3142,25 @@
           ],
           "gate_criteria": "Use the leaderboard/aggregation guard design before adding clarification UX so the UI is solving the right ambiguity classes.",
           "completedAt": "2026-03-20T10:55:40.552567+00:00"
+        },
+        {
+          "id": "4.14",
+          "title": "Pass prior exchange as context when user clicks a clarification button",
+          "status": "in_progress",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-22T12:30:28.761821+00:00",
+          "updatedAt": "2026-03-22T12:30:34.057307+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T12:30:34.057309+00:00",
+              "note": "Started by Todd Terry"
+            }
+          ],
+          "description": "When user clicks a clarification pill, pass the prior query+answer as context so the LLM understands the conversational flow.",
+          "startedAt": "2026-03-22T12:30:34.056965+00:00"
         }
       ]
     },
@@ -3179,7 +3198,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 14,
+      "4.": 15,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

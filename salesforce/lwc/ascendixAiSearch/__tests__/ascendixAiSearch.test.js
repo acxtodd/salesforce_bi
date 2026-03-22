@@ -1991,9 +1991,67 @@ describe('c-ascendix-ai-search', () => {
             expect(element.clarificationOptions).toEqual([]);
         });
 
-        it('should resubmit with clarification query on pill click', async () => {
+        it('should resubmit with clarification query on pill click and include priorContext', async () => {
+            // First response sets up lastExchange
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'Which metric did you mean?',
+                citations: [],
+                clarificationOptions: [
+                    { label: 'By deal count', query: 'Top 5 markets by deal count' },
+                    { label: 'By revenue', query: 'Top 5 markets by revenue' }
+                ]
+            });
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            await flushPromises();
+
+            // Submit initial query to populate lastExchange
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Top markets';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Top markets' }
+            }));
+
+            await flushPromises();
+
+            const submitButton = element.shadowRoot.querySelector('.submit-button');
+            submitButton.click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Now mock the follow-up response
             callAnswerEndpoint.mockResolvedValue({
                 answer: 'Here are the top 5 markets by deal count.',
+                citations: []
+            });
+
+            // Find and click a clarification button
+            const clarifyButtons = element.shadowRoot.querySelectorAll('.clarification-options lightning-button');
+            if (clarifyButtons && clarifyButtons.length > 0) {
+                const btn = clarifyButtons[0];
+                btn.dispatchEvent(new CustomEvent('click', { bubbles: true }));
+
+                await flushPromises();
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Verify callAnswerEndpoint was called with priorContext
+                const lastCall = callAnswerEndpoint.mock.calls[callAnswerEndpoint.mock.calls.length - 1];
+                const parsedBody = JSON.parse(lastCall[0].requestBodyJson);
+                expect(parsedBody.priorContext).toBeDefined();
+                expect(parsedBody.priorContext.query).toBe('Top markets');
+                expect(parsedBody.priorContext.answer).toBe('Which metric did you mean?');
+            }
+        });
+
+        it('should NOT include priorContext on normal typed submission', async () => {
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'Some answer.',
                 citations: []
             });
             getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
@@ -2005,28 +2063,25 @@ describe('c-ascendix-ai-search', () => {
 
             await flushPromises();
 
-            // Set clarification options directly
-            element.clarificationOptions = [
-                { key: 'c-0', label: 'By deal count', query: 'Top 5 markets by deal count' },
-                { key: 'c-1', label: 'By revenue', query: 'Top 5 markets by revenue' }
-            ];
-            element.showAnswerSection = true;
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Find offices in Dallas';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Find offices in Dallas' }
+            }));
 
             await flushPromises();
 
-            // Find and click a clarification button
-            const clarifyButtons = element.shadowRoot.querySelectorAll('.clarification-options lightning-button');
-            if (clarifyButtons && clarifyButtons.length > 0) {
-                // Simulate click with dataset
-                const btn = clarifyButtons[0];
-                btn.dispatchEvent(new CustomEvent('click', { bubbles: true }));
+            const submitButton = element.shadowRoot.querySelector('.submit-button');
+            submitButton.click();
 
-                await flushPromises();
-                await new Promise(resolve => setTimeout(resolve, 100));
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Verify that callAnswerEndpoint was called
-                expect(callAnswerEndpoint).toHaveBeenCalled();
-            }
+            // Verify callAnswerEndpoint was called without priorContext
+            expect(callAnswerEndpoint).toHaveBeenCalled();
+            const lastCall = callAnswerEndpoint.mock.calls[callAnswerEndpoint.mock.calls.length - 1];
+            const parsedBody = JSON.parse(lastCall[0].requestBodyJson);
+            expect(parsedBody.priorContext).toBeUndefined();
         });
     });
 });

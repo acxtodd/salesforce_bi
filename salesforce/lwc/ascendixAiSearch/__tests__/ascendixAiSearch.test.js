@@ -527,6 +527,7 @@ describe('c-ascendix-ai-search', () => {
             const payload = JSON.parse(callArgs.requestBodyJson);
             expect(payload.query).toBe('Find Class A properties');
             expect(payload.sessionId).toBeTruthy();
+            expect(payload.priorContext).toBeUndefined();
             // No legacy fields in payload
             expect(payload.salesforceUserId).toBeUndefined();
             expect(payload.topK).toBeUndefined();
@@ -1973,7 +1974,6 @@ describe('c-ascendix-ai-search', () => {
 
             await flushPromises();
 
-            // Enter new query
             const textarea = element.shadowRoot.querySelector('lightning-textarea');
             textarea.value = 'New query';
             textarea.dispatchEvent(new CustomEvent('change', {
@@ -1992,10 +1992,19 @@ describe('c-ascendix-ai-search', () => {
         });
 
         it('should resubmit with clarification query on pill click', async () => {
-            callAnswerEndpoint.mockResolvedValue({
-                answer: 'Here are the top 5 markets by deal count.',
-                citations: []
-            });
+            callAnswerEndpoint
+                .mockResolvedValueOnce({
+                    answer: 'Which metric did you mean?',
+                    citations: [],
+                    clarificationOptions: [
+                        { label: 'By deal count', query: 'Top 5 markets by deal count' },
+                        { label: 'By revenue', query: 'Top 5 markets by revenue' }
+                    ]
+                })
+                .mockResolvedValueOnce({
+                    answer: 'Here are the top 5 markets by deal count.',
+                    citations: []
+                });
             getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
 
             const element = createElement('c-ascendix-ai-search', {
@@ -2005,28 +2014,37 @@ describe('c-ascendix-ai-search', () => {
 
             await flushPromises();
 
-            // Set clarification options directly
-            element.clarificationOptions = [
-                { key: 'c-0', label: 'By deal count', query: 'Top 5 markets by deal count' },
-                { key: 'c-1', label: 'By revenue', query: 'Top 5 markets by revenue' }
-            ];
-            element.showAnswerSection = true;
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Top markets';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Top markets' }
+            }));
 
             await flushPromises();
 
-            // Find and click a clarification button
+            const submitButton = element.shadowRoot.querySelector('.submit-button');
+            submitButton.click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(callAnswerEndpoint).toHaveBeenCalledTimes(1);
             const clarifyButtons = element.shadowRoot.querySelectorAll('.clarification-options lightning-button');
-            if (clarifyButtons && clarifyButtons.length > 0) {
-                // Simulate click with dataset
-                const btn = clarifyButtons[0];
-                btn.dispatchEvent(new CustomEvent('click', { bubbles: true }));
+            expect(clarifyButtons).toHaveLength(2);
 
-                await flushPromises();
-                await new Promise(resolve => setTimeout(resolve, 100));
+            clarifyButtons[0].dispatchEvent(new CustomEvent('click', { bubbles: true }));
 
-                // Verify that callAnswerEndpoint was called
-                expect(callAnswerEndpoint).toHaveBeenCalled();
-            }
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(callAnswerEndpoint).toHaveBeenCalledTimes(2);
+            const callArgs = callAnswerEndpoint.mock.calls[1][0];
+            const payload = JSON.parse(callArgs.requestBodyJson);
+            expect(payload.query).toBe('Top 5 markets by deal count');
+            expect(payload.priorContext).toEqual({
+                query: 'Top markets',
+                answer: 'Which metric did you mean?'
+            });
         });
     });
 });

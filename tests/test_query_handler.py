@@ -6,6 +6,7 @@ All tests use mocked Bedrock client and SearchBackend -- no real API calls.
 from __future__ import annotations
 
 import sys
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
@@ -856,3 +857,69 @@ class TestEdgeCases:
         # Should not crash -- the error is handled gracefully.
         assert result.turns == 2
         assert result.tool_calls_made == 1
+
+
+# =========================================================================
+# 10. Prior context replay
+# =========================================================================
+
+class TestPriorContext:
+    """Prior context is replayed as a one-turn user/assistant history."""
+
+    def test_no_prior_context_single_user_message(self):
+        bedrock = MagicMock()
+        captured_messages: list[list[dict]] = []
+
+        def _capture(**kwargs):
+            captured_messages.append(deepcopy(kwargs["messages"]))
+            return _end_turn_response("Answer.")
+
+        bedrock.converse.side_effect = _capture
+
+        handler = _make_handler(bedrock)
+        handler.query("Clarified question")
+
+        assert captured_messages[0] == [
+            {"role": "user", "content": [{"text": "Clarified question"}]}
+        ]
+
+    def test_prior_context_builds_three_message_history(self):
+        bedrock = MagicMock()
+        captured_messages: list[list[dict]] = []
+
+        def _capture(**kwargs):
+            captured_messages.append(deepcopy(kwargs["messages"]))
+            return _end_turn_response("Answer.")
+
+        bedrock.converse.side_effect = _capture
+
+        handler = _make_handler(bedrock)
+        handler.query(
+            "Top 5 markets by deal count",
+            prior_context={
+                "query": "Top markets",
+                "answer": "Which metric did you mean?",
+            },
+        )
+
+        assert captured_messages[0] == [
+            {"role": "user", "content": [{"text": "Top markets"}]},
+            {"role": "assistant", "content": [{"text": "Which metric did you mean?"}]},
+            {"role": "user", "content": [{"text": "Top 5 markets by deal count"}]},
+        ]
+
+    def test_prior_context_none_same_as_absent(self):
+        bedrock_without_context = MagicMock()
+        bedrock_without_context.converse.return_value = _end_turn_response("Answer.")
+        handler_without_context = _make_handler(bedrock_without_context)
+        handler_without_context.query("Clarified question")
+
+        bedrock_with_none = MagicMock()
+        bedrock_with_none.converse.return_value = _end_turn_response("Answer.")
+        handler_with_none = _make_handler(bedrock_with_none)
+        handler_with_none.query("Clarified question", prior_context=None)
+
+        assert (
+            bedrock_without_context.converse.call_args[1]["messages"]
+            == bedrock_with_none.converse.call_args[1]["messages"]
+        )

@@ -37,6 +37,8 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     currentUserId = null;
     streamingChunkBuffer = '';
     lastRequestBody = null;
+    lastExchange = null;
+    _pendingPriorContext = null;
     @track selectedModelId = '';
     @track lastModelUsed = '';
 
@@ -377,6 +379,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.answer = '';
         this.citations = [];
         this.clarificationOptions = [];
+        this.lastExchange = null;
         this.errorMessage = '';
         this.showRetryButton = false;
         this.showAnswerSection = true;
@@ -389,6 +392,9 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     handleClarificationClick(event) {
         const query = event.currentTarget.dataset.query;
         if (query) {
+            this._pendingPriorContext = this.lastExchange
+                ? { query: this.lastExchange.query, answer: this.lastExchange.answer }
+                : null;
             this.queryText = query;
             this.clarificationOptions = [];
             this.handleSubmit();
@@ -504,11 +510,13 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                 query: this.queryText,
                 sessionId: this.sessionId,
                 ...(this.recordId ? { recordId: this.recordId } : {}),
-                ...(this.selectedModelId ? { modelId: this.selectedModelId } : {})
+                ...(this.selectedModelId ? { modelId: this.selectedModelId } : {}),
+                ...(this._pendingPriorContext ? { priorContext: this._pendingPriorContext } : {})
             };
 
             // Store for retry
             this.lastRequestBody = requestBody;
+            this._pendingPriorContext = null;
 
             await this.callAnswerEndpoint(requestBody);
 
@@ -557,6 +565,11 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                         query: opt.query
                     }));
                 }
+
+                this.lastExchange = {
+                    query: requestBody.query,
+                    answer: answerText
+                };
 
                 // Check for special cases
                 if (response.reason === 'no_accessible_results') {

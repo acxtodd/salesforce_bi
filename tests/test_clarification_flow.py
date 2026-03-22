@@ -69,6 +69,26 @@ class TestExtractClarifications:
         assert "Done." in clean
         assert "[CLARIFY:" not in clean
 
+    def test_clarify_pills_are_full_executable_queries(self):
+        answer = (
+            "Which ranking did you mean?\n"
+            "[CLARIFY:By deal count|Show top 5 markets by deal count]\n"
+            "[CLARIFY:Tenant reps by deal value|Top 10 tenant rep brokers by gross deal value]\n"
+        )
+
+        _, options = extract_clarifications(answer)
+
+        assert options == [
+            {
+                "label": "By deal count",
+                "query": "Show top 5 markets by deal count",
+            },
+            {
+                "label": "Tenant reps by deal value",
+                "query": "Top 10 tenant rep brokers by gross deal value",
+            },
+        ]
+
 
 # ---------------------------------------------------------------------------
 # QueryResult field

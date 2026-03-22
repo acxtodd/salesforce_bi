@@ -82,6 +82,11 @@ _MODEL_ID = os.getenv(
     "BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0"
 )
 
+_CONVERSATION_HISTORY_MAX_TURNS = 10
+_CONVERSATION_HISTORY_MAX_CHARS = 15_000
+_CONVERSATION_HISTORY_MAX_QUERY_CHARS = 500
+_CONVERSATION_HISTORY_MAX_ANSWER_CHARS = 2_000
+
 
 # ---------------------------------------------------------------------------
 # SSE helpers
@@ -138,6 +143,59 @@ def _parse_body(event: dict) -> dict:
     return json.loads(body_raw)
 
 
+def _normalize_context_exchange(exchange: Any) -> dict[str, str] | None:
+    """Validate and trim a single query/answer exchange."""
+    if not isinstance(exchange, dict):
+        return None
+
+    query = exchange.get("query")
+    answer = exchange.get("answer")
+    if not isinstance(query, str) or not isinstance(answer, str):
+        return None
+
+    query = query.strip()
+    answer = answer.strip()
+    if not query or not answer:
+        return None
+
+    if len(query) > _CONVERSATION_HISTORY_MAX_QUERY_CHARS:
+        query = query[:_CONVERSATION_HISTORY_MAX_QUERY_CHARS] + "..."
+    if len(answer) > _CONVERSATION_HISTORY_MAX_ANSWER_CHARS:
+        answer = answer[:_CONVERSATION_HISTORY_MAX_ANSWER_CHARS] + "..."
+
+    return {"query": query, "answer": answer}
+
+
+def _normalize_conversation_history(raw_history: Any) -> list[dict[str, str]] | None:
+    """Validate, trim, and cap conversation history with a sliding window."""
+    if not isinstance(raw_history, list):
+        return None
+
+    normalized_reversed: list[dict[str, str]] = []
+    total_chars = 0
+
+    for exchange in reversed(raw_history):
+        normalized_exchange = _normalize_context_exchange(exchange)
+        if normalized_exchange is None:
+            continue
+
+        exchange_chars = len(normalized_exchange["query"]) + len(normalized_exchange["answer"])
+        if total_chars + exchange_chars > _CONVERSATION_HISTORY_MAX_CHARS:
+            break
+
+        normalized_reversed.append(normalized_exchange)
+        total_chars += exchange_chars
+
+        if len(normalized_reversed) >= _CONVERSATION_HISTORY_MAX_TURNS:
+            break
+
+    if not normalized_reversed:
+        return None
+
+    normalized_reversed.reverse()
+    return normalized_reversed
+
+
 # ---------------------------------------------------------------------------
 # Lambda handler
 # ---------------------------------------------------------------------------
@@ -181,24 +239,10 @@ def handler(event: dict, context: Any) -> dict:
     record_type = body.get("record_type", "")
     record_name = body.get("record_name", "")
     model_id_override = body.get("model_id", "")
-    prior_context = body.get("prior_context")
-    if prior_context is not None:
-        if (
-            not isinstance(prior_context, dict)
-            or not isinstance(prior_context.get("query"), str)
-            or not isinstance(prior_context.get("answer"), str)
-            or not prior_context["query"].strip()
-            or not prior_context["answer"].strip()
-        ):
-            prior_context = None
-        else:
-            pc_query = prior_context["query"].strip()
-            pc_answer = prior_context["answer"].strip()
-            if len(pc_query) > 500:
-                pc_query = pc_query[:500] + "..."
-            if len(pc_answer) > 2000:
-                pc_answer = pc_answer[:2000] + "..."
-            prior_context = {"query": pc_query, "answer": pc_answer}
+    conversation_history = _normalize_conversation_history(body.get("conversation_history"))
+    prior_context = _normalize_context_exchange(body.get("prior_context"))
+    if conversation_history is None and prior_context is not None:
+        conversation_history = [prior_context]
 
     errors: list[str] = []
     if not question or not isinstance(question, str) or not question.strip():
@@ -269,7 +313,7 @@ def handler(event: dict, context: Any) -> dict:
             )
         result: QueryResult = qh.query(
             effective_question,
-            prior_context=prior_context,
+            conversation_history=conversation_history,
         )
     except Exception as exc:
         logger.exception("QueryHandler failed")

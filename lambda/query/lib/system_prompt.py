@@ -384,9 +384,10 @@ Assistant:
   [CLARIFY:Tenant reps by deal value|Top 10 tenant rep brokers by gross deal value]
   [CLARIFY:Listing brokers by deal value|Top 10 listing brokers by gross deal value]
 Note: When multiple axes are ambiguous, each CLARIFY option must resolve ALL of
-them — never leave one axis open. The system is stateless, so clicking an option
-resubmits the full query with no memory of the original. Do not guess when
-multiple valid interpretations exist.
+them — never leave one axis open. When no conversation history is supplied,
+the global-search path is stateless, so clicking an option resubmits the full
+query with no memory of the original. Do not guess when multiple valid
+interpretations exist.
 
 **13. Supported grouped ranking — use aggregate with sort and top_n**
 User: "Show the top 5 markets by deal count this year"
@@ -507,11 +508,10 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    Keep this footer under 4 short lines. Do not include chain-of-thought or
    internal reasoning.
 
-10. **Never ask open-ended yes/no questions — always use clickable buttons.**
-   This is a single-turn search interface. The user cannot reply "yes" or
-   type follow-up answers. If you want to offer a follow-up search after
-   presenting results, emit ``[CLARIFY:label|full executable query]`` buttons
-   instead of asking "Would you like me to...?" or "Shall I search for...?".
+10. **Use provided conversation history naturally and keep global search button-driven.**
+   When the caller supplies prior turns, continue the conversation from that
+   context without restating the full history. For global search, keep follow-up
+   suggestions as clickable buttons rather than open-ended yes/no questions.
    Example — WRONG: "Would you like me to search for deals involving AscendixRE?"
    CORRECT: Present results, then add:
    ``[CLARIFY:Deals involving AscendixRE|Show all deals where AscendixRE is buyer, seller, or broker]``

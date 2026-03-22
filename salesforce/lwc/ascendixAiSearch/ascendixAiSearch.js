@@ -7,10 +7,47 @@ import getCurrentUserId from '@salesforce/apex/AscendixAISearchController.getCur
 
 export default class AscendixAiSearch extends NavigationMixin(LightningElement) {
 
-    @api recordId; // Current record ID for context
+    constructor() {
+        super();
+        this._recordId = null;
+        this.queryText = '';
+        this.answer = '';
+        this.citations = [];
+        this.conversationHistory = [];
+        this.isStreaming = false;
+        this.showAnswerSection = false;
+        this.showCitationsDrawer = false;
+        this.showCitationPreview = false;
+        this.selectedCitation = null;
+        this.errorMessage = '';
+        this.showRetryButton = false;
+        this.clarificationOptions = [];
+        this.selectedFilters = {
+            region: null,
+            businessUnit: null,
+            quarter: null
+        };
+        this.showActionPreview = false;
+        this.actionPreviewData = null;
+        this.isExecutingAction = false;
+        this.actionResultMessage = '';
+        this.actionResultRecordIds = [];
+        this.sessionId = null;
+        this.currentAbortController = null;
+        this.currentUserId = null;
+        this.streamingChunkBuffer = '';
+        this.lastRequestBody = null;
+        this.lastExchange = null;
+        this._pendingPriorContext = null;
+        this.selectedModelId = '';
+        this.lastModelUsed = '';
+    }
+
+    _recordId = null;
     @track queryText = '';
     @api answer = '';
     @track citations = [];
+    @track conversationHistory = [];
     @track isStreaming = false;
     @track showAnswerSection = false;
     @track showCitationsDrawer = false;
@@ -41,6 +78,21 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     _pendingPriorContext = null;
     @track selectedModelId = '';
     @track lastModelUsed = '';
+
+    @api
+    get recordId() {
+        return this._recordId;
+    }
+
+    set recordId(value) {
+        const normalizedValue = value || null;
+        const previousRecordId = this._recordId;
+        this._recordId = normalizedValue;
+
+        if (previousRecordId && previousRecordId !== normalizedValue) {
+            this._resetConversation();
+        }
+    }
 
     get modelOptions() {
         return [
@@ -114,6 +166,14 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
 
     get hasClarificationOptions() {
         return this.clarificationOptions && this.clarificationOptions.length > 0;
+    }
+
+    get isRecordPage() {
+        return !!this._recordId;
+    }
+
+    get showConversationThread() {
+        return this.isRecordPage && Array.isArray(this.conversationHistory) && this.conversationHistory.length > 0;
     }
 
     get formattedAnswer() {
@@ -379,7 +439,9 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.answer = '';
         this.citations = [];
         this.clarificationOptions = [];
-        this.lastExchange = null;
+        if (!this.isRecordPage) {
+            this.lastExchange = null;
+        }
         this.errorMessage = '';
         this.showRetryButton = false;
         this.showAnswerSection = true;
@@ -389,12 +451,18 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.streamAnswer();
     }
 
+    handleClearChat() {
+        this._resetConversation();
+    }
+
     handleClarificationClick(event) {
         const query = event.currentTarget.dataset.query;
         if (query) {
-            this._pendingPriorContext = this.lastExchange
-                ? { query: this.lastExchange.query, answer: this.lastExchange.answer }
-                : null;
+            this._pendingPriorContext = this.isRecordPage
+                ? null
+                : (this.lastExchange
+                    ? { query: this.lastExchange.query, answer: this.lastExchange.answer }
+                    : null);
             this.queryText = query;
             this.clarificationOptions = [];
             this.handleSubmit();
@@ -511,6 +579,14 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                 sessionId: this.sessionId,
                 ...(this.recordId ? { recordId: this.recordId } : {}),
                 ...(this.selectedModelId ? { modelId: this.selectedModelId } : {}),
+                ...(this.isRecordPage && this.conversationHistory.length > 0
+                    ? {
+                        conversationHistory: this.conversationHistory.map(exchange => ({
+                            query: exchange.query,
+                            answer: exchange.answer
+                        }))
+                    }
+                    : {}),
                 ...(this._pendingPriorContext ? { priorContext: this._pendingPriorContext } : {})
             };
 
@@ -564,6 +640,17 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                         label: opt.label,
                         query: opt.query
                     }));
+                }
+
+                if (this.isRecordPage) {
+                    this.conversationHistory = [
+                        ...this.conversationHistory,
+                        {
+                            id: `exchange-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                            query: requestBody.query,
+                            answer: answerText
+                        }
+                    ];
                 }
 
                 this.lastExchange = {
@@ -806,6 +893,25 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     // Helper methods
     generateSessionId() {
         return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    _resetConversation() {
+        this.conversationHistory = [];
+        this.answer = '';
+        this.citations = [];
+        this.clarificationOptions = [];
+        this.lastExchange = null;
+        this.lastRequestBody = null;
+        this._pendingPriorContext = null;
+        this.errorMessage = '';
+        this.showRetryButton = false;
+        this.showAnswerSection = false;
+        this.queryText = '';
+        this.sessionId = this.generateSessionId();
+        this.streamingChunkBuffer = '';
+        this.lastModelUsed = '';
+        this.showCitationsDrawer = false;
+        this.showCitationPreview = false;
     }
 
     getUserId() {

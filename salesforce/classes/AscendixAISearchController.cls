@@ -39,7 +39,9 @@ public with sharing class AscendixAISearchController {
             if (requestBody.containsKey('modelId') && requestBody.get('modelId') != null) {
                 newPayload.put('model_id', (String) requestBody.get('modelId'));
             }
-            if (requestBody.containsKey('priorContext') && requestBody.get('priorContext') != null) {
+            if (requestBody.containsKey('conversationHistory') && requestBody.get('conversationHistory') != null) {
+                newPayload.put('conversation_history', requestBody.get('conversationHistory'));
+            } else if (requestBody.containsKey('priorContext') && requestBody.get('priorContext') != null) {
                 newPayload.put('prior_context', requestBody.get('priorContext'));
             }
 

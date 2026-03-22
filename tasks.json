@@ -3142,6 +3142,31 @@
           ],
           "gate_criteria": "Use the leaderboard/aggregation guard design before adding clarification UX so the UI is solving the right ambiguity classes.",
           "completedAt": "2026-03-20T10:55:40.552567+00:00"
+        },
+        {
+          "id": "4.14",
+          "title": "Pass prior exchange as context when user clicks a clarification button",
+          "status": "review",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-22T11:52:12.008445+00:00",
+          "updatedAt": "2026-03-22T13:02:08.221354+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T13:02:08.221564+00:00",
+              "note": "Implemented in e91d0df and opened PR #6 for QA review."
+            }
+          ],
+          "description": "When a user clicks a clarification button or suggestion pill, the LWC currently sends only the button text as a fresh stateless query. The model receives a decontextualized fragment and cannot continue the prior interaction. Fix: on button click, bundle the prior exchange (original query + agent answer) and pass it to the Lambda as prior_context. The Lambda prepends this as a user+assistant turn pair in the Bedrock Converse messages array, giving Claude the one-turn history it needs to fulfill the clarification. Normal typed queries remain single-turn. This is not full multi-turn conversation (99.1) — it is a single prior-turn replay scoped to button interactions.",
+          "acceptance_criteria": [
+            "Clicking a clarification button or suggestion pill sends the prior exchange (original query text + agent answer text) alongside the button query to the Lambda.",
+            "The Lambda builds a 3-message Converse sequence (prior user, prior assistant, current user) when prior_context is present; omits prior turns when absent.",
+            "Claude's response to a clarification click demonstrates awareness of the prior search context (does not ask the user to re-specify information already established).",
+            "Normal typed queries (non-button submissions) remain single-turn with no prior context attached.",
+            "Token cost increase is bounded to one extra user+assistant turn pair, only on button-click requests."
+          ]
         }
       ]
     },

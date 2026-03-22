@@ -178,6 +178,8 @@ def handler(event: dict, context: Any) -> dict:
     org_id = body.get("org_id")
     session_id = body.get("session_id", "")
     record_id = body.get("record_id", "")
+    record_type = body.get("record_type", "")
+    record_name = body.get("record_name", "")
     model_id_override = body.get("model_id", "")
 
     errors: list[str] = []
@@ -234,11 +236,17 @@ def handler(event: dict, context: Any) -> dict:
             system_prompt=_SYSTEM_PROMPT,
             tool_definitions=_TOOL_DEFINITIONS,
         )
-        # Prepend record context so Claude knows which record the user is viewing.
+        # Prepend record context so the LLM knows which record the user is viewing.
         effective_question = question
-        if record_id:
+        if record_name and record_type:
             effective_question = (
-                f"[The user is currently viewing Salesforce record {record_id}.] "
+                f"[The user is currently viewing a {record_type} record named "
+                f'"{record_name}". Use this as context for their question.] '
+                f"{question}"
+            )
+        elif record_id:
+            effective_question = (
+                f"[The user is viewing Salesforce record {record_id}.] "
                 f"{question}"
             )
         result: QueryResult = qh.query(effective_question)

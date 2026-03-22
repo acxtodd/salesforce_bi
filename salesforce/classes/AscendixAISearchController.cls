@@ -18,7 +18,23 @@ public with sharing class AscendixAISearchController {
             newPayload.put('org_id', UserInfo.getOrganizationId());
             newPayload.put('session_id', (String) requestBody.get('sessionId'));
             if (requestBody.containsKey('recordId') && requestBody.get('recordId') != null) {
-                newPayload.put('record_id', (String) requestBody.get('recordId'));
+                String recId = (String) requestBody.get('recordId');
+                newPayload.put('record_id', recId);
+                // Resolve record name and object type so the LLM has context
+                try {
+                    Id sfId = Id.valueOf(recId);
+                    String objType = sfId.getSObjectType().getDescribe().getName();
+                    newPayload.put('record_type', objType);
+                    // Query the Name field (most standard/custom objects have it)
+                    String nameField = (objType == 'Task') ? 'Subject' : 'Name';
+                    String soql = 'SELECT ' + nameField + ' FROM ' + objType + ' WHERE Id = :recId LIMIT 1';
+                    List<SObject> records = Database.query(soql);
+                    if (!records.isEmpty()) {
+                        newPayload.put('record_name', (String) records[0].get(nameField));
+                    }
+                } catch (Exception e) {
+                    System.debug('Could not resolve record context: ' + e.getMessage());
+                }
             }
             if (requestBody.containsKey('modelId') && requestBody.get('modelId') != null) {
                 newPayload.put('model_id', (String) requestBody.get('modelId'));

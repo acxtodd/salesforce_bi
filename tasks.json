@@ -1812,14 +1812,19 @@
         {
           "id": "4.1",
           "title": "Audit all target objects via Salesforce describe API",
-          "status": "pending",
+          "status": "skipped",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:02.305679+00:00",
-          "updatedAt": "2026-03-19T06:09:02.305877+00:00",
+          "updatedAt": "2026-03-22T15:44:51.214276+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T15:44:51.214487+00:00",
+              "note": "Superseded by 4.6.5.1/4.6.5.2: field audit performed inline via describe API during config generation"
+            }
+          ],
           "description": "Introspect every object with >0 records in the org. For each object, catalog all fields (name, type, label, reference/relationship). Classify fields into embed_fields (text, textarea, picklist — good for semantic search), metadata_fields (number, currency, date, percent — good for filtering), and parents (reference fields with relationshipName — for denormalization). Output a field inventory spreadsheet or JSON for review before config generation."
         },
         {
@@ -1846,14 +1851,19 @@
         {
           "id": "4.3",
           "title": "Generate denorm configs for all remaining objects",
-          "status": "pending",
+          "status": "skipped",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:16.902143+00:00",
-          "updatedAt": "2026-03-19T06:09:55.075108+00:00",
+          "updatedAt": "2026-03-22T15:44:56.178982+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T15:44:56.179138+00:00",
+              "note": "Superseded by 4.6.5.2: denorm configs for all 11 searchable objects generated and committed"
+            }
+          ],
           "description": "Build denorm_config.yaml entries for every object not already covered. Target objects: Account (4,756), Contact (6,625), ascendix__Inquiry__c (2,340), ascendix__Listing__c (1,763), ascendix__Preference__c (3,209), ascendix__Unit__c (101), ascendix__Geography__c (57), Opportunity (8), Task (29), Event (23), Meeting_Summary__c (7). For standard objects, map standard Salesforce fields (Account.Name, Account.Industry, Contact.Email, Contact.Title, Task.Subject, Event.Subject, etc.). For Ascendix custom objects, use the field inventory from 4.1. Include parent relationships where they add search value (e.g., Contact -> Account, Listing -> Property).",
           "depends_on": [
             "4.1"
@@ -1907,14 +1917,19 @@
         {
           "id": "4.4",
           "title": "Update CDC_ENTITY_MAP for all indexed objects",
-          "status": "pending",
+          "status": "skipped",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:24.790998+00:00",
-          "updatedAt": "2026-03-19T06:09:55.126560+00:00",
+          "updatedAt": "2026-03-22T15:44:59.769778+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T15:44:59.769931+00:00",
+              "note": "Expansion objects (Deal, Sale, Inquiry, Listing, Preference, Task) use poll sync, not CDC. Adding them to CDC_ENTITY_MAP would be dead code. If any move to CDC later, scope a new task."
+            }
+          ],
           "description": "Add entries to CDC_ENTITY_MAP in lambda/cdc_sync/index.py for every newly indexed object. Include both ChangeEvent channel names (e.g., Account__ChangeEvent) and SObject names (e.g., Account) as keys, since AppFlow uses SObject names. Standard objects use different CDC channel patterns (e.g., AccountChangeEvent without the double underscore). Test that parse_eventbridge_s3_cdc resolves all new entities correctly.",
           "depends_on": [
             "4.3"
@@ -1923,14 +1938,19 @@
         {
           "id": "4.5",
           "title": "Update system prompt for expanded object set",
-          "status": "pending",
+          "status": "skipped",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:32.078956+00:00",
-          "updatedAt": "2026-03-19T06:09:55.181272+00:00",
+          "updatedAt": "2026-03-22T15:45:03.443119+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T15:45:03.443316+00:00",
+              "note": "Superseded by 4.6.5.3 and 4.10: system prompt and tool definitions are fully dynamic from config, covering all 11 objects"
+            }
+          ],
           "description": "Revise the Claude system prompt (Phase 1.2) to inform the LLM about all indexed objects, their fields, and their relationships. The prompt must describe what each object represents in CRE context and how they relate (Contact works at Account, Listing is on a Property, Deal involves a Property and Contact, etc.) so Claude can formulate correct multi-object tool-use queries. Add tool descriptions for any new filter dimensions.",
           "depends_on": [
             "4.3"
@@ -1939,18 +1959,28 @@
         {
           "id": "4.6",
           "title": "Run bulk load for all objects and verify",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:37.893947+00:00",
-          "updatedAt": "2026-03-19T06:09:55.348796+00:00",
+          "updatedAt": "2026-03-22T15:45:15.690177+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T15:45:12.351124+00:00",
+              "note": "All substantive children complete: 4.6.1 (auth fallback), 4.6.3 (CDC scope swap), 4.6.4 (demo CDC deploy), 4.6.5 (full 11-object index). 4.6.2 (throughput optimization) moved to backlog as 99.2."
+            },
+            {
+              "timestamp": "2026-03-22T15:45:15.690180+00:00",
+              "note": "Task completed"
+            }
+          ],
           "description": "Execute bulk_load.py with the complete denorm_config.yaml covering all objects. Expected: ~24,500 records indexed, ~24,500 denorm audit artifacts in documents/, ~24,500 replay artifacts in replay/. Verify: zero INVALID_FIELD errors, zero skipped records (or documented reasons), Turbopuffer aggregate counts match Salesforce counts per object, audit artifacts present in both S3 prefixes for all object types.",
           "depends_on": [
             "4.4"
-          ]
+          ],
+          "completedAt": "2026-03-22T15:45:15.690002+00:00"
         },
         {
           "id": "4.6.1",
@@ -2000,14 +2030,19 @@
         {
           "id": "4.6.2",
           "title": "Optimize bulk load throughput",
-          "status": "pending",
+          "status": "skipped",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T11:53:17.240600+00:00",
-          "updatedAt": "2026-03-19T11:53:43.266470+00:00",
+          "updatedAt": "2026-03-22T15:45:31.251414+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T15:45:31.251577+00:00",
+              "note": "Moved to backlog as 99.2"
+            }
+          ],
           "description": "Reduce end-to-end bulk load runtime after the current clean rerun completes. Focus on the confirmed bottlenecks in the local loader path: per-record Bedrock embedding calls masquerading as batches, and S3 audit write contention/connection-pool churn during denorm/replay artifact writes. The goal is to preserve audit coverage while materially improving clean rebuild speed.",
           "parent": "4.6",
           "acceptance_criteria": [
@@ -2314,15 +2349,18 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:43.457686+00:00",
-          "updatedAt": "2026-03-19T06:09:55.457869+00:00",
+          "updatedAt": "2026-03-22T15:45:22.955743+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T15:45:22.955563+00:00",
+              "note": "Dependency on 4.6 cleared — 4.6 completed. This is now unblocked as the next validation work."
+            }
+          ],
           "description": "Run validate_data.py across the full corpus. Check: per-object record counts match Salesforce, parent fields populated for objects with parent configs, metadata filters work for numeric/date fields, search returns results for each object type. Add new acceptance test cases for cross-object queries: 'find contacts at properties in Dallas', 'show deals related to ACME Corp', 'what leases are expiring this quarter'. Smoke-test via LWC search interface.",
-          "depends_on": [
-            "4.6"
-          ]
+          "depends_on": []
         },
         {
           "id": "4.8",

@@ -83,32 +83,29 @@
                 </div>
             </template>
 
-            <!-- Record Page Conversation Thread -->
+            <!-- Record Page Conversation Thread (compact prior exchanges) -->
             <template if:true={showConversationThread}>
-                <section class="conversation-thread slds-m-top_large" role="region"
-                    aria-label="Record page conversation history">
+                <div class="conversation-thread slds-m-top_medium" role="region"
+                    aria-label="Prior conversation exchanges">
                     <div class="conversation-thread__header">
-                        <div class="conversation-thread__title">Conversation</div>
-                        <lightning-button variant="neutral" label="Clear Chat" title="Clear conversation history"
-                            onclick={handleClearChat} class="conversation-thread__clear"></lightning-button>
+                        <span class="conversation-thread__badge">{priorExchangeLabel}</span>
+                        <lightning-button variant="base" label="Clear Chat" title="Clear conversation history"
+                            onclick={handleClearChat} icon-name="utility:close"
+                            class="conversation-thread__clear"></lightning-button>
                     </div>
 
                     <div class="conversation-thread__body">
-                        <template for:each={conversationHistory} for:item="exchange">
-                            <article key={exchange.id} class="conversation-exchange">
-                                <div class="conversation-bubble conversation-bubble_user">
-                                    <div class="conversation-bubble__label">You</div>
-                                    <div class="conversation-bubble__text">{exchange.query}</div>
+                        <template for:each={priorExchanges} for:item="exchange">
+                            <div key={exchange.id} class="conversation-turn">
+                                <div class="conversation-turn__query">
+                                    <span class="conversation-turn__label">Q{exchange.turnNumber}</span>
+                                    <span class="conversation-turn__text">{exchange.query}</span>
                                 </div>
-
-                                <div class="conversation-bubble conversation-bubble_assistant">
-                                    <div class="conversation-bubble__label">Assistant</div>
-                                    <div class="conversation-bubble__text">{exchange.answer}</div>
-                                </div>
-                            </article>
+                                <div class="conversation-turn__answer">{exchange.truncatedAnswer}</div>
+                            </div>
                         </template>
                     </div>
-                </section>
+                </div>
             </template>
 
             <!-- Streaming Answer Display Container -->

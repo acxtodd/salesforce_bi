@@ -180,7 +180,39 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     }
 
     get showConversationThread() {
-        return this.isRecordPage && Array.isArray(this.conversationHistory) && this.conversationHistory.length > 0;
+        return this.isRecordPage && Array.isArray(this.conversationHistory) && this.conversationHistory.length > 1;
+    }
+
+    /** Prior exchanges (all except the latest, which is shown in the Answer section).
+     *  Each exchange gets a truncated, markdown-stripped answer preview. */
+    get priorExchanges() {
+        if (!Array.isArray(this.conversationHistory) || this.conversationHistory.length < 2) return [];
+        return this.conversationHistory.slice(0, -1).map((ex, idx) => ({
+            ...ex,
+            turnNumber: idx + 1,
+            truncatedAnswer: this._stripAndTruncate(ex.answer, 160)
+        }));
+    }
+
+    get priorExchangeLabel() {
+        const n = this.priorExchanges.length;
+        return n === 1 ? '1 prior exchange' : `${n} prior exchanges`;
+    }
+
+    /** Strip markdown syntax and truncate for thread preview. */
+    _stripAndTruncate(text, maxLen) {
+        if (!text) return '';
+        let s = text;
+        s = s.replace(/^#{1,4}\s+/gm, '');
+        s = s.replace(/\*{1,2}(.*?)\*{1,2}/g, '$1');
+        s = s.replace(/\|[-:\s|]+\|/g, '');
+        s = s.replace(/\|\s*/g, ' ').replace(/\s*\|/g, ' ');
+        s = s.replace(/^---+$/gm, '');
+        s = s.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+        if (s.length > maxLen) {
+            s = s.substring(0, maxLen).replace(/\s+\S*$/, '') + '…';
+        }
+        return s;
     }
 
     get formattedAnswer() {
@@ -242,8 +274,6 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         const nameToSObject = {};
 
         if (this.citations && this.citations.length > 0) {
-            console.log('Building hyperlink map from', this.citations.length, 'citations');
-
             const sortedCitations = [...this.citations].sort((a, b) => {
                 const scoreA = parseFloat(b.score) || 0;
                 const scoreB = parseFloat(a.score) || 0;
@@ -256,12 +286,9 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                     if (!nameToId[normalizedTitle]) {
                         nameToId[normalizedTitle] = citation.recordId;
                         nameToSObject[normalizedTitle] = citation.sobject || 'Record';
-                        console.log('Mapped:', normalizedTitle, '→', citation.recordId);
                     }
                 }
             });
-
-            console.log('Created', Object.keys(nameToId).length, 'hyperlink mappings');
         }
 
         // Replace record names with hyperlinks
@@ -655,6 +682,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                             answer: answerText
                         }
                     ];
+                    this.queryText = '';
                 }
 
                 this.lastExchange = {

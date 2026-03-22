@@ -3281,6 +3281,24 @@
           "acceptance_criteria": [],
           "startedAt": "2026-03-22T15:42:29.160445+00:00",
           "completedAt": "2026-03-22T16:33:13.387581+00:00"
+        },
+        {
+          "id": "4.16",
+          "title": "Index Property RecordType and denormalize to child objects",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-22T18:56:37.129361+00:00",
+          "updatedAt": "2026-03-22T18:58:52.945283+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-22T18:58:52.945122+00:00",
+              "note": "Root cause: generate_denorm_config.py does not harvest standard relationship fields like RecordType.Name. It harvests ascendix__* custom fields and flat standard fields from describe/layouts, but RecordType is a lookup relationship (RecordType.Name) not a direct field. This is a config generator gap — RecordType is a primary filter in Ascendix Search and should have been caught during 4.6.5.1. When fixing, also check for other standard relationship fields (Owner.Name, CreatedBy.Name) that may be missing."
+            }
+          ],
+          "description": "Property RecordType.Name (Office, Retail, Industrial, etc.) is not indexed. When users ask for 'office availabilities in Dallas', the model falls back to text_query for 'office' instead of using a structured filter, causing inconsistent results. Fix: add RecordType.Name to Property denorm config as a metadata field, denormalize as property_record_type onto Availability, Lease, Listing. Add semantic alias so the model can filter by property_record_type='Office'. Update prompt example 4 to use property_record_type instead of text_query for primary property type. Bulk load Property, Availability, Lease, Listing to reindex (~5,200 records). Use Type on Availability remains separate — it describes the space use within a building (e.g., retail space in an office building)."
         }
       ]
     },
@@ -3318,7 +3336,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 16,
+      "4.": 17,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

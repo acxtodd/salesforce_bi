@@ -2031,22 +2031,22 @@ describe('c-ascendix-ai-search', () => {
                 citations: []
             });
 
-            // Find and click a clarification button
+            // Find and click a clarification button — assert they rendered
             const clarifyButtons = element.shadowRoot.querySelectorAll('.clarification-options lightning-button');
-            if (clarifyButtons && clarifyButtons.length > 0) {
-                const btn = clarifyButtons[0];
-                btn.dispatchEvent(new CustomEvent('click', { bubbles: true }));
+            expect(clarifyButtons.length).toBeGreaterThan(0);
 
-                await flushPromises();
-                await new Promise(resolve => setTimeout(resolve, 100));
+            const btn = clarifyButtons[0];
+            btn.dispatchEvent(new CustomEvent('click', { bubbles: true }));
 
-                // Verify callAnswerEndpoint was called with priorContext
-                const lastCall = callAnswerEndpoint.mock.calls[callAnswerEndpoint.mock.calls.length - 1];
-                const parsedBody = JSON.parse(lastCall[0].requestBodyJson);
-                expect(parsedBody.priorContext).toBeDefined();
-                expect(parsedBody.priorContext.query).toBe('Top markets');
-                expect(parsedBody.priorContext.answer).toBe('Which metric did you mean?');
-            }
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Verify callAnswerEndpoint was called with priorContext
+            const lastCall = callAnswerEndpoint.mock.calls[callAnswerEndpoint.mock.calls.length - 1];
+            const parsedBody = JSON.parse(lastCall[0].requestBodyJson);
+            expect(parsedBody.priorContext).toBeDefined();
+            expect(parsedBody.priorContext.query).toBe('Top markets');
+            expect(parsedBody.priorContext.answer).toBe('Which metric did you mean?');
         });
 
         it('should NOT include priorContext on normal typed submission', async () => {

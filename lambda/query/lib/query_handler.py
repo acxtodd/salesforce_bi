@@ -304,11 +304,6 @@ class QueryHandler:
                     if tool_name == "search_records" and "results" in dispatch_result:
                         all_search_results.extend(dispatch_result["results"])
                         search_result_count += len(dispatch_result["results"])
-                    # Collect record IDs from aggregate results for citation linking.
-                    if tool_name == "aggregate_records":
-                        agg_result = dispatch_result.get("result", {})
-                        if "_records" in agg_result:
-                            all_search_results.extend(agg_result["_records"])
 
                     tool_result_contents.append({
                         "toolResult": {

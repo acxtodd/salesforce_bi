@@ -3233,10 +3233,10 @@
         {
           "id": "4.15",
           "title": "Conversational context on record pages",
-          "status": "review",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-22T10:39:44.783501+00:00",
-          "updatedAt": "2026-03-22T16:19:34.940892+00:00",
+          "updatedAt": "2026-03-22T16:33:13.387906+00:00",
           "files_modified": [
             "salesforce/lwc/ascendixAiSearch/ascendixAiSearch.html",
             "salesforce/lwc/ascendixAiSearch/__tests__/ascendixAiSearch.test.js",
@@ -3247,7 +3247,9 @@
             "tests/test_query_handler.py",
             "tests/test_query_lambda.py"
           ],
-          "commits": [],
+          "commits": [
+            "b25ef1ff87209a6806e8ff39ebb0b151f880eae9"
+          ],
           "pull_requests": [],
           "progress_notes": [
             {
@@ -3269,11 +3271,16 @@
             {
               "timestamp": "2026-03-22T16:19:34.940689+00:00",
               "note": "Addressed QA review findings: stale in-flight record-page responses are now invalidated on Clear Chat and record navigation, and the LWC now prunes conversationHistory client-side before serialization. Re-ran targeted LWC suite covering submissions, citations, clarifications, record-page history, stale-response suppression, and client-side pruning via sfdx-lwc-jest (20 passed)."
+            },
+            {
+              "timestamp": "2026-03-22T16:33:13.387912+00:00",
+              "note": "Task completed, commit: b25ef1ff"
             }
           ],
           "description": "Add multi-turn chat history to the LWC when embedded on a record page. Session persists until user navigates away or clicks Clear. Enables natural follow-up conversations (e.g., 'tell me about this record' → follow-up suggestions → user clicks one → context carries forward). Global search tab stays single-turn. Implementation: LWC accumulates messages array, Lambda accepts full conversation history for Bedrock Converse, session resets on recordId change. Watch token cost growth and 29s Lambda timeout on long conversations.",
           "acceptance_criteria": [],
-          "startedAt": "2026-03-22T15:42:29.160445+00:00"
+          "startedAt": "2026-03-22T15:42:29.160445+00:00",
+          "completedAt": "2026-03-22T16:33:13.387581+00:00"
         }
       ]
     },

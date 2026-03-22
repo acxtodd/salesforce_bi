@@ -39,6 +39,9 @@ public with sharing class AscendixAISearchController {
             if (requestBody.containsKey('modelId') && requestBody.get('modelId') != null) {
                 newPayload.put('model_id', (String) requestBody.get('modelId'));
             }
+            if (requestBody.containsKey('priorContext') && requestBody.get('priorContext') != null) {
+                newPayload.put('prior_context', requestBody.get('priorContext'));
+            }
 
             HttpRequest req = new HttpRequest();
             req.setEndpoint(QUERY_CREDENTIAL + '/query');

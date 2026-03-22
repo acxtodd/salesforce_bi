@@ -101,6 +101,7 @@ describe('c-ascendix-ai-search', () => {
                 is: AscendixAiSearch
             });
             document.body.appendChild(element);
+            bindSearchMethods(element);
 
             await flushPromises();
 
@@ -139,6 +140,7 @@ describe('c-ascendix-ai-search', () => {
                 is: AscendixAiSearch
             });
             document.body.appendChild(element);
+            bindSearchMethods(element);
 
             await flushPromises();
 
@@ -179,6 +181,7 @@ describe('c-ascendix-ai-search', () => {
                 is: AscendixAiSearch
             });
             document.body.appendChild(element);
+            bindSearchMethods(element);
 
             await flushPromises();
 
@@ -227,6 +230,7 @@ describe('c-ascendix-ai-search', () => {
                 is: AscendixAiSearch
             });
             document.body.appendChild(element);
+            bindSearchMethods(element);
 
             await flushPromises();
 
@@ -527,6 +531,7 @@ describe('c-ascendix-ai-search', () => {
             const payload = JSON.parse(callArgs.requestBodyJson);
             expect(payload.query).toBe('Find Class A properties');
             expect(payload.sessionId).toBeTruthy();
+            expect(payload.priorContext).toBeUndefined();
             // No legacy fields in payload
             expect(payload.salesforceUserId).toBeUndefined();
             expect(payload.topK).toBeUndefined();
@@ -1973,7 +1978,6 @@ describe('c-ascendix-ai-search', () => {
 
             await flushPromises();
 
-            // Enter new query
             const textarea = element.shadowRoot.querySelector('lightning-textarea');
             textarea.value = 'New query';
             textarea.dispatchEvent(new CustomEvent('change', {
@@ -2005,6 +2009,11 @@ describe('c-ascendix-ai-search', () => {
 
             await flushPromises();
 
+            element.lastExchange = {
+                query: 'Top markets',
+                answer: 'Which metric did you mean?'
+            };
+
             // Set clarification options directly
             element.clarificationOptions = [
                 { key: 'c-0', label: 'By deal count', query: 'Top 5 markets by deal count' },
@@ -2014,18 +2023,22 @@ describe('c-ascendix-ai-search', () => {
 
             await flushPromises();
 
-            // Find and click a clarification button
             const clarifyButtons = element.shadowRoot.querySelectorAll('.clarification-options lightning-button');
             if (clarifyButtons && clarifyButtons.length > 0) {
-                // Simulate click with dataset
                 const btn = clarifyButtons[0];
                 btn.dispatchEvent(new CustomEvent('click', { bubbles: true }));
 
                 await flushPromises();
                 await new Promise(resolve => setTimeout(resolve, 100));
 
-                // Verify that callAnswerEndpoint was called
                 expect(callAnswerEndpoint).toHaveBeenCalled();
+                const callArgs = callAnswerEndpoint.mock.calls[0][0];
+                const payload = JSON.parse(callArgs.requestBodyJson);
+                expect(payload.query).toBe('Top 5 markets by deal count');
+                expect(payload.priorContext).toEqual({
+                    query: 'Top markets',
+                    answer: 'Which metric did you mean?'
+                });
             }
         });
     });

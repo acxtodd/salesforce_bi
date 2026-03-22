@@ -531,3 +531,156 @@ class TestAnswerChunking:
     def test_no_split_points(self):
         chunks = _mod._split_answer_into_chunks("No punctuation ending here")
         assert chunks == ["No punctuation ending here"]
+
+
+# ---------------------------------------------------------------------------
+# 11. Prior context extraction and forwarding
+# ---------------------------------------------------------------------------
+
+class TestPriorContext:
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_prior_context_passed_to_query_handler(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Top 5 markets by deal count",
+            "org_id": "00Ddl000003yx57EAA",
+            "prior_context": {
+                "query": "Top markets",
+                "answer": "Which metric did you mean?",
+            },
+        })
+
+        mock_qh_instance.query.assert_called_once_with(
+            "Top 5 markets by deal count",
+            prior_context={
+                "query": "Top markets",
+                "answer": "Which metric did you mean?",
+            },
+        )
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_no_prior_context_passes_none(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({"question": "Find offices", "org_id": "00Ddl000003yx57EAA"})
+
+        mock_qh_instance.query.assert_called_once_with(
+            "Find offices",
+            prior_context=None,
+        )
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_malformed_prior_context_dropped(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Find offices",
+            "org_id": "00Ddl000003yx57EAA",
+            "prior_context": {"query": "Top markets"},
+        })
+
+        mock_qh_instance.query.assert_called_once_with(
+            "Find offices",
+            prior_context=None,
+        )
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_non_string_prior_context_fields_dropped(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Find offices",
+            "org_id": "00Ddl000003yx57EAA",
+            "prior_context": {"query": {}, "answer": []},
+        })
+
+        mock_qh_instance.query.assert_called_once_with(
+            "Find offices",
+            prior_context=None,
+        )
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_non_dict_prior_context_dropped(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Find offices",
+            "org_id": "00Ddl000003yx57EAA",
+            "prior_context": "just a string",
+        })
+
+        mock_qh_instance.query.assert_called_once_with(
+            "Find offices",
+            prior_context=None,
+        )
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_long_answer_truncated(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+        long_answer = "a" * 5000
+
+        _invoke({
+            "question": "Find offices",
+            "org_id": "00Ddl000003yx57EAA",
+            "prior_context": {"query": "Top markets", "answer": long_answer},
+        })
+
+        forwarded = mock_qh_instance.query.call_args.kwargs["prior_context"]
+        assert len(forwarded["answer"]) == 2003
+        assert forwarded["answer"].endswith("...")
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_long_query_truncated(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+        long_query = "q" * 1000
+
+        _invoke({
+            "question": "Find offices",
+            "org_id": "00Ddl000003yx57EAA",
+            "prior_context": {"query": long_query, "answer": "Prior answer"},
+        })
+
+        forwarded = mock_qh_instance.query.call_args.kwargs["prior_context"]
+        assert len(forwarded["query"]) == 503
+        assert forwarded["query"].endswith("...")
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_whitespace_only_fields_dropped(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "Find offices",
+            "org_id": "00Ddl000003yx57EAA",
+            "prior_context": {"query": "   ", "answer": " "},
+        })
+
+        mock_qh_instance.query.assert_called_once_with(
+            "Find offices",
+            prior_context=None,
+        )

@@ -201,15 +201,22 @@ class QueryHandler:
     # Public API
     # ------------------------------------------------------------------
 
-    def query(self, question: str) -> QueryResult:
+    def query(
+        self,
+        question: str,
+        *,
+        prior_context: dict[str, str] | None = None,
+    ) -> QueryResult:
         """Execute a user question through the Claude tool-use loop.
 
         Returns a :class:`QueryResult` with the final answer, citations,
         and execution metadata.
         """
-        messages: list[dict[str, Any]] = [
-            {"role": "user", "content": [{"text": question}]},
-        ]
+        messages: list[dict[str, Any]] = []
+        if prior_context:
+            messages.append({"role": "user", "content": [{"text": prior_context["query"]}]})
+            messages.append({"role": "assistant", "content": [{"text": prior_context["answer"]}]})
+        messages.append({"role": "user", "content": [{"text": question}]})
 
         tool_calls_made = 0
         turns = 0

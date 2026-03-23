@@ -24,6 +24,6 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "dist"
   },
-  "include": ["lib/**/*", "bin/**/*"],
+  "include": ["lib/**/*", "bin/**/*", "test/**/*"],
   "exclude": ["node_modules", "cdk.out"]
 }

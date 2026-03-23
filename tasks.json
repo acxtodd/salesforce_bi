@@ -3306,7 +3306,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:46:44.300596+00:00",
-          "updatedAt": "2026-03-23T13:57:10.026981+00:00",
+          "updatedAt": "2026-03-23T14:29:19.789745+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -3323,6 +3323,11 @@
             "Scenario B (create): user asks to create a new record -> agent proposes object type, writable field defaults, and resolved parent lookups -> preview modal shows the proposed values -> user opens the native Salesforce create experience with encoded defaultFieldValues prefilled -> remaining required fields can be completed and saved through the standard Salesforce path.",
             "The implementation does not claim create success or cancel outcomes in chat after native NavigationMixin create unless a supported detection mechanism is implemented and validated. If no such mechanism exists, the UX must fail safe and return the user to chat without false confirmation.",
             "Scenario C (multi-record) is deferred until Scenarios A and B are solid and uses the same metadata and transport foundations plus sequential orchestration and ID chaining."
+          ],
+          "references": [
+            "docs/specs/task-4.17.7-writable-field-metadata-spec.md",
+            "docs/specs/task-4.17.8-write-proposal-transport-spec.md",
+            "docs/specs/task-4.17.3-edit-form-modal-spec.md"
           ]
         },
         {
@@ -3369,18 +3374,26 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:47:10.193681+00:00",
-          "updatedAt": "2026-03-23T13:58:26.612993+00:00",
+          "updatedAt": "2026-03-23T14:29:20.089471+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-23T14:29:20.089323+00:00",
+              "note": "Supplemental implementation spec added at docs/specs/task-4.17.3-edit-form-modal-spec.md."
+            }
+          ],
           "description": "After the user clicks Edit in Form from the diff view, open an embedded Salesforce edit form bound to the target record and scoped to the proposed writable fields. Pre-populate the form with the proposed values, allow the user to adjust them, and submit through the standard Salesforce form path so validation rules, triggers, flows, FLS, CRUD, and sharing are enforced. On success, close the modal, post confirmation in chat, and show a toast. Do not assume this task includes expanding to the object's full page layout; full-layout editing is out of scope unless implemented through a separately validated supported pattern.",
           "parent": "4.17",
           "depends_on": [
             "4.17.2",
             "4.17.7"
           ],
-          "technical_context": "Use the supported custom-layout edit form path. Do not promise a 'show all fields/full layout' toggle unless a separate design proves it with a supported component strategy; lightning-record-edit-form scoped to explicit fields is the safe baseline."
+          "technical_context": "Use the supported custom-layout edit form path. Do not promise a 'show all fields/full layout' toggle unless a separate design proves it with a supported component strategy; lightning-record-edit-form scoped to explicit fields is the safe baseline.",
+          "references": [
+            "docs/specs/task-4.17.3-edit-form-modal-spec.md"
+          ]
         },
         {
           "id": "4.17.4",
@@ -3444,14 +3457,22 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:56:53.789285+00:00",
-          "updatedAt": "2026-03-23T13:56:53.789470+00:00",
+          "updatedAt": "2026-03-23T14:29:19.989543+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-23T14:29:19.989372+00:00",
+              "note": "Supplemental implementation spec added at docs/specs/task-4.17.7-writable-field-metadata-spec.md."
+            }
+          ],
           "description": "Create the shared metadata layer required for agent write-back. Provide object/field metadata for supported write scenarios: field API name, label, data type, createable/updateable flags, required-on-create hints, lookup targets, and visibility to the current user/context where feasible. Exclude formula, system, auto-number, denormalized, and otherwise read-only fields from agent-proposable write scope. Define how search-time aliases or denormalized labels map back to real Salesforce writable fields so the agent and UI do not confuse read-model fields with write targets.",
           "technical_context": "Current query prompt/tooling is built around indexed search aliases and denormalized fields, not Salesforce writeable fields. This task must establish the authoritative write-field contract consumed by propose_edit/propose_create, diff rendering, and form generation. It is the main dependency the BA draft was missing.",
-          "parent": "4.17"
+          "parent": "4.17",
+          "references": [
+            "docs/specs/task-4.17.7-writable-field-metadata-spec.md"
+          ]
         },
         {
           "id": "4.17.8",
@@ -3459,14 +3480,22 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:56:53.854066+00:00",
-          "updatedAt": "2026-03-23T13:56:53.854226+00:00",
+          "updatedAt": "2026-03-23T14:29:20.040688+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-23T14:29:20.040548+00:00",
+              "note": "Supplemental implementation spec added at docs/specs/task-4.17.8-write-proposal-transport-spec.md."
+            }
+          ],
           "description": "Define and implement the transport contract for agent write proposals end to end: Claude tool result -> query handler response -> Lambda SSE event or JSON payload -> Apex parser -> LWC state. Replace or supersede the current bracketed [ACTION:...] answer-marker flow for write-back scenarios with a typed payload that includes proposal kind (edit/create/multi), object type, target record or parent context, proposed fields, and any user-facing summary text. Preserve backward compatibility only if it does not complicate the new contract materially.",
           "technical_context": "The current action preview path is not driven by structured tool output. The LWC parses free-form answer text markers, while the Apex bridge only returns answer/citations/clarification metadata. Write-back needs a first-class payload contract before any scenario UI can be reliable.",
-          "parent": "4.17"
+          "parent": "4.17",
+          "references": [
+            "docs/specs/task-4.17.8-write-proposal-transport-spec.md"
+          ]
         }
       ]
     },

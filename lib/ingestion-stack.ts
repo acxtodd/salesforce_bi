@@ -159,6 +159,7 @@ export class IngestionStack extends cdk.Stack {
       cdcObjects.forEach(({ changeEventObject, sobjectName }) => {
         const flow = new appflow.CfnFlow(this, `CDCFlow${changeEventObject}`, {
           flowName: `salesforce-ai-search-cdc-${sobjectName.toLowerCase()}`,
+          flowStatus: "Active",
           triggerConfig: {
             triggerType: "Event",
           },

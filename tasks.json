@@ -3552,6 +3552,116 @@
           "references": [
             "docs/specs/task-4.17.8-write-proposal-transport-spec.md"
           ]
+        },
+        {
+          "id": "4.18",
+          "title": "Deploy AppFlow CDC flows to activate real-time reindexing",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T18:57:31.730667+00:00",
+          "updatedAt": "2026-03-23T18:57:48.943283+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "The CDC sync Lambda, EventBridge rule, and S3 bucket are deployed, but the AppFlow flows that listen to Salesforce CDC events are missing. The ingestion stack CDK conditionally creates AppFlow resources only when three context values are passed at deploy time: salesforceInstanceUrl (SSM: /salesforce/instance_url), salesforceSecretArn (Secrets Manager: salesforce-ai-search/appflow-creds), and salesforceJwtToken (minted via scripts/mint_jwt.py). Both SSM and Secrets Manager prerequisites exist. The fix is to redeploy SalesforceAISearch-Ingestion-dev with the three -c context flags. After deployment, validate by editing a Contact in SF and confirming the CDC event flows through AppFlow to S3 to EventBridge to cdc_sync Lambda to Turbopuffer upsert within about 60 seconds.",
+          "acceptance_criteria": [
+            "AppFlow connector profile and CDC flows for all 5 CDC objects (Property, Lease, Availability, Account, Contact) are deployed in AWS",
+            "End-to-end validation: edit a Contact field in SF, observe the change reindexed in Turbopuffer within 60 seconds without manual bulk load",
+            "Write-back edits made via the propose_edit flow (task 4.17) are automatically reindexed — no manual intervention needed after the user clicks Save"
+          ]
+        },
+        {
+          "id": "4.19",
+          "title": "Apollo.io enrichment: enrich Contacts and Accounts via AI agent",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T19:09:22.412039+00:00",
+          "updatedAt": "2026-03-23T19:11:07.245867+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-23T19:11:07.245711+00:00",
+              "note": "Apollo.io API reference — Auth: X-Api-Key header, no OAuth. Endpoints: People Enrichment POST /api/v1/people/match (~1 credit), Org Enrichment GET /api/v1/organizations/enrich (~1 credit), People Search POST /api/v1/mixed_people/api_search (free, requires master key). Free tier: 10 credits/month. Rate limit: ~600/hour on enrichment. No confidence score returned — single best match or nothing. Phone reveal async via webhook at 8 credits each (deferred to 99.3). Docs: https://docs.apollo.io/reference"
+            }
+          ],
+          "description": "Add an enrichment capability to the AI agent using Apollo.io APIs. The user asks the agent to enrich a Contact or Account, the agent calls Apollo to find matching data, presents the match to the user, and on confirmation feeds the enriched fields into the existing propose_edit diff-view and edit-form flow (4.17). Three Apollo endpoints are needed: People Enrichment (POST /api/v1/people/match) for Contacts, Organization Enrichment (GET /api/v1/organizations/enrich) for Accounts, and People Search (POST /api/v1/mixed_people/api_search) for disambiguation when the single-match endpoint returns nothing. Starting with free tier (10 credits/month) for POC validation. Apollo API key stored in AWS Secrets Manager. Architecture: new enrich_contact and enrich_account tools added to the query Lambda, which call Apollo server-side and return structured enrichment data. The agent then maps Apollo fields to SF fields and calls propose_edit to invoke the existing diff/edit flow. Phone number enrichment is deferred (async webhook required, 8 credits each) — tracked separately in backlog.",
+          "acceptance_criteria": [
+            "User says 'enrich Todd Terry at Todco' -> agent calls Apollo People Enrichment -> match presented in chat with key fields (title, email, location) -> user clicks Apply -> propose_edit diff modal shows current vs Apollo values -> user confirms via edit form -> Contact updated in SF",
+            "User says 'enrich Todco Investments' -> agent calls Apollo Organization Enrichment -> match presented with industry, revenue, employee count, website -> user clicks Apply -> propose_edit diff modal for Account -> user confirms via edit form -> Account updated in SF",
+            "When Apollo returns no match or ambiguous results, agent falls back to People Search for disambiguation and presents candidate list for user selection before enriching",
+            "Apollo API key stored in AWS Secrets Manager, not hardcoded. Free tier (10 credits/month) sufficient for POC validation"
+          ],
+          "depends_on": [
+            "4.17.3"
+          ]
+        },
+        {
+          "id": "4.19.1",
+          "title": "Apollo.io account setup and API key provisioning",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T19:09:54.996490+00:00",
+          "updatedAt": "2026-03-23T19:09:54.996648+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Create a free-tier Apollo.io account. Generate a Master API key (required for People Search). Enable endpoints: People Enrichment (/people/match), Organization Enrichment (/organizations/enrich), People Search (/mixed_people/api_search), Usage (/usage). Store the API key in AWS Secrets Manager as apollo-api-key. Do NOT enable reveal_phone_number (deferred to backlog). Verify key works via health check: GET https://api.apollo.io/v1/auth/health with X-Api-Key header.",
+          "parent": "4.19"
+        },
+        {
+          "id": "4.19.2",
+          "title": "Add Apollo client module to query Lambda",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T19:10:03.301531+00:00",
+          "updatedAt": "2026-03-23T19:10:37.769115+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Create lib/apollo_client.py with functions: enrich_person(first_name, last_name, organization_name=None, email=None, domain=None) -> dict, enrich_organization(organization_name=None, domain=None) -> dict, search_people(organization_names, person_titles=None, keywords=None) -> list[dict]. All calls use X-Api-Key header from Secrets Manager. Handle rate limits (429 with x-minute-requests-left headers), empty/null responses, and network errors gracefully. Map Apollo response fields to a normalized enrichment result that downstream tools can consume. Include in bundle_query.sh.",
+          "parent": "4.19",
+          "depends_on": [
+            "4.19.1"
+          ]
+        },
+        {
+          "id": "4.19.3",
+          "title": "Add enrich_contact and enrich_account tools to agent tool-use schema",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T19:10:22.720264+00:00",
+          "updatedAt": "2026-03-23T19:10:42.753377+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Add two new tool definitions to the Claude tool-use schema: enrich_contact(record_id, first_name, last_name, organization_name?, email?, domain?) and enrich_account(record_id, account_name, domain?, website?). The tools call Apollo client, map returned fields to SF field API names, and return a structured enrichment result. Field mapping — Contact: Apollo title->Title, email->Email (only if email_status=verified), city->MailingCity, state->MailingState, linkedin_url->skip for now. Account: Apollo industry->Industry, estimated_num_employees->NumberOfEmployees, annual_revenue->AnnualRevenue, website_url->Website, phone->Phone. When enrichment data is found, the tool should automatically invoke propose_edit with the mapped fields so the existing diff-view and edit-form flow handles user confirmation. If Apollo returns no match, return a message suggesting the user try with more details (email, domain). Prompt guidance: agent should confirm which record to enrich and summarize what Apollo found before proposing edits.",
+          "parent": "4.19",
+          "depends_on": [
+            "4.19.2"
+          ]
+        },
+        {
+          "id": "4.19.4",
+          "title": "Add disambiguation flow for ambiguous Apollo matches",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T19:10:31.612430+00:00",
+          "updatedAt": "2026-03-23T19:10:42.804753+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "When Apollo People Enrichment returns no match (common with just name + company), fall back to People Search (POST /api/v1/mixed_people/api_search) with organization_names filter. Present up to 5 candidates in chat as a selection list showing name, title, company, and location. User clicks a candidate. Agent then calls People Enrichment with the selected person's Apollo ID to get full data, then proceeds to propose_edit. If People Search also returns no results, inform the user and suggest trying with an email address or domain. Note: People Search requires Master API key and does NOT consume credits.",
+          "parent": "4.19",
+          "depends_on": [
+            "4.19.3"
+          ]
         }
       ]
     },
@@ -3573,6 +3683,19 @@
           "pull_requests": [],
           "progress_notes": [],
           "description": "Investigate batch size tuning, embedding concurrency, and Turbopuffer upsert parallelism for large initial seeds. Currently: embed batch 25, upsert batch 100, concurrency 4. Deferred from 4.6.2."
+        },
+        {
+          "id": "99.3",
+          "title": "Apollo.io phone number enrichment via webhook",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T19:10:58.987164+00:00",
+          "updatedAt": "2026-03-23T19:10:58.987309+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Apollo phone number reveal requires reveal_phone_number=true and a webhook_url for async delivery (phones are not returned inline). Each phone reveal costs ~8 credits. Implementation: add a webhook endpoint (new Lambda or route on existing API), store phone data on receipt, and feed into the propose_edit flow. Deferred from 4.19 because: (a) async webhook adds infrastructure complexity, (b) 8 credits per phone burns through free tier instantly, (c) core enrichment value (title, email, company data) is validated without phone."
         }
       ]
     }
@@ -3589,7 +3712,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 18,
+      "4.": 20,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,
@@ -3597,8 +3720,9 @@
       "4.9.": 11,
       "4.12.": 6,
       "4.13.": 2,
-      "99.": 3,
-      "4.17.": 9
+      "99.": 4,
+      "4.17.": 9,
+      "4.19.": 5
     }
   }
 }

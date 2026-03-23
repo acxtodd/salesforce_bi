@@ -3299,6 +3299,174 @@
             }
           ],
           "description": "Property RecordType.Name (Office, Retail, Industrial, etc.) is not indexed. When users ask for 'office availabilities in Dallas', the model falls back to text_query for 'office' instead of using a structured filter, causing inconsistent results. Fix: add RecordType.Name to Property denorm config as a metadata field, denormalize as property_record_type onto Availability, Lease, Listing. Add semantic alias so the model can filter by property_record_type='Office'. Update prompt example 4 to use property_record_type instead of text_query for primary property type. Bulk load Property, Availability, Lease, Listing to reindex (~5,200 records). Use Type on Availability remains separate — it describes the space use within a building (e.g., retail space in an office building)."
+        },
+        {
+          "id": "4.17",
+          "title": "Agent write-back: edit, create, and multi-record workflows",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T13:46:44.300596+00:00",
+          "updatedAt": "2026-03-23T13:57:10.026981+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-23T13:57:10.026838+00:00",
+              "note": "Revised after QA/feasibility review. Added missing shared-foundation work for writable metadata and structured proposal transport; narrowed UI subtasks so they match current repo architecture and supported Salesforce form/navigation behavior."
+            }
+          ],
+          "description": "Enable AI-assisted Salesforce write-back through standard Salesforce forms. Build this in two shared foundations first: (1) a writable field metadata/eligibility contract that separates real Salesforce write targets from denormalized search fields, and (2) a structured write-proposal transport from the query stack through Apex into LWC state. Scenario A is edit existing record via diff review plus embedded form scoped to writable fields. Scenario B is create new record via preview plus NavigationMixin native create with encoded default values. Scenario C is deferred multi-record orchestration built on A and B. No direct Lambda-side Salesforce API DML for user-initiated writes.",
+          "acceptance_criteria": [
+            "Shared foundations exist before scenario UI work: writable-field metadata excludes read-only, formula, system, and denormalized fields from proposal scope, and structured write proposals reach the LWC without relying on bracketed answer markers.",
+            "Scenario A (edit): user asks to change an existing record -> agent identifies the target record and valid writable fields -> diff view shows Field Label, Current Value, and Proposed Value -> user advances into an embedded Salesforce edit form scoped to the proposed writable fields -> save runs through standard Salesforce form submission and surfaces standard validation/FLS behavior -> chat and toast show success with a record link.",
+            "Scenario B (create): user asks to create a new record -> agent proposes object type, writable field defaults, and resolved parent lookups -> preview modal shows the proposed values -> user opens the native Salesforce create experience with encoded defaultFieldValues prefilled -> remaining required fields can be completed and saved through the standard Salesforce path.",
+            "The implementation does not claim create success or cancel outcomes in chat after native NavigationMixin create unless a supported detection mechanism is implemented and validated. If no such mechanism exists, the UX must fail safe and return the user to chat without false confirmation.",
+            "Scenario C (multi-record) is deferred until Scenarios A and B are solid and uses the same metadata and transport foundations plus sequential orchestration and ID chaining."
+          ]
+        },
+        {
+          "id": "4.17.1",
+          "title": "Add propose_edit tool to agent tool-use schema",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T13:46:51.822080+00:00",
+          "updatedAt": "2026-03-23T13:58:26.395433+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Add a propose_edit tool definition to the query Lambda's Claude tool-use schema so the agent can propose field-level edits to existing records using real Salesforce writable field API names. The tool must consume the writable metadata contract and reject read-only, formula, system, and denormalized/search-only fields from proposal scope. The output proposal should feed the structured write-proposal transport rather than relying on free-form [ACTION:...] answer markers. Include prompt guidance: confirm the target record before proposing and prefer minimal, explicit field changes.",
+          "parent": "4.17",
+          "depends_on": [
+            "4.17.7",
+            "4.17.8"
+          ],
+          "technical_context": "Current tool definitions only cover search_records and aggregate_records. This task must extend the Bedrock tool schema, prompt rules, tests, and query-handler contract in a way that is consistent with the new structured proposal transport and writeable-field metadata layer."
+        },
+        {
+          "id": "4.17.2",
+          "title": "Diff view modal: current vs proposed values",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T13:47:00.850057+00:00",
+          "updatedAt": "2026-03-23T13:58:26.506569+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "When the LWC receives a structured propose_edit payload, fetch the record's current values and display a diff-view modal. The modal shows Field Label, Current Value, and Proposed Value, with labels and formatting derived from the writable metadata contract rather than naive API-name prettification. This is a review-only step with Cancel and Edit in Form actions. It must handle null/empty values, lookup display labels, and common formatted types such as dates, currency, phone, and picklists.",
+          "parent": "4.17",
+          "depends_on": [
+            "4.17.1",
+            "4.17.7",
+            "4.17.8"
+          ]
+        },
+        {
+          "id": "4.17.3",
+          "title": "Edit form modal with pre-filled proposed values",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T13:47:10.193681+00:00",
+          "updatedAt": "2026-03-23T13:58:26.612993+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "After the user clicks Edit in Form from the diff view, open an embedded Salesforce edit form bound to the target record and scoped to the proposed writable fields. Pre-populate the form with the proposed values, allow the user to adjust them, and submit through the standard Salesforce form path so validation rules, triggers, flows, FLS, CRUD, and sharing are enforced. On success, close the modal, post confirmation in chat, and show a toast. Do not assume this task includes expanding to the object's full page layout; full-layout editing is out of scope unless implemented through a separately validated supported pattern.",
+          "parent": "4.17",
+          "depends_on": [
+            "4.17.2",
+            "4.17.7"
+          ],
+          "technical_context": "Use the supported custom-layout edit form path. Do not promise a 'show all fields/full layout' toggle unless a separate design proves it with a supported component strategy; lightning-record-edit-form scoped to explicit fields is the safe baseline."
+        },
+        {
+          "id": "4.17.4",
+          "title": "Add propose_create tool to agent tool-use schema",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T13:47:18.882987+00:00",
+          "updatedAt": "2026-03-23T13:58:26.724268+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Add a propose_create tool definition to the query Lambda's Claude tool-use schema so the agent can propose new-record creation using real Salesforce createable field API names. The tool must consume the writable metadata contract, resolve parent lookups explicitly, and emit a structured create proposal through the shared proposal transport. Prompt guidance should require the agent to state what it will create, which parent/context it will link to, and which required fields still need user input.",
+          "parent": "4.17",
+          "depends_on": [
+            "4.17.7",
+            "4.17.8"
+          ]
+        },
+        {
+          "id": "4.17.5",
+          "title": "Create preview and native SF form via NavigationMixin",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T13:47:28.364704+00:00",
+          "updatedAt": "2026-03-23T13:58:26.833131+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "When the LWC receives a structured propose_create payload, show a preview modal with the proposed field values and resolved parent context. On Create, use NavigationMixin.Navigate to open the native Salesforce create experience with encoded defaultFieldValues. Scope this task to opening the correct native create flow with accurate defaults and preserving a sane chat state before and after navigation. Do not claim save/cancel detection in chat unless a supported mechanism is identified and validated; otherwise the UX must return safely without false confirmation.",
+          "parent": "4.17",
+          "depends_on": [
+            "4.17.4",
+            "4.17.7",
+            "4.17.8"
+          ],
+          "technical_context": "NavigationMixin with encodeDefaultFieldValues is supported for opening native create, but reliable chat-side success/cancel detection after navigation is not yet established in this repo. Keep acceptance criteria to supported behavior unless a validated callback/override strategy is added."
+        },
+        {
+          "id": "4.17.6",
+          "title": "Multi-record sequential workflow with ID chaining",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T13:47:36.446354+00:00",
+          "updatedAt": "2026-03-23T13:58:26.942009+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Enable the agent to propose a sequence of related create/edit operations as an ordered action plan after the single-record edit and create foundations are proven. The LWC shows the plan as a checklist, launches forms sequentially, captures saved record IDs, and injects them into downstream lookup defaults. If a step fails or is cancelled, remaining steps pause with explicit retry/skip handling. Reuse the shared metadata contract and structured proposal transport rather than creating a separate orchestration protocol.",
+          "parent": "4.17",
+          "depends_on": [
+            "4.17.3",
+            "4.17.5"
+          ]
+        },
+        {
+          "id": "4.17.7",
+          "title": "Build writable field metadata and eligibility contract",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T13:56:53.789285+00:00",
+          "updatedAt": "2026-03-23T13:56:53.789470+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Create the shared metadata layer required for agent write-back. Provide object/field metadata for supported write scenarios: field API name, label, data type, createable/updateable flags, required-on-create hints, lookup targets, and visibility to the current user/context where feasible. Exclude formula, system, auto-number, denormalized, and otherwise read-only fields from agent-proposable write scope. Define how search-time aliases or denormalized labels map back to real Salesforce writable fields so the agent and UI do not confuse read-model fields with write targets.",
+          "technical_context": "Current query prompt/tooling is built around indexed search aliases and denormalized fields, not Salesforce writeable fields. This task must establish the authoritative write-field contract consumed by propose_edit/propose_create, diff rendering, and form generation. It is the main dependency the BA draft was missing.",
+          "parent": "4.17"
+        },
+        {
+          "id": "4.17.8",
+          "title": "Add structured write proposal transport from query Lambda to LWC",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-23T13:56:53.854066+00:00",
+          "updatedAt": "2026-03-23T13:56:53.854226+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Define and implement the transport contract for agent write proposals end to end: Claude tool result -> query handler response -> Lambda SSE event or JSON payload -> Apex parser -> LWC state. Replace or supersede the current bracketed [ACTION:...] answer-marker flow for write-back scenarios with a typed payload that includes proposal kind (edit/create/multi), object type, target record or parent context, proposed fields, and any user-facing summary text. Preserve backward compatibility only if it does not complicate the new contract materially.",
+          "technical_context": "The current action preview path is not driven by structured tool output. The LWC parses free-form answer text markers, while the Apex bridge only returns answer/citations/clarification metadata. Write-back needs a first-class payload contract before any scenario UI can be reliable.",
+          "parent": "4.17"
         }
       ]
     },
@@ -3336,7 +3504,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 17,
+      "4.": 18,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,
@@ -3344,7 +3512,8 @@
       "4.9.": 11,
       "4.12.": 6,
       "4.13.": 2,
-      "99.": 3
+      "99.": 3,
+      "4.17.": 9
     }
   }
 }

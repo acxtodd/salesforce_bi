@@ -3336,7 +3336,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:46:51.822080+00:00",
-          "updatedAt": "2026-03-23T15:05:39.197783+00:00",
+          "updatedAt": "2026-03-23T17:45:33.836276+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -3352,6 +3352,10 @@
             {
               "timestamp": "2026-03-23T15:05:39.197785+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-23T17:45:33.836101+00:00",
+              "note": "Squash-merged to main in commit 98a1c01a338654e022524331b8552ae77c916ec5 on 2026-03-23 via PR #9."
             }
           ],
           "description": "Add a propose_edit tool definition to the query Lambda's Claude tool-use schema so the agent can propose field-level edits to existing records using real Salesforce writable field API names. The tool must consume the writable metadata contract and reject read-only, formula, system, and denormalized/search-only fields from proposal scope. The output proposal should feed the structured write-proposal transport rather than relying on free-form [ACTION:...] answer markers. Include prompt guidance: confirm the target record before proposing and prefer minimal, explicit field changes.",
@@ -3370,7 +3374,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:47:00.850057+00:00",
-          "updatedAt": "2026-03-23T15:05:48.710974+00:00",
+          "updatedAt": "2026-03-23T17:45:33.891111+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -3386,6 +3390,10 @@
             {
               "timestamp": "2026-03-23T15:05:48.710977+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-23T17:45:33.890933+00:00",
+              "note": "Squash-merged to main in commit 98a1c01a338654e022524331b8552ae77c916ec5 on 2026-03-23 via PR #9."
             }
           ],
           "description": "When the LWC receives a structured propose_edit payload, fetch the record's current values and display a diff-view modal. The modal shows Field Label, Current Value, and Proposed Value, with labels and formatting derived from the writable metadata contract rather than naive API-name prettification. This is a review-only step with Cancel and Edit in Form actions. It must handle null/empty values, lookup display labels, and common formatted types such as dates, currency, phone, and picklists.",
@@ -3404,7 +3412,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:47:10.193681+00:00",
-          "updatedAt": "2026-03-23T15:05:58.446013+00:00",
+          "updatedAt": "2026-03-23T17:45:33.946533+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -3424,6 +3432,10 @@
             {
               "timestamp": "2026-03-23T15:05:58.446016+00:00",
               "note": "Task completed"
+            },
+            {
+              "timestamp": "2026-03-23T17:45:33.946363+00:00",
+              "note": "Squash-merged to main in commit 98a1c01a338654e022524331b8552ae77c916ec5 on 2026-03-23 via PR #9."
             }
           ],
           "description": "After the user clicks Edit in Form from the diff view, open an embedded Salesforce edit form bound to the target record and scoped to the proposed writable fields. Pre-populate the form with the proposed values, allow the user to adjust them, and submit through the standard Salesforce form path so validation rules, triggers, flows, FLS, CRUD, and sharing are enforced. On success, close the modal, post confirmation in chat, and show a toast. Do not assume this task includes expanding to the object's full page layout; full-layout editing is out of scope unless implemented through a separately validated supported pattern.",

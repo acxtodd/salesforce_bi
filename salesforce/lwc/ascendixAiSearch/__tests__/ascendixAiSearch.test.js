@@ -1,6 +1,7 @@
 import { createElement } from 'lwc';
 import AscendixAiSearch from 'c/ascendixAiSearch';
 import callAnswerEndpoint from '@salesforce/apex/AscendixAISearchController.callAnswerEndpoint';
+import previewWriteProposal from '@salesforce/apex/AscendixAISearchController.previewWriteProposal';
 import callActionEndpoint from '@salesforce/apex/AscendixAISearchController.callActionEndpoint';
 import getCurrentUserId from '@salesforce/apex/AscendixAISearchController.getCurrentUserId';
 import { ShowToastEventName } from 'lightning/platformShowToastEvent';
@@ -9,6 +10,16 @@ import { NavigationMixin } from 'lightning/navigation';
 // Mock Apex methods
 jest.mock(
     '@salesforce/apex/AscendixAISearchController.callAnswerEndpoint',
+    () => {
+        return {
+            default: jest.fn()
+        };
+    },
+    { virtual: true }
+);
+
+jest.mock(
+    '@salesforce/apex/AscendixAISearchController.previewWriteProposal',
     () => {
         return {
             default: jest.fn()
@@ -947,6 +958,408 @@ describe('c-ascendix-ai-search', () => {
 
             // Verify modal is closed
             expect(element.showActionPreview).toBe(false);
+        });
+    });
+
+    describe('Write Proposal Diff and Edit Flow', () => {
+        beforeEach(() => {
+            previewWriteProposal.mockReset();
+        });
+
+        it('should render a validated diff modal and open the edit form with proposed values', async () => {
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'I prepared a proposed update.',
+                writeProposal: {
+                    kind: 'edit',
+                    objectType: 'Contact',
+                    recordId: '003xx0000012345AAA',
+                    summary: 'Update contact phone',
+                    fields: [
+                        {
+                            apiName: 'Phone',
+                            proposedValue: '4695559988'
+                        }
+                    ]
+                }
+            });
+            previewWriteProposal.mockResolvedValue({
+                kind: 'edit',
+                objectApiName: 'Contact',
+                objectLabel: 'Contact',
+                recordId: '003xx0000012345AAA',
+                recordLabel: 'Avery Smith',
+                summary: 'Update contact phone',
+                fields: [
+                    {
+                        apiName: 'Phone',
+                        label: 'Phone',
+                        dataType: 'phone',
+                        currentValue: '2145551234',
+                        currentValueDisplay: '(214) 555-1234',
+                        proposedValue: '4695559988',
+                        proposedValueDisplay: '(469) 555-9988',
+                        updateable: true,
+                        required: false,
+                        lookupTarget: null
+                    }
+                ]
+            });
+
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Update the contact phone';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Update the contact phone' }
+            }));
+
+            await flushPromises();
+
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(previewWriteProposal).toHaveBeenCalled();
+            const diffHeading = element.shadowRoot.querySelector('#write-proposal-diff-heading');
+            expect(diffHeading).toBeTruthy();
+            expect(diffHeading.textContent).toContain('Avery Smith');
+
+            const diffRow = element.shadowRoot.querySelector('.write-proposal-diff-row');
+            expect(diffRow.textContent).toContain('Phone');
+            expect(diffRow.textContent).toContain('(214) 555-1234');
+            expect(diffRow.textContent).toContain('(469) 555-9988');
+
+            const editButton = element.shadowRoot.querySelector('lightning-button[label="Edit in Form"]');
+            editButton.click();
+
+            await flushPromises();
+
+            const formHeading = element.shadowRoot.querySelector('#write-proposal-form-heading');
+            expect(formHeading).toBeTruthy();
+            expect(formHeading.textContent).toContain('Avery Smith');
+            const form = element.shadowRoot.querySelector('lightning-record-edit-form');
+            expect(form).toBeTruthy();
+            const messages = element.shadowRoot.querySelector('lightning-messages');
+            expect(messages).toBeTruthy();
+
+            const inputFields = element.shadowRoot.querySelectorAll('lightning-input-field');
+            expect(inputFields.length).toBe(1);
+        });
+
+        it('should keep the edit form open and surface native validation errors', async () => {
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'I prepared a proposed update.',
+                writeProposal: {
+                    kind: 'edit',
+                    objectType: 'Contact',
+                    recordId: '003xx0000012345AAA',
+                    fields: [
+                        {
+                            apiName: 'Phone',
+                            proposedValue: '4695559988'
+                        }
+                    ]
+                }
+            });
+            previewWriteProposal.mockResolvedValue({
+                kind: 'edit',
+                objectApiName: 'Contact',
+                objectLabel: 'Contact',
+                recordId: '003xx0000012345AAA',
+                recordLabel: 'Avery Smith',
+                summary: 'Update contact phone',
+                fields: [
+                    {
+                        apiName: 'Phone',
+                        label: 'Phone',
+                        dataType: 'phone',
+                        currentValue: '2145551234',
+                        currentValueDisplay: '(214) 555-1234',
+                        proposedValue: '4695559988',
+                        proposedValueDisplay: '(469) 555-9988',
+                        updateable: true,
+                        required: false,
+                        lookupTarget: null
+                    }
+                ]
+            });
+
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Update the contact phone';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Update the contact phone' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            element.shadowRoot.querySelector('lightning-button[label="Edit in Form"]').click();
+            await flushPromises();
+
+            const form = element.shadowRoot.querySelector('lightning-record-edit-form');
+            form.dispatchEvent(new CustomEvent('error', {
+                detail: {
+                    message: 'Validation Rule: Phone must be 10 digits'
+                }
+            }));
+
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('#write-proposal-form-heading')).toBeTruthy();
+            const errorBanner = element.shadowRoot.querySelector('.write-proposal-form-error');
+            expect(errorBanner.textContent).toContain('Validation Rule');
+            const messages = element.shadowRoot.querySelector('lightning-messages');
+            expect(messages).toBeTruthy();
+        });
+
+        it('should close the form on success, show a toast, and add a chat confirmation', async () => {
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            const toastHandler = jest.fn();
+            element.addEventListener(ShowToastEventName, toastHandler);
+
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'I prepared a proposed update.',
+                writeProposal: {
+                    kind: 'edit',
+                    objectType: 'Contact',
+                    recordId: '003xx0000012345AAA',
+                    summary: 'Update contact phone',
+                    fields: [
+                        {
+                            apiName: 'Phone',
+                            proposedValue: '4695559988'
+                        }
+                    ]
+                }
+            });
+            previewWriteProposal.mockResolvedValue({
+                kind: 'edit',
+                objectApiName: 'Contact',
+                objectLabel: 'Contact',
+                recordId: '003xx0000012345AAA',
+                recordLabel: 'Avery Smith',
+                summary: 'Update contact phone',
+                fields: [
+                    {
+                        apiName: 'Phone',
+                        label: 'Phone',
+                        dataType: 'phone',
+                        currentValue: '2145551234',
+                        currentValueDisplay: '(214) 555-1234',
+                        proposedValue: '4695559988',
+                        proposedValueDisplay: '(469) 555-9988',
+                        updateable: true,
+                        required: false,
+                        lookupTarget: null
+                    }
+                ]
+            });
+
+            element.answer = 'Original answer';
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Update the contact phone';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Update the contact phone' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            element.shadowRoot.querySelector('lightning-button[label="Edit in Form"]').click();
+            await flushPromises();
+
+            const form = element.shadowRoot.querySelector('lightning-record-edit-form');
+            form.dispatchEvent(new CustomEvent('success', {
+                detail: {
+                    id: '003xx0000012345AAA'
+                }
+            }));
+
+            await flushPromises();
+
+            expect(element.shadowRoot.querySelector('#write-proposal-form-heading')).toBeFalsy();
+            expect(element.answer).toContain('Confirmed update saved for Avery Smith.');
+            expect(toastHandler).toHaveBeenCalled();
+
+            const successBanner = element.shadowRoot.querySelector('.write-proposal-success');
+            expect(successBanner.textContent).toContain('Successfully updated Avery Smith');
+            const viewRecordButton = element.shadowRoot.querySelector('lightning-button[label="View Record"]');
+            expect(viewRecordButton).toBeTruthy();
+        });
+
+        it('should submit reviewed draft values through the native record form', async () => {
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'I prepared a proposed update.',
+                writeProposal: {
+                    kind: 'edit',
+                    objectType: 'Contact',
+                    recordId: '003xx0000012345AAA',
+                    summary: 'Update contact details',
+                    fields: [
+                        {
+                            apiName: 'Phone',
+                            proposedValue: '4695559988'
+                        },
+                        {
+                            apiName: 'Title',
+                            proposedValue: 'Regional Manager'
+                        }
+                    ]
+                }
+            });
+            previewWriteProposal.mockResolvedValue({
+                kind: 'edit',
+                objectApiName: 'Contact',
+                objectLabel: 'Contact',
+                recordId: '003xx0000012345AAA',
+                recordLabel: 'Avery Smith',
+                summary: 'Update contact details',
+                fields: [
+                    {
+                        apiName: 'Phone',
+                        label: 'Phone',
+                        dataType: 'phone',
+                        currentValue: '2145551234',
+                        currentValueDisplay: '(214) 555-1234',
+                        proposedValue: '4695559988',
+                        proposedValueDisplay: '(469) 555-9988',
+                        updateable: true,
+                        required: false,
+                        lookupTarget: null
+                    },
+                    {
+                        apiName: 'Title',
+                        label: 'Title',
+                        dataType: 'string',
+                        currentValue: 'Manager',
+                        currentValueDisplay: 'Manager',
+                        proposedValue: 'Regional Manager',
+                        proposedValueDisplay: 'Regional Manager',
+                        updateable: true,
+                        required: false,
+                        lookupTarget: null
+                    }
+                ]
+            });
+
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Update the contact details';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Update the contact details' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            element.shadowRoot.querySelector('lightning-button[label="Edit in Form"]').click();
+            await flushPromises();
+
+            const inputFields = element.shadowRoot.querySelectorAll('lightning-input-field');
+            inputFields[0].dispatchEvent(new CustomEvent('change', {
+                detail: { value: '9725551212' }
+            }));
+            await flushPromises();
+
+            const submit = jest.fn();
+            const form = element.shadowRoot.querySelector('lightning-record-edit-form');
+            form.submit = submit;
+            form.dispatchEvent(new CustomEvent('submit', {
+                detail: {
+                    fields: {
+                        Phone: '1111111111'
+                    }
+                },
+                cancelable: true
+            }));
+
+            expect(submit).toHaveBeenCalledWith({
+                Phone: '9725551212',
+                Title: 'Regional Manager'
+            });
+        });
+
+        it('should reject unsupported proposals and avoid opening the diff modal', async () => {
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'I prepared a proposed update.',
+                writeProposal: {
+                    kind: 'edit',
+                    objectType: 'Opportunity',
+                    recordId: '006000000000001AAA',
+                    fields: [
+                        {
+                            apiName: 'Name',
+                            proposedValue: 'Unsupported'
+                        }
+                    ]
+                }
+            });
+            previewWriteProposal.mockRejectedValue(new Error('Unsupported objectType: Opportunity'));
+
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            await flushPromises();
+
+            const toastHandler = jest.fn();
+            element.addEventListener(ShowToastEventName, toastHandler);
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Update the opportunity';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Update the opportunity' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            expect(element.shadowRoot.querySelector('#write-proposal-diff-heading')).toBeFalsy();
+            expect(element.shadowRoot.querySelector('#write-proposal-form-heading')).toBeFalsy();
+            expect(toastHandler).toHaveBeenCalled();
+            const toastEvent = toastHandler.mock.calls[0][0];
+            expect(toastEvent.detail.title).toBe('Write Proposal Rejected');
         });
     });
 

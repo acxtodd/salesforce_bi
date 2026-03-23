@@ -329,6 +329,116 @@ class TestFieldResolution:
 
 
 # =========================================================================
+# propose_edit handling
+# =========================================================================
+
+
+class TestDispatchProposeEdit:
+    def test_account_proposal_returns_structured_payload(self):
+        d, backend = _make_dispatcher()
+        result = d.dispatch({
+            "name": "propose_edit",
+            "parameters": {
+                "object_type": "Account",
+                "record_id": "001000000000001AAA",
+                "record_name": "Acme Inc",
+                "fields": [
+                    {"apiName": "AnnualRevenue", "proposedValue": 1250000},
+                    {"apiName": "NumberOfEmployees", "proposedValue": 42},
+                    {"apiName": "Type", "proposedValue": "Customer - Direct"},
+                ],
+            },
+        })
+
+        assert "write_proposal" in result
+        proposal = result["write_proposal"]
+        assert proposal["kind"] == "edit"
+        assert proposal["objectType"] == "Account"
+        assert proposal["recordId"] == "001000000000001AAA"
+        assert proposal["recordName"] == "Acme Inc"
+        assert proposal["summary"] == "Edit Acme Inc: AnnualRevenue, NumberOfEmployees, Type"
+        assert proposal["fields"][0]["apiName"] == "AnnualRevenue"
+        assert proposal["fields"][0]["label"] == "Annual Revenue"
+        assert proposal["fields"][0]["proposedValue"] == 1250000
+        assert proposal["fields"][2]["apiName"] == "Type"
+        backend.search.assert_not_called()
+        backend.aggregate.assert_not_called()
+
+    def test_contact_proposal_preserves_lookup_target(self):
+        d, _ = _make_dispatcher()
+        result = d.dispatch({
+            "name": "propose_edit",
+            "parameters": {
+                "object_type": "Contact",
+                "record_id": "003000000000001AAA",
+                "fields": [
+                    {"apiName": "Phone", "proposedValue": "214-555-0100"},
+                    {"apiName": "AccountId", "proposedValue": "001000000000002AAA"},
+                ],
+            },
+        })
+
+        proposal = result["write_proposal"]
+        assert proposal["summary"] == "Edit Contact: Phone, AccountId"
+        assert proposal["fields"][1]["lookupTarget"] == "Account"
+        assert proposal["fields"][0]["label"] == "Phone"
+
+    def test_task_proposal_covers_date_and_picklists(self):
+        d, _ = _make_dispatcher()
+        result = d.dispatch({
+            "name": "propose_edit",
+            "parameters": {
+                "object_type": "Task",
+                "record_id": "00T000000000001AAA",
+                "fields": [
+                    {"apiName": "Subject", "proposedValue": "Call client"},
+                    {"apiName": "Status", "proposedValue": "Not Started"},
+                    {"apiName": "Priority", "proposedValue": "High"},
+                    {"apiName": "ActivityDate", "proposedValue": "2026-03-23"},
+                ],
+            },
+        })
+
+        proposal = result["write_proposal"]
+        assert proposal["objectType"] == "Task"
+        assert proposal["fields"][3]["apiName"] == "ActivityDate"
+        assert proposal["fields"][3]["proposedValue"] == "2026-03-23"
+
+    def test_rejects_denormalized_field(self):
+        d, _ = _make_dispatcher()
+        result = d.dispatch({
+            "name": "propose_edit",
+            "parameters": {
+                "object_type": "Contact",
+                "record_id": "003000000000001AAA",
+                "fields": [
+                    {"apiName": "account_name", "proposedValue": "Acme Inc"},
+                ],
+            },
+        })
+
+        assert "error" in result
+        assert "account_name" in result["error"]
+        assert "proposal-eligible" in result["error"]
+
+    def test_rejects_unsupported_object_type(self):
+        d, _ = _make_dispatcher()
+        result = d.dispatch({
+            "name": "propose_edit",
+            "parameters": {
+                "object_type": "Property",
+                "record_id": "a0X000000000001AAA",
+                "fields": [
+                    {"apiName": "Phone", "proposedValue": "123"},
+                ],
+            },
+        })
+
+        assert "error" in result
+        assert "unsupported object_type" in result["error"]
+
+
+# =========================================================================
 # dispatch — unknown tools
 # =========================================================================
 

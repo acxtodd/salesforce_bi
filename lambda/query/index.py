@@ -343,13 +343,15 @@ def handler(event: dict, context: Any) -> dict:
         }))
 
     # --- Done event ------------------------------------------------------
-    sse_parts.append(
-        format_sse("done", {
-            "tool_calls": result.tool_calls_made,
-            "turns": result.turns,
-            "model_id": effective_model,
-        })
-    )
+    done_payload = {
+        "tool_calls": result.tool_calls_made,
+        "turns": result.turns,
+        "model_id": effective_model,
+    }
+    if result.write_proposal is not None:
+        done_payload["write_proposal"] = result.write_proposal
+
+    sse_parts.append(format_sse("done", done_payload))
 
     return {
         "statusCode": 200,

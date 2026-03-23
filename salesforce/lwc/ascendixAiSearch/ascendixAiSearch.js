@@ -79,6 +79,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     showWriteProposalForm = false;
     @track writeProposalPreviewData = null;
     @track writeProposalDraftValues = {};
+    @track writeProposalDraftDisplayValues = {};
     writeProposalErrorMessage = '';
     writeProposalSuccessMessage = '';
     writeProposalSuccessRecordId = null;
@@ -417,7 +418,8 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             ...field,
             proposedValue: Object.prototype.hasOwnProperty.call(this.writeProposalDraftValues, field.apiName)
                 ? this.writeProposalDraftValues[field.apiName]
-                : field.proposedValue
+                : field.proposedValue,
+            proposedValueDisplay: this.getWriteProposalDraftDisplayValue(field)
         }));
     }
 
@@ -887,6 +889,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                 fields: sanitizedPreview.fields.map(field => ({ ...field }))
             };
             this.writeProposalDraftValues = this.buildWriteProposalDraftValues(this.writeProposalPreviewData.fields);
+            this.writeProposalDraftDisplayValues = {};
             this.writeProposalSuccessMessage = '';
             this.writeProposalSuccessRecordId = null;
             this.writeProposalSuccessRecordLabel = '';
@@ -918,6 +921,67 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         }, {});
     }
 
+    getWriteProposalDraftDisplayValue(field) {
+        if (Object.prototype.hasOwnProperty.call(this.writeProposalDraftDisplayValues, field.apiName)) {
+            return this.writeProposalDraftDisplayValues[field.apiName];
+        }
+
+        const proposedValue = Object.prototype.hasOwnProperty.call(this.writeProposalDraftValues, field.apiName)
+            ? this.writeProposalDraftValues[field.apiName]
+            : field.proposedValue;
+
+        if (proposedValue === field.proposedValue && field.proposedValueDisplay) {
+            return field.proposedValueDisplay;
+        }
+
+        return this.formatWriteProposalValueDisplay(field, proposedValue);
+    }
+
+    formatWriteProposalValueDisplay(field, value) {
+        if (value === null || value === undefined || value === '') {
+            return '(empty)';
+        }
+
+        switch (field.dataType) {
+            case 'boolean':
+                return value ? 'Yes' : 'No';
+            case 'currency': {
+                const numericValue = Number(value);
+                if (!Number.isNaN(numericValue)) {
+                    return new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'USD'
+                    }).format(numericValue);
+                }
+                break;
+            }
+            case 'date': {
+                const parsedDate = new Date(`${value}T00:00:00`);
+                if (!Number.isNaN(parsedDate.getTime())) {
+                    return new Intl.DateTimeFormat('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    }).format(parsedDate);
+                }
+                break;
+            }
+            case 'phone': {
+                const digits = String(value).replace(/\D/g, '');
+                if (digits.length === 10) {
+                    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+                }
+                break;
+            }
+            case 'reference':
+                return String(value);
+            default:
+                return String(value);
+        }
+
+        return String(value);
+    }
+
     handleWriteProposalDiffCancel() {
         this._resetWriteProposalState();
     }
@@ -947,14 +1011,28 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             return;
         }
 
+        const previewField = this.writeProposalPreviewData?.fields?.find(field => field.apiName === apiName);
         const nextValue = event.detail && Object.prototype.hasOwnProperty.call(event.detail, 'value')
             ? event.detail.value
             : event.target.value;
+        const explicitDisplayValue = event.detail?.displayValue || event.target?.displayValue || null;
 
         this.writeProposalDraftValues = {
             ...this.writeProposalDraftValues,
             [apiName]: nextValue
         };
+
+        const nextDraftDisplayValues = {
+            ...this.writeProposalDraftDisplayValues
+        };
+        if (explicitDisplayValue) {
+            nextDraftDisplayValues[apiName] = explicitDisplayValue;
+        } else if (previewField && nextValue === previewField.proposedValue) {
+            delete nextDraftDisplayValues[apiName];
+        } else if (previewField) {
+            nextDraftDisplayValues[apiName] = this.formatWriteProposalValueDisplay(previewField, nextValue);
+        }
+        this.writeProposalDraftDisplayValues = nextDraftDisplayValues;
     }
 
     handleWriteProposalSubmit(event) {
@@ -985,6 +1063,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.showWriteProposalDiff = false;
         this.writeProposalPreviewData = null;
         this.writeProposalDraftValues = {};
+        this.writeProposalDraftDisplayValues = {};
         this.writeProposalSuccessRecordId = savedRecordId;
         this.writeProposalSuccessRecordLabel = recordLabel;
         this.writeProposalSuccessMessage = `Successfully updated ${recordLabel}.`;
@@ -1304,6 +1383,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.showWriteProposalForm = false;
         this.writeProposalPreviewData = null;
         this.writeProposalDraftValues = {};
+        this.writeProposalDraftDisplayValues = {};
         this.writeProposalErrorMessage = '';
         this.writeProposalSuccessMessage = '';
         this.writeProposalSuccessRecordId = null;

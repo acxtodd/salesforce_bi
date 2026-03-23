@@ -375,6 +375,13 @@ def build_writable_proposal_tool_definition() -> dict[str, Any]:
                                     "proposedValue": {
                                         "description": "The new value to apply to the field.",
                                     },
+                                    "proposedLabel": {
+                                        "type": "string",
+                                        "description": (
+                                            "Optional display label for lookup proposals "
+                                            "when the human-readable target name is known."
+                                        ),
+                                    },
                                 },
                                 "required": ["apiName", "proposedValue"],
                             },
@@ -464,6 +471,9 @@ def normalize_propose_edit_input(params: dict[str, Any]) -> dict[str, Any]:
             "label": raw_field.get("label") if isinstance(raw_field.get("label"), str) and raw_field.get("label") else field_metadata.label,
             "proposedValue": proposed_value,
         }
+        proposed_label = raw_field.get("proposedLabel")
+        if isinstance(proposed_label, str) and proposed_label.strip():
+            normalized_field["proposedLabel"] = proposed_label.strip()
         if field_metadata.lookup_target:
             normalized_field["lookupTarget"] = field_metadata.lookup_target
         normalized_fields.append(normalized_field)

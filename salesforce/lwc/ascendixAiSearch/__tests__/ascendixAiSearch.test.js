@@ -1315,6 +1315,81 @@ describe('c-ascendix-ai-search', () => {
             });
         });
 
+        it('should show edited values when returning from the form to Back to Review', async () => {
+            getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
+            callAnswerEndpoint.mockResolvedValue({
+                answer: 'I prepared a proposed update.',
+                writeProposal: {
+                    kind: 'edit',
+                    objectType: 'Contact',
+                    recordId: '003xx0000012345AAA',
+                    summary: 'Update contact details',
+                    fields: [
+                        {
+                            apiName: 'MailingCity',
+                            proposedValue: 'Austin'
+                        }
+                    ]
+                }
+            });
+            previewWriteProposal.mockResolvedValue({
+                kind: 'edit',
+                objectApiName: 'Contact',
+                objectLabel: 'Contact',
+                recordId: '003xx0000012345AAA',
+                recordLabel: 'Avery Smith',
+                summary: 'Update contact details',
+                fields: [
+                    {
+                        apiName: 'MailingCity',
+                        label: 'Mailing City',
+                        dataType: 'string',
+                        currentValue: 'Dallas',
+                        currentValueDisplay: 'Dallas',
+                        proposedValue: 'Austin',
+                        proposedValueDisplay: 'Austin',
+                        updateable: true,
+                        required: false,
+                        lookupTarget: null
+                    }
+                ]
+            });
+
+            const element = createElement('c-ascendix-ai-search', {
+                is: AscendixAiSearch
+            });
+            document.body.appendChild(element);
+
+            await flushPromises();
+
+            const textarea = element.shadowRoot.querySelector('lightning-textarea');
+            textarea.value = 'Update the contact details';
+            textarea.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Update the contact details' }
+            }));
+
+            await flushPromises();
+            element.shadowRoot.querySelector('.submit-button').click();
+            await flushPromises();
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            element.shadowRoot.querySelector('lightning-button[label="Edit in Form"]').click();
+            await flushPromises();
+
+            const inputField = element.shadowRoot.querySelector('lightning-input-field');
+            inputField.dispatchEvent(new CustomEvent('change', {
+                detail: { value: 'Houston' }
+            }));
+            await flushPromises();
+
+            element.shadowRoot.querySelector('lightning-button[label="Back to Review"]').click();
+            await flushPromises();
+
+            const diffRow = element.shadowRoot.querySelector('.write-proposal-diff-row');
+            expect(diffRow.textContent).toContain('Houston');
+            expect(diffRow.textContent).not.toContain('Austin');
+        });
+
         it('should reject unsupported proposals and avoid opening the diff modal', async () => {
             getCurrentUserId.mockResolvedValue('005xx000001X8UzAAK');
             callAnswerEndpoint.mockResolvedValue({

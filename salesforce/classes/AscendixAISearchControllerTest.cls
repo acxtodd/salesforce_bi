@@ -140,7 +140,8 @@ private class AscendixAISearchControllerTest {
         Map<String, Object> accountField = (Map<String, Object>) fields[2];
         System.assertEquals('AccountId', accountField.get('apiName'));
         System.assertEquals('Northwind', accountField.get('currentValueDisplay'));
-        System.assertEquals(String.valueOf(secondAccount.Id), accountField.get('proposedValueDisplay'));
+        System.assertEquals('Southwind', accountField.get('proposedValueDisplay'));
+        System.assertEquals('Southwind', accountField.get('proposedLabel'));
     }
 
     @isTest

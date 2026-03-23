@@ -447,8 +447,11 @@ public with sharing class AscendixAISearchController {
         for (WriteFieldPreview preview : fieldPreviews) {
             Schema.DescribeFieldResult fieldDescribe = fieldMap.get(preview.apiName).getDescribe();
             Object currentRaw = record.get(preview.apiName);
+            String resolvedProposedLabel = preview.proposedLabel != null
+                ? stringValue(preview.proposedLabel)
+                : resolveReferenceDisplayLabel(fieldDescribe, preview.proposedValue, record);
             String currentDisplay = formatDisplayValue(fieldDescribe, currentRaw, record, currencyIsoCode, null, referenceTargetNameFields.get(preview.apiName));
-            String proposedDisplay = formatDisplayValue(fieldDescribe, preview.proposedValue, record, currencyIsoCode, preview.proposedLabel, referenceTargetNameFields.get(preview.apiName));
+            String proposedDisplay = formatDisplayValue(fieldDescribe, preview.proposedValue, record, currencyIsoCode, resolvedProposedLabel, referenceTargetNameFields.get(preview.apiName));
 
             Map<String, Object> fieldPayload = new Map<String, Object>();
             fieldPayload.put('apiName', preview.apiName);
@@ -457,6 +460,7 @@ public with sharing class AscendixAISearchController {
             fieldPayload.put('currentValue', currentRaw);
             fieldPayload.put('currentValueDisplay', currentDisplay);
             fieldPayload.put('proposedValue', preview.proposedValue);
+            fieldPayload.put('proposedLabel', resolvedProposedLabel);
             fieldPayload.put('proposedValueDisplay', proposedDisplay);
             fieldPayload.put('updateable', fieldDescribe.isUpdateable());
             fieldPayload.put('required', !fieldDescribe.isNillable() && !fieldDescribe.isDefaultedOnCreate());
@@ -584,6 +588,47 @@ public with sharing class AscendixAISearchController {
             return null;
         }
         return targets[0].getDescribe().getName();
+    }
+
+    private static String resolveReferenceDisplayLabel(
+        Schema.DescribeFieldResult fieldDescribe,
+        Object rawValue,
+        SObject record
+    ) {
+        if (String.valueOf(fieldDescribe.getType()).toLowerCase() != 'reference' || rawValue == null) {
+            return null;
+        }
+
+        Object currentRaw = record != null ? record.get(fieldDescribe.getName()) : null;
+        String rawId = String.valueOf(rawValue);
+        if (currentRaw != null && String.valueOf(currentRaw) == rawId) {
+            return null;
+        }
+
+        String targetObjectName = getLookupTargetName(fieldDescribe);
+        String targetNameField = getReferenceTargetNameField(fieldDescribe);
+        if (String.isBlank(targetObjectName) || String.isBlank(targetNameField)) {
+            return null;
+        }
+
+        Id targetId;
+        try {
+            targetId = Id.valueOf(rawId);
+        } catch (Exception invalidId) {
+            return null;
+        }
+
+        try {
+            SObject targetRecord = Database.query(
+                'SELECT ' + targetNameField +
+                ' FROM ' + targetObjectName +
+                ' WHERE Id = :targetId LIMIT 1'
+            );
+            Object display = targetRecord != null ? targetRecord.get(targetNameField) : null;
+            return display != null ? String.valueOf(display) : null;
+        } catch (Exception queryException) {
+            return null;
+        }
     }
 
     private static String formatDisplayValue(Schema.DescribeFieldResult fieldDescribe, Object rawValue, SObject record) {

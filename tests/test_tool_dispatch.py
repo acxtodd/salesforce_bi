@@ -373,7 +373,11 @@ class TestDispatchProposeEdit:
                 "record_id": "003000000000001AAA",
                 "fields": [
                     {"apiName": "Phone", "proposedValue": "214-555-0100"},
-                    {"apiName": "AccountId", "proposedValue": "001000000000002AAA"},
+                    {
+                        "apiName": "AccountId",
+                        "proposedValue": "001000000000002AAA",
+                        "proposedLabel": "Southwind",
+                    },
                 ],
             },
         })
@@ -381,6 +385,7 @@ class TestDispatchProposeEdit:
         proposal = result["write_proposal"]
         assert proposal["summary"] == "Edit Contact: Phone, AccountId"
         assert proposal["fields"][1]["lookupTarget"] == "Account"
+        assert proposal["fields"][1]["proposedLabel"] == "Southwind"
         assert proposal["fields"][0]["label"] == "Phone"
 
     def test_task_proposal_covers_date_and_picklists(self):

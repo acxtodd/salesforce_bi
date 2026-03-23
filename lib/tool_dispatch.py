@@ -1,6 +1,7 @@
 """Tool dispatch module for AscendixIQ query pipeline (Task 1.1.1).
 
-Translates Claude tool-call JSON (search_records, aggregate_records) into
+Translates Claude tool-call JSON (search_records, aggregate_records,
+propose_edit) into
 SearchBackend method calls.  Pure module — no network I/O.  Takes a
 SearchBackend instance as an injected dependency so it can be unit-tested
 with mocks.
@@ -19,6 +20,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lib.search_backend import SearchBackend
+from lib.write_proposal import (
+    WriteProposalValidationError,
+    normalize_propose_edit_input,
+)
 
 # ---------------------------------------------------------------------------
 # Field-name utilities
@@ -353,7 +358,7 @@ class FieldValidationError(ValueError):
 # Dispatcher
 # ---------------------------------------------------------------------------
 
-_SUPPORTED_TOOLS = frozenset({"search_records", "aggregate_records"})
+_SUPPORTED_TOOLS = frozenset({"search_records", "aggregate_records", "propose_edit"})
 _SUPPORTED_AGGREGATES = frozenset({"count", "sum", "avg"})
 _MAX_LIMIT = 50
 _DEFAULT_LIMIT = 10
@@ -404,9 +409,13 @@ class ToolDispatcher:
         try:
             if name == "search_records":
                 return self._handle_search(params)
-            else:
+            elif name == "aggregate_records":
                 return self._handle_aggregate(params)
+            else:
+                return self._handle_propose_edit(params)
         except FieldValidationError as exc:
+            return {"error": str(exc)}
+        except WriteProposalValidationError as exc:
             return {"error": str(exc)}
         except Exception as exc:
             return {"error": f"Tool execution failed: {exc}"}
@@ -556,3 +565,8 @@ class ToolDispatcher:
             result["_truncated"] = truncated
 
         return {"result": result}
+
+    def _handle_propose_edit(self, params: dict) -> dict:
+        """Validate and normalize a structured edit proposal."""
+        proposal = normalize_propose_edit_input(params)
+        return {"write_proposal": proposal}

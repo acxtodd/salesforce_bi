@@ -19,6 +19,12 @@ from __future__ import annotations
 from datetime import date
 
 from lib.tool_dispatch import SEMANTIC_ALIASES, _clean_label, _to_snake_case, build_field_registry
+from lib.write_proposal import (
+    build_writable_field_reference,
+    build_writable_proposal_guidance,
+    build_writable_proposal_tool_definition,
+    get_writable_object_types,
+)
 
 # ---------------------------------------------------------------------------
 # CRE domain vocabulary (referenced in the system prompt)
@@ -117,6 +123,23 @@ _CONTACT_FIELDS = """\
   - account_name: parent account name (denormalized)
   - reports_to_name: manager/contact hierarchy name (denormalized)
   - mailing_latitude, mailing_longitude, other_latitude, other_longitude: geocoordinates"""
+
+_WRITE_PROPOSAL_FIELDS = build_writable_field_reference()
+_WRITE_PROPOSAL_OBJECTS = ", ".join(get_writable_object_types())
+_WRITE_PROPOSAL_EXAMPLE = """\
+
+**14. Edit proposal — confirm the target record and use exact writable fields**
+User: "Update John Smith's phone number to 214-555-0100"
+Tool call:
+  propose_edit(
+    object_type="Contact",
+    record_id="003000000000001AAA",
+    record_name="John Smith",
+    summary="Update John Smith's phone number",
+    fields=[{"apiName": "Phone", "proposedValue": "214-555-0100"}]
+  )
+Note: Confirm the target record first, then propose the smallest explicit field
+change. Never include denormalized search fields or read-only/system fields."""
 
 # ---------------------------------------------------------------------------
 # Field reference tables for new objects (curated, task 4.10)
@@ -573,7 +596,12 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
      where Colliers is buyer rep, seller rep, or listing broker]``
    - User: "What's the best way to compare two markets?"
      Answer: brief explanation + ``[CLARIFY:Dallas vs Houston deals|Compare
-     total deal volume in Dallas vs Houston]``\
+     total deal volume in Dallas vs Houston]``
+
+20. **For write proposals, keep the payload inside the writable contract.**
+   {build_writable_proposal_guidance()} Supported writable objects: {_WRITE_PROPOSAL_OBJECTS}.
+   Writable fields:
+{_WRITE_PROPOSAL_FIELDS}\
 """
 
 # Static guidelines used by the static SYSTEM_PROMPT (5-object fallback).
@@ -596,7 +624,7 @@ You understand the following commercial real estate terminology: {_CRE_VOCABULAR
 
 ## Available Tools
 
-You have access to two tools:
+You have access to three tools:
 
 - **search_records**: Search indexed CRE and CRM data (Property, Lease, Availability, Account, Contact). \
 Use metadata filters for precise queries. Call multiple times in parallel for \
@@ -605,6 +633,10 @@ cross-object questions. Returns matching documents with relevance scores.
 - **aggregate_records**: Count, sum, or average records matching criteria, \
 optionally grouped by a field. Use for "how many," "total," "average," \
 "breakdown" questions.
+
+- **propose_edit**: Create a typed edit proposal for a supported writable \
+Salesforce record. Use only when the target record is already identified, and \
+only propose fields from the writable contract.
 
 Note: live_salesforce_query is NOT available in this POC.
 
@@ -625,7 +657,14 @@ Note: live_salesforce_query is NOT available in this POC.
 ### Contact fields
 {_CONTACT_FIELDS}
 
-{_FEW_SHOT_EXAMPLES}
+## Write Proposals
+
+Supported writable objects: {_WRITE_PROPOSAL_OBJECTS}
+
+Writable fields:
+{_WRITE_PROPOSAL_FIELDS}
+
+{_FEW_SHOT_EXAMPLES}{_WRITE_PROPOSAL_EXAMPLE}
 
 {_GUIDELINES}
 """
@@ -766,6 +805,7 @@ TOOL_DEFINITIONS: list[dict] = [
             },
         }
     },
+    build_writable_proposal_tool_definition(),
 ]
 
 
@@ -823,6 +863,8 @@ def build_system_prompt(config: dict) -> str:
     # Build object name list for dynamic sections
     object_names = [k.capitalize() for k in sorted(field_map.keys())]
     object_list_str = ", ".join(object_names)
+    writable_object_list_str = ", ".join(get_writable_object_types())
+    writable_field_reference = build_writable_field_reference()
 
     field_sections: list[str] = []
     for obj_type in sorted(field_map.keys()):
@@ -854,7 +896,7 @@ You understand the following commercial real estate terminology: {_CRE_VOCABULAR
 
 ## Available Tools
 
-You have access to two tools:
+You have access to three tools:
 
 - **search_records**: Search indexed CRE and CRM data ({object_list_str}). \
 Use metadata filters for precise queries. Call multiple times in parallel for \
@@ -864,13 +906,24 @@ cross-object questions. Returns matching documents with relevance scores.
 optionally grouped by a field. Use for "how many," "total," "average," \
 "breakdown" questions.
 
+- **propose_edit**: Create a typed edit proposal for a supported writable \
+Salesforce record. Use only when the target record is already identified, and \
+only propose fields from the writable contract.
+
 Note: live_salesforce_query is NOT available in this POC.
 
 ## Field Reference
 
 {field_reference}
 
-{_FEW_SHOT_EXAMPLES}
+## Write Proposals
+
+Supported writable objects: {writable_object_list_str}
+
+Writable fields:
+{writable_field_reference}
+
+{_FEW_SHOT_EXAMPLES}{_WRITE_PROPOSAL_EXAMPLE}
 
 {guidelines}
 """
@@ -1017,4 +1070,5 @@ def build_tool_definitions(config: dict) -> list[dict]:
                 },
             }
         },
+        build_writable_proposal_tool_definition(),
     ]

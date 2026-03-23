@@ -83,6 +83,20 @@
                 </div>
             </template>
 
+            <!-- Write Proposal Success Banner -->
+            <template if:true={writeProposalSuccessMessage}>
+                <div class="slds-m-top_medium write-proposal-success" role="status" aria-live="polite">
+                    <lightning-icon icon-name="utility:success" alternative-text="Success" size="small"
+                        class="slds-m-right_x-small"></lightning-icon>
+                    <span>{writeProposalSuccessMessage}</span>
+                    <template if:true={writeProposalSuccessRecordId}>
+                        <lightning-button variant="base" label="View Record" title="Open updated record"
+                            onclick={handleWriteProposalSuccessRecordClick}
+                            icon-name="utility:new_window" class="slds-m-left_small"></lightning-button>
+                    </template>
+                </div>
+            </template>
+
             <!-- Record Page Conversation Thread (compact prior exchanges) -->
             <template if:true={showConversationThread}>
                 <div class="conversation-thread slds-m-top_medium" role="region"
@@ -388,6 +402,126 @@
                         onclick={handleActionConfirm} disabled={isExecutingAction} icon-name="utility:check"
                         class="slds-m-left_x-small"></lightning-button>
                 </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <!-- Write Proposal Diff Modal -->
+    <template if:true={hasWriteProposalDiff}>
+        <section role="dialog" tabindex="-1" aria-labelledby="write-proposal-diff-heading" aria-modal="true"
+            class="slds-modal slds-fade-in-open slds-modal_large">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close" onclick={closeWriteProposalDiff}>
+                        <lightning-icon icon-name="utility:close" alternative-text="close"
+                            size="small"></lightning-icon>
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                    <h2 id="write-proposal-diff-heading" class="slds-modal__title slds-hyphenate">
+                        {writeProposalDiffTitle}
+                    </h2>
+                    <p class="slds-m-top_x-small slds-text-body_small">
+                        Review the proposed values before opening the edit form.
+                    </p>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium" id="write-proposal-diff-content">
+                    <template if:true={hasWriteProposalSummary}>
+                        <p class="slds-m-bottom_medium">{writeProposalSummary}</p>
+                    </template>
+
+                    <table class="slds-table slds-table_bordered slds-table_cell-buffer write-proposal-diff-table">
+                        <thead>
+                            <tr class="slds-line-height_reset">
+                                <th scope="col" class="slds-text-title_caps">Field</th>
+                                <th scope="col" class="slds-text-title_caps">Current Value</th>
+                                <th scope="col" class="slds-text-title_caps">Proposed Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={writeProposalFields} for:item="field">
+                                <tr key={field.apiName} class="slds-hint-parent write-proposal-diff-row">
+                                    <th scope="row">
+                                        <div class="slds-truncate" title={field.label}>{field.label}</div>
+                                    </th>
+                                    <td>
+                                        <div class="slds-truncate" title={field.currentValueDisplay}>
+                                            {field.currentValueDisplay}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="slds-truncate" title={field.proposedValueDisplay}>
+                                            {field.proposedValueDisplay}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+                <footer class="slds-modal__footer">
+                    <lightning-button variant="neutral" label="Cancel" title="Close diff review"
+                        onclick={handleWriteProposalDiffCancel}></lightning-button>
+                    <lightning-button variant="brand" label="Edit in Form" title="Open Salesforce edit form"
+                        onclick={handleWriteProposalEditInForm} icon-name="utility:edit"
+                        class="slds-m-left_x-small"></lightning-button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+
+    <!-- Write Proposal Edit Form Modal -->
+    <template if:true={hasWriteProposalForm}>
+        <section role="dialog" tabindex="-1" aria-labelledby="write-proposal-form-heading" aria-modal="true"
+            class="slds-modal slds-fade-in-open slds-modal_large">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse"
+                        title="Close" onclick={closeWriteProposalForm}>
+                        <lightning-icon icon-name="utility:close" alternative-text="close"
+                            size="small"></lightning-icon>
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                    <h2 id="write-proposal-form-heading" class="slds-modal__title slds-hyphenate">
+                        {writeProposalFormTitle}
+                    </h2>
+                    <p class="slds-m-top_x-small slds-text-body_small">
+                        Salesforce will validate the edit through the native record form.
+                    </p>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium" id="write-proposal-form-content">
+                    <lightning-record-edit-form record-id={writeProposalRecordId}
+                        object-api-name={writeProposalObjectApiName}
+                        onsubmit={handleWriteProposalSubmit}
+                        onsuccess={handleWriteProposalSuccess}
+                        onerror={handleWriteProposalError}>
+                        <lightning-messages></lightning-messages>
+
+                        <template if:true={writeProposalErrorMessage}>
+                            <div class="slds-m-bottom_small write-proposal-form-error">
+                                <lightning-icon icon-name="utility:error" alternative-text="Error" size="small"
+                                    class="slds-m-right_x-small"></lightning-icon>
+                                <span>{writeProposalErrorMessage}</span>
+                            </div>
+                        </template>
+
+                        <template for:each={writeProposalFields} for:item="field">
+                            <lightning-input-field key={field.apiName} field-name={field.apiName}
+                                data-api-name={field.apiName}
+                                onchange={handleWriteProposalFieldChange}
+                                value={field.proposedValue}></lightning-input-field>
+                        </template>
+
+                        <footer class="slds-modal__footer slds-p-horizontal_none slds-p-top_medium">
+                            <lightning-button variant="neutral" label="Back to Review" title="Return to diff review"
+                                onclick={handleWriteProposalFormCancel}></lightning-button>
+                            <lightning-button variant="brand" label="Save" title="Save record changes" type="submit"
+                                icon-name="utility:save" class="slds-m-left_x-small"></lightning-button>
+                        </footer>
+                    </lightning-record-edit-form>
+                </div>
             </div>
         </section>
         <div class="slds-backdrop slds-backdrop_open"></div>

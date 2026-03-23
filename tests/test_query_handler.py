@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from lib.query_handler import MAX_TURNS, QueryHandler, QueryResult
 from lib.search_backend import SearchBackend
+from lib.system_prompt import build_tool_definitions
 from lib.tool_dispatch import ToolDispatcher, build_field_registry
 
 # =========================================================================
@@ -71,45 +72,7 @@ SAMPLE_CONFIG = {
 NAMESPACE = "org_00Ddl000003yx57EAA"
 MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 SYSTEM_PROMPT = "You are a CRE search assistant."
-TOOL_DEFS = [
-    {
-        "toolSpec": {
-            "name": "search_records",
-            "description": "Search AscendixIQ CRE records.",
-            "inputSchema": {
-                "json": {
-                    "type": "object",
-                    "properties": {
-                        "object_type": {"type": "string"},
-                        "filters": {"type": "object"},
-                        "text_query": {"type": "string"},
-                        "limit": {"type": "integer"},
-                    },
-                    "required": ["object_type"],
-                }
-            },
-        }
-    },
-    {
-        "toolSpec": {
-            "name": "aggregate_records",
-            "description": "Aggregate CRE records.",
-            "inputSchema": {
-                "json": {
-                    "type": "object",
-                    "properties": {
-                        "object_type": {"type": "string"},
-                        "aggregate": {"type": "string"},
-                        "filters": {"type": "object"},
-                        "aggregate_field": {"type": "string"},
-                        "group_by": {"type": "string"},
-                    },
-                    "required": ["object_type"],
-                }
-            },
-        }
-    },
-]
+TOOL_DEFS = build_tool_definitions(SAMPLE_CONFIG)
 
 
 def _make_backend() -> MagicMock:
@@ -509,6 +472,45 @@ class TestToolErrorHandling:
         error_json = tool_result_msg["content"][0]["toolResult"]["content"][0]["json"]
         assert "error" in error_json
         assert "nonexistent_field" in error_json["error"]
+
+
+# =========================================================================
+# 6b. Write proposal handling
+# =========================================================================
+
+class TestWriteProposalHandling:
+    """Structured propose_edit results should be preserved separately."""
+
+    def test_write_proposal_is_returned_separately_from_answer(self):
+        backend = _make_backend()
+        bedrock = MagicMock()
+        bedrock.converse.side_effect = [
+            _tool_use_response([{
+                "toolUseId": "call-edit",
+                "name": "propose_edit",
+                "input": {
+                    "object_type": "Contact",
+                    "record_id": "003000000000001AAA",
+                    "record_name": "John Smith",
+                    "fields": [
+                        {"apiName": "Phone", "proposedValue": "214-555-0100"},
+                        {"apiName": "AccountId", "proposedValue": "001000000000001AAA"},
+                    ],
+                },
+            }]),
+            _end_turn_response("I prepared a minimal edit proposal."),
+        ]
+
+        handler = _make_handler(bedrock, backend)
+        result = handler.query("Update John Smith's contact details")
+
+        assert result.answer == "I prepared a minimal edit proposal."
+        assert result.write_proposal is not None
+        assert result.write_proposal["kind"] == "edit"
+        assert result.write_proposal["objectType"] == "Contact"
+        assert result.write_proposal["recordId"] == "003000000000001AAA"
+        assert result.write_proposal["fields"][1]["lookupTarget"] == "Account"
+        assert result.tool_call_log[0]["result_count"] == 2
 
 
 # =========================================================================

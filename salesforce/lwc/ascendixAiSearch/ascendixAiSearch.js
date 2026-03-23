@@ -2,6 +2,7 @@ import { LightningElement, api, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { NavigationMixin } from 'lightning/navigation';
 import callAnswerEndpoint from '@salesforce/apex/AscendixAISearchController.callAnswerEndpoint';
+import previewWriteProposal from '@salesforce/apex/AscendixAISearchController.previewWriteProposal';
 import callActionEndpoint from '@salesforce/apex/AscendixAISearchController.callActionEndpoint';
 import getCurrentUserId from '@salesforce/apex/AscendixAISearchController.getCurrentUserId';
 
@@ -32,6 +33,14 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             businessUnit: null,
             quarter: null
         };
+        this.showWriteProposalDiff = false;
+        this.showWriteProposalForm = false;
+        this.writeProposalPreviewData = null;
+        this.writeProposalErrorMessage = '';
+        this.writeProposalSuccessMessage = '';
+        this.writeProposalSuccessRecordId = null;
+        this.writeProposalSuccessRecordLabel = '';
+        this.isLoadingWriteProposal = false;
         this.showActionPreview = false;
         this.actionPreviewData = null;
         this.isExecutingAction = false;
@@ -66,6 +75,16 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         businessUnit: null,
         quarter: null
     };
+    showWriteProposalDiff = false;
+    showWriteProposalForm = false;
+    @track writeProposalPreviewData = null;
+    @track writeProposalDraftValues = {};
+    @track writeProposalDraftDisplayValues = {};
+    writeProposalErrorMessage = '';
+    writeProposalSuccessMessage = '';
+    writeProposalSuccessRecordId = null;
+    writeProposalSuccessRecordLabel = '';
+    isLoadingWriteProposal = false;
 
     // Phase 2: Action preview and confirmation
     @api showActionPreview = false;
@@ -383,6 +402,61 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         return this.actionResultRecordIds && this.actionResultRecordIds.length > 0;
     }
 
+    get hasWriteProposalDiff() {
+        return this.showWriteProposalDiff && this.writeProposalPreviewData && Array.isArray(this.writeProposalPreviewData.fields) && this.writeProposalPreviewData.fields.length > 0;
+    }
+
+    get hasWriteProposalForm() {
+        return this.showWriteProposalForm && this.writeProposalPreviewData;
+    }
+
+    get writeProposalFields() {
+        if (!this.writeProposalPreviewData || !Array.isArray(this.writeProposalPreviewData.fields)) {
+            return [];
+        }
+        return this.writeProposalPreviewData.fields.map(field => ({
+            ...field,
+            proposedValue: Object.prototype.hasOwnProperty.call(this.writeProposalDraftValues, field.apiName)
+                ? this.writeProposalDraftValues[field.apiName]
+                : field.proposedValue,
+            proposedValueDisplay: this.getWriteProposalDraftDisplayValue(field)
+        }));
+    }
+
+    get writeProposalFormTitle() {
+        if (!this.writeProposalPreviewData) {
+            return 'Edit Proposal';
+        }
+        const label = this.writeProposalPreviewData.recordLabel || this.writeProposalPreviewData.objectLabel || 'record';
+        return `Edit ${label}`;
+    }
+
+    get writeProposalDiffTitle() {
+        if (!this.writeProposalPreviewData) {
+            return 'Review Proposed Changes';
+        }
+        const label = this.writeProposalPreviewData.recordLabel || this.writeProposalPreviewData.objectLabel || 'record';
+        return `Review proposed changes for ${label}`;
+    }
+
+    get hasWriteProposalSummary() {
+        return !!(this.writeProposalPreviewData && this.writeProposalPreviewData.summary);
+    }
+
+    get writeProposalSummary() {
+        return this.writeProposalPreviewData && this.writeProposalPreviewData.summary
+            ? this.writeProposalPreviewData.summary
+            : '';
+    }
+
+    get writeProposalRecordId() {
+        return this.writeProposalPreviewData ? this.writeProposalPreviewData.recordId : null;
+    }
+
+    get writeProposalObjectApiName() {
+        return this.writeProposalPreviewData ? this.writeProposalPreviewData.objectApiName : null;
+    }
+
     get regionOptions() {
         return [
             { label: 'None', value: '' },
@@ -454,6 +528,14 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
 
         // Close modals on Escape
         if (event.key === 'Escape') {
+            if (this.showWriteProposalForm) {
+                this.closeWriteProposalForm();
+                return;
+            }
+            if (this.showWriteProposalDiff) {
+                this.closeWriteProposalDiff();
+                return;
+            }
             if (this.showCitationsDrawer) {
                 this.toggleCitationsDrawer();
             }
@@ -480,6 +562,7 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.showRetryButton = false;
         this.showAnswerSection = true;
         this.isStreaming = true;
+        this._resetWriteProposalState();
 
         // Call the answer endpoint
         this.streamAnswer();
@@ -690,6 +773,10 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                     answer: answerText
                 };
 
+                if (response.writeProposal) {
+                    await this.prepareWriteProposal(response.writeProposal);
+                }
+
                 // Check for special cases
                 if (response.reason === 'no_accessible_results') {
                     this.showToast('No Results', 'No results found that you have access to.', 'info');
@@ -778,6 +865,277 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         });
 
         console.log('Total citations:', this.citations.length);
+    }
+
+    async prepareWriteProposal(writeProposal) {
+        if (!writeProposal) {
+            return;
+        }
+
+        this.isLoadingWriteProposal = true;
+        this.writeProposalErrorMessage = '';
+
+        try {
+            const sanitizedPreview = await previewWriteProposal({
+                proposalJson: JSON.stringify(writeProposal)
+            });
+
+            if (!sanitizedPreview || !sanitizedPreview.fields || sanitizedPreview.fields.length === 0) {
+                throw new Error('Write proposal did not contain any supported fields.');
+            }
+
+            this.writeProposalPreviewData = {
+                ...sanitizedPreview,
+                fields: sanitizedPreview.fields.map(field => ({ ...field }))
+            };
+            this.writeProposalDraftValues = this.buildWriteProposalDraftValues(this.writeProposalPreviewData.fields);
+            this.writeProposalDraftDisplayValues = {};
+            this.writeProposalSuccessMessage = '';
+            this.writeProposalSuccessRecordId = null;
+            this.writeProposalSuccessRecordLabel = '';
+            this.showWriteProposalDiff = true;
+            this.showWriteProposalForm = false;
+        } catch (error) {
+            const message = this.extractErrorMessage(error) || 'The proposed edit could not be reviewed.';
+            this.showToast('Write Proposal Rejected', message, 'error');
+            this._resetWriteProposalState();
+        } finally {
+            this.isLoadingWriteProposal = false;
+        }
+    }
+
+    handleWriteProposalEditInForm() {
+        if (!this.writeProposalPreviewData) {
+            return;
+        }
+
+        this.writeProposalErrorMessage = '';
+        this.showWriteProposalDiff = false;
+        this.showWriteProposalForm = true;
+    }
+
+    buildWriteProposalDraftValues(fields) {
+        return (Array.isArray(fields) ? fields : []).reduce((draftValues, field) => {
+            draftValues[field.apiName] = field.proposedValue;
+            return draftValues;
+        }, {});
+    }
+
+    getWriteProposalDraftDisplayValue(field) {
+        if (Object.prototype.hasOwnProperty.call(this.writeProposalDraftDisplayValues, field.apiName)) {
+            return this.writeProposalDraftDisplayValues[field.apiName];
+        }
+
+        const proposedValue = Object.prototype.hasOwnProperty.call(this.writeProposalDraftValues, field.apiName)
+            ? this.writeProposalDraftValues[field.apiName]
+            : field.proposedValue;
+
+        if (proposedValue === field.proposedValue && field.proposedValueDisplay) {
+            return field.proposedValueDisplay;
+        }
+
+        return this.formatWriteProposalValueDisplay(field, proposedValue);
+    }
+
+    formatWriteProposalValueDisplay(field, value) {
+        if (value === null || value === undefined || value === '') {
+            return '(empty)';
+        }
+
+        switch (field.dataType) {
+            case 'boolean':
+                return value ? 'Yes' : 'No';
+            case 'currency': {
+                const numericValue = Number(value);
+                if (!Number.isNaN(numericValue)) {
+                    return new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: 'USD'
+                    }).format(numericValue);
+                }
+                break;
+            }
+            case 'date': {
+                const parsedDate = new Date(`${value}T00:00:00`);
+                if (!Number.isNaN(parsedDate.getTime())) {
+                    return new Intl.DateTimeFormat('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    }).format(parsedDate);
+                }
+                break;
+            }
+            case 'phone': {
+                const digits = String(value).replace(/\D/g, '');
+                if (digits.length === 10) {
+                    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+                }
+                break;
+            }
+            case 'reference':
+                return String(value);
+            default:
+                return String(value);
+        }
+
+        return String(value);
+    }
+
+    handleWriteProposalDiffCancel() {
+        this._resetWriteProposalState();
+    }
+
+    closeWriteProposalDiff() {
+        this._resetWriteProposalState();
+    }
+
+    handleWriteProposalFormCancel() {
+        if (!this.writeProposalPreviewData) {
+            this._resetWriteProposalState();
+            return;
+        }
+
+        this.writeProposalErrorMessage = '';
+        this.showWriteProposalForm = false;
+        this.showWriteProposalDiff = true;
+    }
+
+    closeWriteProposalForm() {
+        this._resetWriteProposalState();
+    }
+
+    handleWriteProposalFieldChange(event) {
+        const apiName = event.target?.dataset?.apiName;
+        if (!apiName) {
+            return;
+        }
+
+        const previewField = this.writeProposalPreviewData?.fields?.find(field => field.apiName === apiName);
+        const nextValue = event.detail && Object.prototype.hasOwnProperty.call(event.detail, 'value')
+            ? event.detail.value
+            : event.target.value;
+        const explicitDisplayValue = event.detail?.displayValue || event.target?.displayValue || null;
+
+        this.writeProposalDraftValues = {
+            ...this.writeProposalDraftValues,
+            [apiName]: nextValue
+        };
+
+        const nextDraftDisplayValues = {
+            ...this.writeProposalDraftDisplayValues
+        };
+        if (explicitDisplayValue) {
+            nextDraftDisplayValues[apiName] = explicitDisplayValue;
+        } else if (previewField && nextValue === previewField.proposedValue) {
+            delete nextDraftDisplayValues[apiName];
+        } else if (previewField) {
+            nextDraftDisplayValues[apiName] = this.formatWriteProposalValueDisplay(previewField, nextValue);
+        }
+        this.writeProposalDraftDisplayValues = nextDraftDisplayValues;
+    }
+
+    handleWriteProposalSubmit(event) {
+        event.preventDefault();
+        this.writeProposalErrorMessage = '';
+
+        const submittedFields = event.detail?.fields || {};
+        const mergedFields = {
+            ...submittedFields
+        };
+
+        this.writeProposalFields.forEach(field => {
+            mergedFields[field.apiName] = Object.prototype.hasOwnProperty.call(this.writeProposalDraftValues, field.apiName)
+                ? this.writeProposalDraftValues[field.apiName]
+                : field.proposedValue;
+        });
+
+        event.target.submit(mergedFields);
+    }
+
+    handleWriteProposalSuccess(event) {
+        const savedRecordId = event?.detail?.id || this.writeProposalPreviewData?.recordId;
+        const recordLabel = this.writeProposalPreviewData?.recordLabel || this.writeProposalPreviewData?.objectLabel || 'record';
+        const confirmationMessage = `Confirmed update saved for ${recordLabel}.`;
+
+        this.writeProposalErrorMessage = '';
+        this.showWriteProposalForm = false;
+        this.showWriteProposalDiff = false;
+        this.writeProposalPreviewData = null;
+        this.writeProposalDraftValues = {};
+        this.writeProposalDraftDisplayValues = {};
+        this.writeProposalSuccessRecordId = savedRecordId;
+        this.writeProposalSuccessRecordLabel = recordLabel;
+        this.writeProposalSuccessMessage = `Successfully updated ${recordLabel}.`;
+        this.appendWriteProposalConfirmation(confirmationMessage);
+
+        this.showToast('Record Updated', this.writeProposalSuccessMessage, 'success');
+    }
+
+    handleWriteProposalError(event) {
+        const message = this.extractWriteProposalError(event) || 'Unable to save the proposed changes.';
+        this.writeProposalErrorMessage = message;
+        this.showToast('Save Failed', message, 'error');
+    }
+
+    handleWriteProposalSuccessRecordClick() {
+        if (this.writeProposalSuccessRecordId) {
+            this.navigateToRecord(this.writeProposalSuccessRecordId);
+        }
+    }
+
+    extractWriteProposalError(event) {
+        if (!event) {
+            return '';
+        }
+
+        if (event.detail) {
+            if (event.detail.message) {
+                return event.detail.message;
+            }
+            if (event.detail.output && event.detail.output.errors && event.detail.output.errors.length > 0) {
+                return event.detail.output.errors[0].message;
+            }
+            if (event.detail.detail && event.detail.detail.message) {
+                return event.detail.detail.message;
+            }
+        }
+
+        if (event.message) {
+            return event.message;
+        }
+
+        return '';
+    }
+
+    appendWriteProposalConfirmation(message) {
+        if (!message) {
+            return;
+        }
+
+        const nextAnswer = this.answer
+            ? `${this.answer}\n\n${message}`
+            : message;
+
+        this.answer = nextAnswer;
+        this.showAnswerSection = true;
+
+        if (this.lastExchange) {
+            this.lastExchange = {
+                ...this.lastExchange,
+                answer: nextAnswer
+            };
+        }
+
+        if (this.isRecordPage && Array.isArray(this.conversationHistory) && this.conversationHistory.length > 0) {
+            const updatedHistory = [...this.conversationHistory];
+            const lastIndex = updatedHistory.length - 1;
+            updatedHistory[lastIndex] = {
+                ...updatedHistory[lastIndex],
+                answer: nextAnswer
+            };
+            this.conversationHistory = updatedHistory;
+        }
     }
 
     /**
@@ -1017,6 +1375,20 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.lastModelUsed = '';
         this.showCitationsDrawer = false;
         this.showCitationPreview = false;
+        this._resetWriteProposalState();
+    }
+
+    _resetWriteProposalState() {
+        this.showWriteProposalDiff = false;
+        this.showWriteProposalForm = false;
+        this.writeProposalPreviewData = null;
+        this.writeProposalDraftValues = {};
+        this.writeProposalDraftDisplayValues = {};
+        this.writeProposalErrorMessage = '';
+        this.writeProposalSuccessMessage = '';
+        this.writeProposalSuccessRecordId = null;
+        this.writeProposalSuccessRecordLabel = '';
+        this.isLoadingWriteProposal = false;
     }
 
     getUserId() {
@@ -1057,6 +1429,27 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
                 button.setAttribute('label', button.label);
             }
         });
+    }
+
+    extractErrorMessage(error) {
+        if (!error) {
+            return '';
+        }
+
+        if (error.body) {
+            if (error.body.message) {
+                return error.body.message;
+            }
+            if (typeof error.body === 'string') {
+                return error.body;
+            }
+        }
+
+        if (error.message) {
+            return error.message;
+        }
+
+        return '';
     }
 
 

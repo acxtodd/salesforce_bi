@@ -279,6 +279,11 @@ class TestSystemPrompt:
     def test_mentions_denormalized_fields(self):
         assert "denormalized" in SYSTEM_PROMPT.lower() or "denorm" in SYSTEM_PROMPT.lower()
 
+    def test_mentions_write_proposals(self):
+        assert "propose_edit" in SYSTEM_PROMPT
+        assert "Supported writable objects" in SYSTEM_PROMPT
+        assert "Confirm the target record" in SYSTEM_PROMPT
+
     def test_mentions_cite_records(self):
         assert "cite" in SYSTEM_PROMPT.lower()
 
@@ -331,11 +336,11 @@ class TestToolDefinitions:
 
     def test_is_list_of_two(self):
         assert isinstance(TOOL_DEFINITIONS, list)
-        assert len(TOOL_DEFINITIONS) == 2
+        assert len(TOOL_DEFINITIONS) == 3
 
     def test_tool_names(self):
         names = {d["toolSpec"]["name"] for d in TOOL_DEFINITIONS}
-        assert names == {"search_records", "aggregate_records"}
+        assert names == {"search_records", "aggregate_records", "propose_edit"}
 
     def test_bedrock_converse_structure(self):
         """Each tool must follow Bedrock Converse API format."""
@@ -438,6 +443,31 @@ class TestToolDefinitions:
         names = {d["toolSpec"]["name"] for d in TOOL_DEFINITIONS}
         assert "live_salesforce_query" not in names
 
+    def test_propose_edit_object_types(self):
+        propose_tool = next(
+            d for d in TOOL_DEFINITIONS if d["toolSpec"]["name"] == "propose_edit"
+        )
+        schema = propose_tool["toolSpec"]["inputSchema"]["json"]
+        enum = schema["properties"]["object_type"]["enum"]
+        assert enum == ["Account", "Contact", "Task"]
+
+    def test_propose_edit_has_fields_array(self):
+        propose_tool = next(
+            d for d in TOOL_DEFINITIONS if d["toolSpec"]["name"] == "propose_edit"
+        )
+        schema = propose_tool["toolSpec"]["inputSchema"]["json"]
+        assert "fields" in schema["properties"]
+        assert schema["properties"]["fields"]["type"] == "array"
+        assert schema["properties"]["fields"]["minItems"] == 1
+
+    def test_propose_edit_mentions_minimal_writable_changes(self):
+        propose_tool = next(
+            d for d in TOOL_DEFINITIONS if d["toolSpec"]["name"] == "propose_edit"
+        )
+        desc = propose_tool["toolSpec"]["description"]
+        assert "minimal" in desc.lower()
+        assert "writable fields" in desc.lower()
+
 
 # =========================================================================
 # 3. build_system_prompt()
@@ -518,6 +548,13 @@ class TestBuildSystemPrompt:
         result = build_system_prompt(SAMPLE_CONFIG)
         assert "NOT available" in result
 
+    def test_includes_write_proposal_guidance(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert "propose_edit" in result
+        assert "Supported writable objects" in result
+        assert "Account, Contact, Task" in result
+        assert "Never include denormalized search fields" in result
+
     def test_includes_cre_vocabulary(self):
         result = build_system_prompt(SAMPLE_CONFIG)
         assert "lease comp" in result
@@ -567,6 +604,7 @@ class TestBuildSystemPrompt:
         assert "Deal" in result
         assert "Inquiry" in result
         assert "are available" in result
+        assert "propose_edit" in result
 
     def test_curated_descriptions_used_for_original_objects(self):
         """Property/Lease/Availability/Account/Contact use curated field descriptions."""
@@ -609,7 +647,7 @@ class TestBuildToolDefinitions:
         """Dynamic tool definitions follow Bedrock Converse API format."""
         tools = build_tool_definitions(SAMPLE_CONFIG_11)
         assert isinstance(tools, list)
-        assert len(tools) == 2
+        assert len(tools) == 3
         for tool in tools:
             assert "toolSpec" in tool
             spec = tool["toolSpec"]
@@ -618,9 +656,18 @@ class TestBuildToolDefinitions:
             assert "inputSchema" in spec
             schema = spec["inputSchema"]["json"]
             assert schema["type"] == "object"
-            assert "properties" in schema
-            assert "required" in schema
-            assert "object_type" in schema["required"]
+
+    def test_build_tool_definitions_include_propose_edit(self):
+        tools = build_tool_definitions(SAMPLE_CONFIG_11)
+        names = {t["toolSpec"]["name"] for t in tools}
+        assert "propose_edit" in names
+
+        propose_tool = next(t for t in tools if t["toolSpec"]["name"] == "propose_edit")
+        schema = propose_tool["toolSpec"]["inputSchema"]["json"]
+        assert schema["properties"]["object_type"]["enum"] == ["Account", "Contact", "Task"]
+        assert "properties" in schema
+        assert "required" in schema
+        assert "object_type" in schema["required"]
 
     def test_build_tool_definitions_description_includes_all_objects(self):
         """Tool descriptions mention all 11 object types."""

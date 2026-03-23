@@ -170,6 +170,32 @@ class TestValidRequest:
     @patch(f"{_PATCH_PREFIX}.boto3")
     @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
     @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_done_event_contains_write_proposal(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result(
+            write_proposal={
+                "kind": "edit",
+                "objectType": "Contact",
+                "recordId": "003000000000001AAA",
+                "summary": "Update John Smith's phone number",
+                "fields": [
+                    {"apiName": "Phone", "label": "Phone", "proposedValue": "214-555-0100"},
+                ],
+            },
+        )
+
+        resp = _invoke({"question": "Update John Smith", "org_id": "00Ddl000003yx57EAA"})
+        events = _parse_sse_events(resp["body"])
+        done_events = [e for e in events if e[0] == "done"]
+
+        assert len(done_events) == 1
+        done_data = done_events[0][1]
+        assert "write_proposal" in done_data
+        assert done_data["write_proposal"]["objectType"] == "Contact"
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
     def test_citations_event_contains_records(self, MockQH, MockBackend, mock_boto3):
         mock_qh_instance = MockQH.return_value
         mock_qh_instance.query.return_value = _make_query_result()

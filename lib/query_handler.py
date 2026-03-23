@@ -144,6 +144,9 @@ class QueryResult:
     search_result_count: int = 0
     """Total number of records returned by search_records calls."""
 
+    write_proposal: dict | None = None
+    """Structured write proposal returned by propose_edit, if any."""
+
     tool_call_log: list[dict] = field(default_factory=list)
     """Log of each tool call: {"name", "input", "result_count", "has_error", "error", "duration_s", "turn"}."""
 
@@ -244,6 +247,7 @@ class QueryHandler:
         all_search_results: list[dict] = []
         tools_used: list[str] = []
         search_result_count = 0
+        write_proposal: dict | None = None
         tool_call_log: list[dict] = []
         turn_durations: list[float] = []
 
@@ -281,6 +285,7 @@ class QueryHandler:
                     turns=turns,
                     tools_used=tools_used,
                     search_result_count=search_result_count,
+                    write_proposal=write_proposal,
                     tool_call_log=tool_call_log,
                     turn_durations=turn_durations,
                     clarification_options=clarification_options,
@@ -316,10 +321,17 @@ class QueryHandler:
                     tool_calls_made += 1
                     tools_used.append(tool_name)
 
+                    result_count = len(dispatch_result.get("results", []))
+                    if "write_proposal" in dispatch_result:
+                        proposal_fields = dispatch_result["write_proposal"].get("fields", [])
+                        result_count = len(proposal_fields)
+                        if write_proposal is None:
+                            write_proposal = dispatch_result["write_proposal"]
+
                     tool_call_log.append({
                         "name": tool_name,
                         "input": tool_input,
-                        "result_count": len(dispatch_result.get("results", [])),
+                        "result_count": result_count,
                         "has_error": "error" in dispatch_result,
                         "error": dispatch_result.get("error", ""),
                         "duration_s": round(dispatch_duration, 3),
@@ -359,6 +371,7 @@ class QueryHandler:
                     turns=turns,
                     tools_used=tools_used,
                     search_result_count=search_result_count,
+                    write_proposal=write_proposal,
                     tool_call_log=tool_call_log,
                     turn_durations=turn_durations,
                 )
@@ -374,6 +387,7 @@ class QueryHandler:
             turns=turns,
             tools_used=tools_used,
             search_result_count=search_result_count,
+            write_proposal=write_proposal,
             tool_call_log=tool_call_log,
             turn_durations=turn_durations,
         )

@@ -22,6 +22,7 @@ cp "$PROJECT_ROOT/lib/search_backend.py" "$QUERY_DIR/lib/"
 cp "$PROJECT_ROOT/lib/tool_dispatch.py" "$QUERY_DIR/lib/"
 cp "$PROJECT_ROOT/lib/turbopuffer_backend.py" "$QUERY_DIR/lib/"
 cp "$PROJECT_ROOT/lib/system_prompt.py" "$QUERY_DIR/lib/"
+cp "$PROJECT_ROOT/lib/write_proposal.py" "$QUERY_DIR/lib/"
 cp "$PROJECT_ROOT/lib/denormalize.py" "$QUERY_DIR/lib/"
 
 # Copy denorm config

@@ -3820,6 +3820,19 @@
             "A new guideline exists covering tool error/unexpected result handling: explain plainly, do not retry silently, suggest corrected query",
             "test_system_prompt.py asserts the date-alignment note appears in build_system_prompt() output"
           ]
+        },
+        {
+          "id": "4.21",
+          "title": "Fix clarification follow-up intent persistence",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-24T09:05:38.351186+00:00",
+          "updatedAt": "2026-03-24T09:05:38.351396+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "When the user selects a clarification button after an ambiguous query (e.g. 'who are our top brokers by deal value?'), the follow-up query does not faithfully execute the selected interpretation. Observed: selected 'Any broker role by deal value' but follow-up narrowed to listing brokers only. The clarification UX renders correctly — the bug is in how the selected intent is passed back to the query handler. Found during 4.7 LWC smoke test (2026-03-24)."
         }
       ]
     },
@@ -3870,7 +3883,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 21,
+      "4.": 22,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

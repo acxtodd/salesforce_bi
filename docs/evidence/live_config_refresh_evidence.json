@@ -290,9 +290,9 @@
     ],
     "scenario": "baseline_object_scope",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T164044-75e7d0ebea94.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T164044-75e7d0ebea94.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T164044-75e7d0ebea94.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T191216-75e7d0ebea94.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T191216-75e7d0ebea94.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T191216-75e7d0ebea94.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -323,8 +323,8 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T16:43:51.749405+00:00",
-    "version_id": "20260324T164044-75e7d0ebea94"
+    "timestamp": "2026-03-24T19:15:03.789732+00:00",
+    "version_id": "20260324T191216-75e7d0ebea94"
   },
   {
     "activated": true,
@@ -373,9 +373,9 @@
     },
     "scenario": "no_change",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T164352-75e7d0ebea94.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T164352-75e7d0ebea94.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T164352-75e7d0ebea94.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T191504-75e7d0ebea94.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T191504-75e7d0ebea94.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T191504-75e7d0ebea94.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -406,8 +406,8 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T16:46:57.476187+00:00",
-    "version_id": "20260324T164352-75e7d0ebea94"
+    "timestamp": "2026-03-24T19:17:51.581917+00:00",
+    "version_id": "20260324T191504-75e7d0ebea94"
   },
   {
     "activated": true,
@@ -456,9 +456,9 @@
     },
     "scenario": "field_add",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T164658-7cce709a4f6a.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T164658-7cce709a4f6a.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T164658-7cce709a4f6a.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T191752-7cce709a4f6a.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T191752-7cce709a4f6a.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T191752-7cce709a4f6a.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -489,8 +489,120 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T16:49:58.563850+00:00",
-    "version_id": "20260324T164658-7cce709a4f6a"
+    "timestamp": "2026-03-24T19:20:38.685587+00:00",
+    "version_id": "20260324T191752-7cce709a4f6a"
+  },
+  {
+    "activated": true,
+    "activation_blocked_reason": "",
+    "actual_classification": "object_scope_change",
+    "apply_plan": {
+      "action_count": 1,
+      "actions": [
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ascendix__ValidationTestObj__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ascendix__ValidationTestObj__c",
+          "requires_reindex": true
+        }
+      ],
+      "classification": "object_scope_change",
+      "requires_reindex": true
+    },
+    "classification_match": true,
+    "diff": {
+      "added_objects": [
+        "ascendix__ValidationTestObj__c"
+      ],
+      "auto_apply_eligible": false,
+      "classification": "object_scope_change",
+      "field_changes": {},
+      "prompt_scope_changed": true,
+      "relationship_changes": {},
+      "removed_objects": [],
+      "requires_apply": true
+    },
+    "expected_classification": "object_scope_change",
+    "fixture_summary": {
+      "object_count": 14,
+      "objects": [
+        "Account",
+        "Contact",
+        "ContentNote",
+        "Lead",
+        "Task",
+        "ascendix__Availability__c",
+        "ascendix__Deal__c",
+        "ascendix__Inquiry__c",
+        "ascendix__Lease__c",
+        "ascendix__Listing__c",
+        "ascendix__Preference__c",
+        "ascendix__Property__c",
+        "ascendix__Sale__c",
+        "ascendix__ValidationTestObj__c"
+      ],
+      "relationship_paths": {
+        "ascendix__Availability__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Deal__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Lease__c": [
+          "ascendix__Property__r"
+        ]
+      }
+    },
+    "reindex_results": [
+      {
+        "action": "seed_new_object",
+        "object": "ascendix__ValidationTestObj__c",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ascendix__ValidationTestObj__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      }
+    ],
+    "scenario": "object_add",
+    "stored_keys": {
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T192039-0a8659fcb276.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T192039-0a8659fcb276.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T192039-0a8659fcb276.json"
+    },
+    "structural_parity_evidence": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 4,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 14 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Availability__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Deal__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Lease__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 4/4 checks passed",
+      "total": 4
+    },
+    "timestamp": "2026-03-24T19:23:29.574126+00:00",
+    "version_id": "20260324T192039-0a8659fcb276"
   },
   {
     "activated": true,
@@ -976,9 +1088,9 @@
     ],
     "scenario": "relationship_path_change",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T164959-ba9c13d28d3c.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T164959-ba9c13d28d3c.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T164959-ba9c13d28d3c.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T192330-ba9c13d28d3c.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T192330-ba9c13d28d3c.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T192330-ba9c13d28d3c.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -1009,8 +1121,8 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T16:53:01.233449+00:00",
-    "version_id": "20260324T164959-ba9c13d28d3c"
+    "timestamp": "2026-03-24T19:26:17.462332+00:00",
+    "version_id": "20260324T192330-ba9c13d28d3c"
   },
   {
     "activated": true,
@@ -1059,9 +1171,9 @@
     },
     "scenario": "prompt_only_label_change",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T165302-75e7d0ebea94.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T165302-75e7d0ebea94.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T165302-75e7d0ebea94.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T192618-75e7d0ebea94.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T192618-75e7d0ebea94.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T192618-75e7d0ebea94.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -1092,7 +1204,7 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T16:56:03.468091+00:00",
-    "version_id": "20260324T165302-75e7d0ebea94"
+    "timestamp": "2026-03-24T19:29:03.163914+00:00",
+    "version_id": "20260324T192618-75e7d0ebea94"
   }
 ]

@@ -2541,7 +2541,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:13:40.870049+00:00",
-          "updatedAt": "2026-03-24T16:56:50.667407+00:00",
+          "updatedAt": "2026-03-24T19:29:53.899509+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2577,6 +2577,14 @@
             {
               "timestamp": "2026-03-24T16:56:50.667574+00:00",
               "note": "All subtasks 4.9.1-4.9.10 complete. Control plane validated end-to-end against real sandbox with 5 scenarios, all structural parity PASS."
+            },
+            {
+              "timestamp": "2026-03-24T19:29:27.695379+00:00",
+              "note": "Reopened: 4.9.9 live evidence was missing object_add scenario."
+            },
+            {
+              "timestamp": "2026-03-24T19:29:53.899683+00:00",
+              "note": "All subtasks 4.9.1-4.9.10 complete. Live validation covers all 4 required scenario types (field add, object add, relationship-path change, prompt-only change)."
             }
           ],
           "description": "Build a config control plane around the actual Ascendix Search payload model so admin changes in Selected Objects, field filters, Default Layout rows, saved searches, relationship paths, and result columns can be detected, compiled into runtime artifacts, classified by impact, and applied without relying on ad hoc manual regeneration. Ascendix Search should be used as an admin-intent signal and structural validation reference, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
@@ -2595,8 +2603,8 @@
             "Validation uses Ascendix Search as a structural reference for object scope, field allowlists, default columns, and relationship paths while preserving freedom for the NL search system to exceed Ascendix's query-builder patterns."
           ],
           "technical_context": "The demo org stores Ascendix Search config in ascendix_search__SearchSetting__c.Name plus ascendix_search__Value__c, not in dedicated SelectedObjects/ResultColumns fields. Selected Objects is chunked across multiple rows and must be concatenated before JSON parsing. Default layouts are stored as Default Layout * rows whose Value__c is a JSON array of result-column expressions. Saved searches remain in ascendix_search__Search__c.Template__c and are useful as relationship and filter fixtures for structural validation. This control plane should inform indexing and denorm, not constrain NL query behavior to Ascendix Search parity.",
-          "startedAt": "2026-03-24T15:43:35.440299+00:00",
-          "completedAt": "2026-03-24T16:56:50.667571+00:00"
+          "startedAt": "2026-03-24T19:29:27.695377+00:00",
+          "completedAt": "2026-03-24T19:29:53.899680+00:00"
         },
         {
           "id": "4.9.1",
@@ -2910,7 +2918,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:15:03.232121+00:00",
-          "updatedAt": "2026-03-24T16:56:46.258573+00:00",
+          "updatedAt": "2026-03-24T19:29:49.292593+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2934,6 +2942,14 @@
             {
               "timestamp": "2026-03-24T16:56:46.258728+00:00",
               "note": "Live validation complete. 5 scenarios validated against real ascendix-beta-sandbox: baseline_object_scope (object_scope_change), no_change (none), field_add (prompt_only — allowlist expansion without denorm impact), relationship_path_change (relationship_change — Market.CreatedById on Availability), prompt_only_label_change (none — label doesn't propagate to query_scope). All activated, all structural parity PASS 4/4. Evidence at docs/evidence/live_config_refresh_evidence.json, raw source at docs/evidence/live_raw_source_snapshot.json. Validation script at scripts/validate_live_config_refresh.py."
+            },
+            {
+              "timestamp": "2026-03-24T19:29:23.663352+00:00",
+              "note": "Reopened: object_add scenario was missing from live evidence. Now wired and executed — 6 scenarios total."
+            },
+            {
+              "timestamp": "2026-03-24T19:29:49.292760+00:00",
+              "note": "Live validation complete with all 4 required scenario types. 6 scenarios validated against real ascendix-beta-sandbox: baseline_object_scope (object_scope_change), no_change (none), field_add (prompt_only), object_add (object_scope_change — adds ascendix__ValidationTestObj__c to Selected Objects, diff detects added object, seed_new_object apply plan executed), relationship_path_change (relationship_change), prompt_only_label_change (none). All activated, all structural parity PASS. Evidence at docs/evidence/live_config_refresh_evidence.json."
             }
           ],
           "description": "Prove the full control-plane loop against real Ascendix Search admin changes: field add, object add, relationship-path change, and prompt-only change. Record the resulting active config versions and search validation evidence using Ascendix Search as a structural reference for admin intent, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
@@ -2952,8 +2968,8 @@
             "Validation records the detected diff, impact classification, applied action, resulting active version, and structural parity evidence for each scenario without treating Ascendix Search ranking or exact query behavior as the acceptance target."
           ],
           "technical_context": "Use the new structural validation harness rather than manual eyeballing. Evidence should map each test scenario back to normalized Ascendix fixtures: object set from Selected Objects*, filtered fields from object descriptors, default columns from Default Layout rows, and relationships from Search__c Template__c.",
-          "completedAt": "2026-03-24T16:56:46.258726+00:00",
-          "startedAt": "2026-03-24T15:43:35.386149+00:00"
+          "completedAt": "2026-03-24T19:29:49.292758+00:00",
+          "startedAt": "2026-03-24T19:29:23.663348+00:00"
         },
         {
           "id": "4.9.10",

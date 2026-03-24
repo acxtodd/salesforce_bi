@@ -394,8 +394,22 @@ def main() -> None:
     )
     all_evidence.append(field_evidence)
 
-    # 6. Scenario 4: Relationship path change
-    LOG.info("\n--- Phase 4: Relationship path change ---")
+    # 6. Scenario 4: Object add
+    LOG.info("\n--- Phase 4: Object add ---")
+    _reset_to_baseline(store, baseline_version)
+    object_add_source = mutate_object_add(real_source)
+    object_evidence = run_scenario(
+        scenario_name="object_add",
+        store=store,
+        raw_source=object_add_source,
+        sf=sf,
+        apply=True,
+        expected_classification=IMPACT_OBJECT_SCOPE,
+    )
+    all_evidence.append(object_evidence)
+
+    # 7. Scenario 5: Relationship path change
+    LOG.info("\n--- Phase 5: Relationship path change ---")
     _reset_to_baseline(store, baseline_version)
     rel_source = mutate_relationship_path(real_source)
     rel_evidence = run_scenario(
@@ -408,13 +422,13 @@ def main() -> None:
     )
     all_evidence.append(rel_evidence)
 
-    # 7. Scenario 5: Prompt-only change (label change)
+    # 8. Scenario 6: Prompt-only change (label change)
     #    Changing a display label in Selected Objects mutates the normalized
     #    source but does NOT change the compiled query_scope because labels
     #    in the artifact are derived from SF metadata (describe), not the
     #    Selected Objects input.  The compiled artifacts are identical →
     #    classification is "none" (no operational impact).
-    LOG.info("\n--- Phase 5: Prompt-only (label → no runtime impact) ---")
+    LOG.info("\n--- Phase 6: Prompt-only (label → no runtime impact) ---")
     _reset_to_baseline(store, baseline_version)
     prompt_source = mutate_prompt_only(real_source)
     prompt_evidence = run_scenario(

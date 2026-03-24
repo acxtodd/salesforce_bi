@@ -2538,10 +2538,10 @@
         {
           "id": "4.9",
           "title": "Systematize Ascendix Search config refresh",
-          "status": "in_progress",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:13:40.870049+00:00",
-          "updatedAt": "2026-03-24T14:17:30.485496+00:00",
+          "updatedAt": "2026-03-24T14:34:20.487204+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2557,6 +2557,10 @@
             {
               "timestamp": "2026-03-24T14:17:30.485644+00:00",
               "note": "4.9.1-4.9.5 merged to main in 8bc582d62f7b4b644d4b5f221160ed4af079589e via PR #13. Remaining scope stays in 4.9.6-4.9.10."
+            },
+            {
+              "timestamp": "2026-03-24T14:34:20.487413+00:00",
+              "note": "All subtasks 4.9.1-4.9.10 completed. PR #13 delivered 4.9.1-4.9.5. Branch codex/4-9-6-to-10-control-plane-completion delivers 4.9.6-4.9.10: runtime config in poll_sync, targeted apply workflow, operator approval flow, structural validation harness, and e2e scenario validation with durable evidence."
             }
           ],
           "description": "Build a config control plane around the actual Ascendix Search payload model so admin changes in Selected Objects, field filters, Default Layout rows, saved searches, relationship paths, and result columns can be detected, compiled into runtime artifacts, classified by impact, and applied without relying on ad hoc manual regeneration. Ascendix Search should be used as an admin-intent signal and structural validation reference, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
@@ -2575,7 +2579,8 @@
             "Validation uses Ascendix Search as a structural reference for object scope, field allowlists, default columns, and relationship paths while preserving freedom for the NL search system to exceed Ascendix's query-builder patterns."
           ],
           "technical_context": "The demo org stores Ascendix Search config in ascendix_search__SearchSetting__c.Name plus ascendix_search__Value__c, not in dedicated SelectedObjects/ResultColumns fields. Selected Objects is chunked across multiple rows and must be concatenated before JSON parsing. Default layouts are stored as Default Layout * rows whose Value__c is a JSON array of result-column expressions. Saved searches remain in ascendix_search__Search__c.Template__c and are useful as relationship and filter fixtures for structural validation. This control plane should inform indexing and denorm, not constrain NL query behavior to Ascendix Search parity.",
-          "startedAt": "2026-03-24T11:30:59.317417+00:00"
+          "startedAt": "2026-03-24T11:30:59.317417+00:00",
+          "completedAt": "2026-03-24T14:34:20.487410+00:00"
         },
         {
           "id": "4.9.1",
@@ -2775,14 +2780,19 @@
         {
           "id": "4.9.6",
           "title": "Add runtime config loading to poll sync",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:49.915308+00:00",
-          "updatedAt": "2026-03-20T07:15:47.793113+00:00",
+          "updatedAt": "2026-03-24T14:34:14.526681+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T14:34:14.526852+00:00",
+              "note": "Implemented in commit b54e9fc. poll_sync uses RuntimeConfigLoader with S3→cache→bundled fallback. Tests in tests/test_poll_sync.py::TestRuntimeConfigLoading."
+            }
+          ],
           "description": "Teach poll_sync to use the active compiled config artifact so new objects, field changes, and relationship changes can be honored by sync without shipping a new bundled YAML first. See docs/architecture/ascendix_search_config_refresh_plan.md.",
           "parent": "4.9",
           "references": [
@@ -2795,19 +2805,25 @@
           "acceptance_criteria": [
             "poll_sync loads active config from control-plane storage with safe fallback behavior.",
             "Poll-managed object and field-scope changes are honored by sync after config publish without editing bundled YAML."
-          ]
+          ],
+          "completedAt": "2026-03-24T14:34:14.526849+00:00"
         },
         {
           "id": "4.9.7",
           "title": "Implement targeted reindex apply workflow",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:53.427845+00:00",
-          "updatedAt": "2026-03-20T07:15:47.892151+00:00",
+          "updatedAt": "2026-03-24T14:34:14.582911+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T14:34:14.583064+00:00",
+              "note": "Implemented in commit 3b11d3f. Targeted apply workflow with _build_apply_plan, execute_targeted_apply, rollback_to_version. Tests in tests/test_config_refresh.py."
+            }
+          ],
           "description": "For field-scope, relationship, and object-scope config changes, add an explicit apply path that performs the required targeted seed or reindex work before promoting the candidate config to active. See docs/architecture/ascendix_search_config_refresh_plan.md.",
           "parent": "4.9",
           "references": [
@@ -2821,19 +2837,25 @@
           "acceptance_criteria": [
             "Apply workflow performs the required targeted seed or reindex work before promoting a candidate config to active.",
             "Object add, object remove, field-scope, and relationship-scope changes each have explicit apply behavior and recorded evidence."
-          ]
+          ],
+          "completedAt": "2026-03-24T14:34:14.583062+00:00"
         },
         {
           "id": "4.9.8",
           "title": "Add runbook and operator approval flow",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:56.986959+00:00",
-          "updatedAt": "2026-03-20T07:15:47.990769+00:00",
+          "updatedAt": "2026-03-24T14:34:14.637501+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T14:34:14.637672+00:00",
+              "note": "Implemented in commit 54227de. CLI supports compile/rollback/status subcommands. Runbook rewritten at docs/runbooks/config_refresh.md. Approval state tracking in S3."
+            }
+          ],
           "description": "Document and implement the operator-facing flow for detecting config changes, reviewing impact, approving reindex-heavy applies, and rolling back to the last known good config version. See docs/architecture/ascendix_search_config_refresh_plan.md.",
           "parent": "4.9",
           "references": [
@@ -2845,19 +2867,25 @@
           "acceptance_criteria": [
             "A runbook documents detect, review, approve, apply, and rollback steps for config refresh operations.",
             "Operator-facing approval state distinguishes auto-applied prompt-only changes from approval-required reindex changes."
-          ]
+          ],
+          "completedAt": "2026-03-24T14:34:14.637669+00:00"
         },
         {
           "id": "4.9.9",
           "title": "Validate end-to-end admin config refresh scenarios",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:15:03.232121+00:00",
-          "updatedAt": "2026-03-20T07:39:44.213948+00:00",
+          "updatedAt": "2026-03-24T14:34:14.692766+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T14:34:14.692916+00:00",
+              "note": "Implemented in commit 88a7b47. All 4 scenarios validated: field add, object add, relationship-path change, prompt-only. Evidence at docs/evidence/e2e_config_refresh_evidence.json. Tests in tests/test_e2e_config_refresh.py."
+            }
+          ],
           "description": "Prove the full control-plane loop against real Ascendix Search admin changes: field add, object add, relationship-path change, and prompt-only change. Record the resulting active config versions and search validation evidence using Ascendix Search as a structural reference for admin intent, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
           "parent": "4.9",
           "references": [
@@ -2873,19 +2901,25 @@
             "Field add, object add, relationship-path change, and prompt-only change scenarios are validated end to end against the control-plane flow using fixtures from Selected Objects*, Default Layout rows, and Search__c templates.",
             "Validation records the detected diff, impact classification, applied action, resulting active version, and structural parity evidence for each scenario without treating Ascendix Search ranking or exact query behavior as the acceptance target."
           ],
-          "technical_context": "Use the new structural validation harness rather than manual eyeballing. Evidence should map each test scenario back to normalized Ascendix fixtures: object set from Selected Objects*, filtered fields from object descriptors, default columns from Default Layout rows, and relationships from Search__c Template__c."
+          "technical_context": "Use the new structural validation harness rather than manual eyeballing. Evidence should map each test scenario back to normalized Ascendix fixtures: object set from Selected Objects*, filtered fields from object descriptors, default columns from Default Layout rows, and relationships from Search__c Template__c.",
+          "completedAt": "2026-03-24T14:34:14.692913+00:00"
         },
         {
           "id": "4.9.10",
           "title": "Add Ascendix Search structural validation harness",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:33:07.264459+00:00",
-          "updatedAt": "2026-03-20T07:40:03.251332+00:00",
+          "updatedAt": "2026-03-24T14:34:14.748182+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T14:34:14.748356+00:00",
+              "note": "Implemented in commit fdf77ca. lib/structural_validation.py with extract_fixtures, assert_*_parity, validate_structural_parity. Tests in tests/test_structural_validation.py."
+            }
+          ],
           "description": "Build fixture extraction and parity assertions from live Ascendix Search config so the control-plane flow can be validated against object scope, field allowlists, default columns, and relationship paths without requiring identical ranking or answer wording. This harness is for structural validation and config-refresh evidence, not for constraining the natural language product to Ascendix Search behavior. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
           "technical_context": "Use normalized fixtures derived from SearchSetting Name plus Value__c and Search__c Template__c. Treat Ascendix Search as a structural oracle: object set, filtered fields, default columns, and saved-search relationship paths. Do not compare semantic ranking or LLM phrasing.",
           "parent": "4.9",
@@ -2900,7 +2934,8 @@
           ],
           "references": [
             "docs/architecture/ascendix_search_signal_priority_and_validation.md"
-          ]
+          ],
+          "completedAt": "2026-03-24T14:34:14.748353+00:00"
         },
         {
           "id": "4.10",

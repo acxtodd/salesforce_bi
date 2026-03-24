@@ -131,20 +131,28 @@ passed on all 18 tests.
    - Clarification buttons work when present
    - No console errors in browser dev tools
 
-### Test queries
+### Results (2026-03-24, manual QA in sandbox browser)
 
-| # | Query | Expected behavior |
-|---|-------|-------------------|
-| 1 | "find contacts at properties in Dallas" | Returns contact records with property context |
-| 2 | "show deals related to ACME Corp" | Returns deal records mentioning ACME |
-| 3 | "what leases are expiring this quarter" | Returns lease records with date context |
-| 4 | "how many properties by city?" | Returns aggregation with city counts |
-| 5 | "help" | Returns onboarding message with examples |
+| # | Query | Status | Notes |
+|---|-------|--------|-------|
+| 1 | "find contacts at properties in Dallas" | PASS | Contact-focused results with valid Dallas/property context. Citations link correctly. Note: citation set was property-heavy; contact citations inconsistent across attempts. |
+| 2 | "show deals related to Griffin Partners" | PASS | Deal-focused results with structured output. Griffin Partners substituted for ACME Corp (no ACME data in sandbox). |
+| 3 | "what leases are expiring this quarter" | PASS | Correct lease answer with valid Q2 2026 reasoning and citations. |
+| 4 | "how many properties by city?" | PASS | Aggregation rendered cleanly. Note: wording "503 total cities represented" could be clearer. |
+| 5 | "help" | PASS | Onboarding message with relevant examples, no internal jargon. |
+| 6 | "who are our top brokers by deal value?" (clarification rendering) | PASS | Ambiguity detected, clarification buttons rendered correctly. |
+| 7 | "tell me about this record" (record context) | PASS | Correctly grounded on the current Cousins Properties record. |
+| 8 | "what open deals are related to it?" (follow-up) | PASS | Context preserved, answer tied to Cousins Properties. Note: stray empty bullet points before clarification buttons. |
+| 9 | Clarification button follow-up execution | **FAIL** | Selected "Any broker role by deal value" but follow-up narrowed to listing brokers only. Interpretation persistence bug. |
 
-### Status
+**7/8 functional queries passed. 1 clarification follow-up bug (see below).**
 
-Requires interactive browser access to Salesforce sandbox. Checklist provided
-above for manual QA execution.
+### Clarification follow-up bug
+
+- **Trigger:** Select a clarification button after an ambiguous leaderboard query
+- **Expected:** Follow-up executes the selected interpretation faithfully
+- **Observed:** Follow-up narrowed to listing brokers instead of honoring the "any broker role" selection
+- **Impact:** Clarification UX renders correctly, but the selected intent is not faithfully passed to the query. This is a separate defect from 4.7 scope — tracked for follow-up.
 
 ## 4. Unit test results (2026-03-24, local run)
 
@@ -161,7 +169,8 @@ Coverage includes:
 
 ## 5. Blockers and residual risks
 
-- **LWC smoke test:** Requires interactive browser session. Checklist provided.
+- **Clarification follow-up bug:** Selected clarification intent is not
+  faithfully executed in follow-up query. Separate defect, not a 4.7 blocker.
 - **Deal parent field inconsistency:** 4/10 sampled deal docs have inconsistent
   partial property keys. Worth investigating in a follow-up task.
 - **Warm latency:** Local machine latency not representative of Lambda perf.

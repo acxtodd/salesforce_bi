@@ -2349,7 +2349,7 @@
           "status": "review",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:43.457686+00:00",
-          "updatedAt": "2026-03-24T07:20:43.235215+00:00",
+          "updatedAt": "2026-03-24T09:04:05.001680+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2373,6 +2373,10 @@
             {
               "timestamp": "2026-03-24T07:20:43.235374+00:00",
               "note": "Count validation resolved: switched to native Turbopuffer aggregate_by(Count) for exact server-side counts. All 11 objects now match Salesforce exactly (24,649 total docs). Object type counts check PASS. 8/10 validation checks pass. PR #11 description updated."
+            },
+            {
+              "timestamp": "2026-03-24T09:04:05.001963+00:00",
+              "note": "LWC smoke test complete (manual QA): 7/8 functional queries pass. Clarification follow-up bug found — selected intent not faithfully executed. This is a separate defect, not a 4.7 blocker. All core 4.7 acceptance criteria now have durable evidence: exact counts (24,649 docs, 11/11 match SF), 3 cross-object tests pass, numeric+date filters verified, LWC smoke tested."
             }
           ],
           "description": "Run validate_data.py across the full corpus. Check: per-object record counts match Salesforce, parent fields populated for objects with parent configs, metadata filters work for numeric/date fields, search returns results for each object type. Add new acceptance test cases for cross-object queries: 'find contacts at properties in Dallas', 'show deals related to ACME Corp', 'what leases are expiring this quarter'. Smoke-test via LWC search interface.",

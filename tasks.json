@@ -2349,7 +2349,7 @@
           "status": "review",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:43.457686+00:00",
-          "updatedAt": "2026-03-24T06:54:28.059111+00:00",
+          "updatedAt": "2026-03-24T07:07:50.168935+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2365,6 +2365,10 @@
             {
               "timestamp": "2026-03-24T06:54:28.059259+00:00",
               "note": "Live validation complete. Data validation: 7/10 PASS (27,820 docs, 11 objects). Acceptance tests: 14/18 PASS (78%, all 3 cross-object tests pass). Failures are: SF count deltas on poll-sync objects, deal parent field inconsistency, local machine latency. LWC smoke test checklist provided for manual QA. PR ready for review."
+            },
+            {
+              "timestamp": "2026-03-24T07:07:50.169071+00:00",
+              "note": "QA findings addressed: (1) aggregate-cap fallback ensures consistent telemetry, (2) date filter check implemented with ISO date comparison, (3) evidence doc reconciled with telemetry, (4) cross-06 year hardcode removed. Re-ran live validation — all artifacts consistent."
             }
           ],
           "description": "Run validate_data.py across the full corpus. Check: per-object record counts match Salesforce, parent fields populated for objects with parent configs, metadata filters work for numeric/date fields, search returns results for each object type. Add new acceptance test cases for cross-object queries: 'find contacts at properties in Dallas', 'show deals related to ACME Corp', 'what leases are expiring this quarter'. Smoke-test via LWC search interface.",

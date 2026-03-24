@@ -214,59 +214,94 @@ class TestLatencyThreshold:
 # ===================================================================
 
 
-class TestObjectTypeCountsFallback:
-    """Verify aggregate-cap fallback in object type counts."""
+class TestNativeCountObjectTypes:
+    """Verify per-object counts use native aggregate_by."""
 
-    def test_missing_object_recovered_by_per_object_aggregate(self):
-        """If group-by aggregate omits an object, per-object fallback fills it."""
+    def _make_validator(self, config, sf_client=None):
         backend = MagicMock()
-        # Group-by aggregate only returns account (property missing)
-        backend.aggregate.side_effect = [
-            {"groups": {"account": {"count": 100}}},  # group-by call
-            {"count": 50},  # per-object fallback for property
-        ]
+        # _ns().query() returns a result with .aggregations dict
+        mock_ns = MagicMock()
+        backend._ns.return_value = mock_ns
         backend.search.return_value = [{"id": "d1"}]
+        return backend, mock_ns, DataValidator(
+            namespace="ns", backend=backend, config=config, sf_client=sf_client,
+        )
 
+    def test_exact_counts_pass(self):
         config = {
             "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
             "Account": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
         }
-        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        backend, mock_ns, validator = self._make_validator(config)
+        # namespace exists count, then per-object counts
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 100}
+        mock_ns.query.return_value = mock_result
+
         result = validator._check_object_type_counts()
-        # property was recovered via fallback, so not missing
-        assert "Missing" not in result.message
-        assert "property: 50" in result.message
+        assert result.status == "PASS"
+        assert "property: 100" in result.message
+        assert "account: 100" in result.message
+        assert "total: 200" in result.message
 
-    def test_truly_empty_object_still_fails(self):
-        """If per-object fallback also returns 0, object is truly missing."""
-        backend = MagicMock()
-        backend.aggregate.side_effect = [
-            {"groups": {"account": {"count": 100}}},
-            {"count": 0},  # property truly empty
-        ]
-        backend.search.return_value = [{"id": "d1"}]
-
+    def test_missing_object_fails(self):
         config = {
             "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
             "Account": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
         }
-        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        backend, mock_ns, validator = self._make_validator(config)
+        # Property returns 0, Account returns 100
+        mock_result_zero = MagicMock()
+        mock_result_zero.aggregations = {"count": 0}
+        mock_result_100 = MagicMock()
+        mock_result_100.aggregations = {"count": 100}
+        mock_ns.query.side_effect = [mock_result_zero, mock_result_100]
+
         result = validator._check_object_type_counts()
         assert result.status == "FAIL"
         assert "Missing" in result.message
         assert "property" in result.message
 
+    def test_sf_mismatch_fails(self):
+        sf = MagicMock()
+        sf.query.return_value = {"totalSize": 200}
+        config = {
+            "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+        }
+        backend, mock_ns, validator = self._make_validator(config, sf_client=sf)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 100}
+        mock_ns.query.return_value = mock_result
+
+        result = validator._check_object_type_counts()
+        assert result.status == "FAIL"
+        assert "SF=200 vs TP=100" in result.message
+
+    def test_namespace_exists_uses_native_count(self):
+        config = {}
+        backend, mock_ns, validator = self._make_validator(config)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 24649}
+        mock_ns.query.return_value = mock_result
+
+        result = validator._check_namespace_exists()
+        assert result.status == "PASS"
+        assert "24,649" in result.message
+
 
 class TestSFCountComparison:
-    def test_matching_counts_pass(self):
+    def _make_validator(self, config, sf_client=None):
         backend = MagicMock()
-        backend.aggregate.return_value = {
-            "groups": {"property": {"count": 100}}
-        }
+        mock_ns = MagicMock()
+        backend._ns.return_value = mock_ns
         backend.search.return_value = [{"id": "doc1"}]
+        return mock_ns, DataValidator(
+            namespace="ns", backend=backend, config=config, sf_client=sf_client,
+        )
+
+    def test_matching_counts_pass(self):
         sf = MagicMock()
         sf.query.return_value = {"totalSize": 100}
-
         config = {
             "ascendix__Property__c": {
                 "embed_fields": ["Name"],
@@ -274,21 +309,17 @@ class TestSFCountComparison:
                 "parents": {},
             }
         }
-        validator = DataValidator(
-            namespace="ns", backend=backend, config=config, sf_client=sf,
-        )
+        mock_ns, validator = self._make_validator(config, sf_client=sf)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 100}
+        mock_ns.query.return_value = mock_result
+
         result = validator._check_object_type_counts()
         assert result.status == "PASS"
 
     def test_mismatched_counts_fail(self):
-        backend = MagicMock()
-        backend.aggregate.return_value = {
-            "groups": {"property": {"count": 90}}
-        }
-        backend.search.return_value = [{"id": "doc1"}]
         sf = MagicMock()
         sf.query.return_value = {"totalSize": 100}
-
         config = {
             "ascendix__Property__c": {
                 "embed_fields": ["Name"],
@@ -296,20 +327,16 @@ class TestSFCountComparison:
                 "parents": {},
             }
         }
-        validator = DataValidator(
-            namespace="ns", backend=backend, config=config, sf_client=sf,
-        )
+        mock_ns, validator = self._make_validator(config, sf_client=sf)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 90}
+        mock_ns.query.return_value = mock_result
+
         result = validator._check_object_type_counts()
         assert result.status == "FAIL"
         assert "SF count mismatch" in result.message
 
     def test_no_sf_client_skips_comparison(self):
-        backend = MagicMock()
-        backend.aggregate.return_value = {
-            "groups": {"property": {"count": 100}}
-        }
-        backend.search.return_value = [{"id": "doc1"}]
-
         config = {
             "ascendix__Property__c": {
                 "embed_fields": ["Name"],
@@ -317,11 +344,12 @@ class TestSFCountComparison:
                 "parents": {},
             }
         }
-        validator = DataValidator(
-            namespace="ns", backend=backend, config=config,
-        )
+        mock_ns, validator = self._make_validator(config)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 100}
+        mock_ns.query.return_value = mock_result
+
         result = validator._check_object_type_counts()
-        # No SF client, so only TP counts matter; should PASS if count > 0
         assert result.status == "PASS"
 
 

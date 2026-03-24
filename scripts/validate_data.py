@@ -136,29 +136,39 @@ class DataValidator:
             results.append(result)
         return results
 
-    def _check_namespace_exists(self) -> CheckResult:
-        """Check 1: Namespace exists via aggregate count.
+    def _native_count(self, filters: dict | None = None) -> int:
+        """Get exact document count using Turbopuffer native aggregate_by.
 
-        Note: Turbopuffer aggregate may cap at 10,000 rows on large
-        namespaces.  The object-type-counts check reports accurate
-        per-object counts via fallback.
+        The backend's aggregate() method fetches rows client-side (capped at
+        top_k=10,000).  Native aggregate_by runs server-side with no row cap,
+        giving exact counts.
         """
+        ns = self.backend._ns(self.namespace)
+        kwargs: dict[str, Any] = {"aggregate_by": {"count": ("Count",)}}
+        if filters:
+            from lib.turbopuffer_backend import translate_filters
+            tpuf_filters = translate_filters(filters)
+            if tpuf_filters is not None:
+                kwargs["filters"] = tpuf_filters
+        result = ns.query(**kwargs)
+        return result.aggregations.get("count", 0)
+
+    def _check_namespace_exists(self) -> CheckResult:
+        """Check 1: Namespace exists via native server-side count."""
         try:
-            agg = self.backend.aggregate(self.namespace)
-            count = agg.get("count", 0)
+            count = self._native_count()
         except Exception:
             count = 0
 
         if count > 0:
-            suffix = " (aggregate may cap at 10k)" if count == 10_000 else ""
             return CheckResult(
                 name="Namespace exists",
                 status="PASS",
-                message=f"{count:,} documents found{suffix}",
+                message=f"{count:,} documents found",
                 details={"count": count},
             )
 
-        # Fallback: BM25 with stopwords (single space is not a valid token)
+        # Fallback: BM25 with stopwords
         results = self.backend.search(
             self.namespace, text_query="a the is of and", top_k=1,
         )
@@ -166,7 +176,7 @@ class DataValidator:
             return CheckResult(
                 name="Namespace exists",
                 status="PASS",
-                message="Namespace exists (aggregate returned 0 but search found docs)",
+                message="Namespace exists (count returned 0 but search found docs)",
                 details={"count": 0},
             )
 
@@ -177,12 +187,11 @@ class DataValidator:
         )
 
     def _check_object_type_counts(self) -> CheckResult:
-        """Check 2: Object type counts.
+        """Check 2: Per-object record counts via native server-side count.
 
-        Uses aggregate(group_by='object_type') as the primary count source.
-        If the aggregate returns capped/partial results (some objects missing
-        from groups despite existing in the index), falls back to per-object
-        aggregate counts so the check doesn't false-fail on large namespaces.
+        Uses Turbopuffer aggregate_by(Count) with per-object-type filters
+        for exact counts, then compares against Salesforce SELECT COUNT()
+        when an SF client is available.
         """
         if not self.config:
             return CheckResult(
@@ -191,33 +200,23 @@ class DataValidator:
                 message="No config provided",
             )
 
-        agg = self.backend.aggregate(self.namespace, group_by="object_type")
-        groups = agg.get("groups", {})
-
-        # For any config object not present in the grouped aggregate,
-        # run a per-object aggregate to get its count.  Turbopuffer's
-        # group-by can return partial results on large namespaces.
+        # Get exact per-object counts via native aggregation
+        groups: dict[str, dict] = {}
         for obj_name in self.config:
             obj_type = clean_label(obj_name).lower()
-            if obj_type not in groups or groups[obj_type].get("count", 0) == 0:
-                try:
-                    obj_agg = self.backend.aggregate(
-                        self.namespace,
-                        filters={"object_type": obj_type},
-                    )
-                    obj_count = obj_agg.get("count", 0)
-                    if obj_count > 0:
-                        groups[obj_type] = {"count": obj_count}
-                except Exception as e:
-                    LOG.debug("Per-object aggregate failed for %s: %s", obj_type, e)
+            try:
+                count = self._native_count(filters={"object_type": obj_type})
+            except Exception as e:
+                LOG.warning("Native count failed for %s: %s", obj_type, e)
+                count = 0
+            groups[obj_type] = {"count": count}
 
-        # Now check for truly missing objects
         missing = []
         counts_parts = []
         total_docs = 0
         for obj_name in self.config:
             obj_type = clean_label(obj_name).lower()
-            count = groups.get(obj_type, {}).get("count", 0)
+            count = groups[obj_type]["count"]
             counts_parts.append(f"{obj_type}: {count:,}")
             total_docs += count
             if count == 0:
@@ -231,7 +230,7 @@ class DataValidator:
                 try:
                     sf_result = self.sf_client.query(f"SELECT COUNT() FROM {obj_name}")
                     sf_count = sf_result.get("totalSize", 0)
-                    tp_count = groups.get(obj_type, {}).get("count", 0)
+                    tp_count = groups[obj_type]["count"]
                     if sf_count != tp_count:
                         sf_mismatches.append(
                             f"{obj_type}: SF={sf_count} vs TP={tp_count}"

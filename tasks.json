@@ -3559,7 +3559,7 @@
           "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T18:57:31.730667+00:00",
-          "updatedAt": "2026-03-23T22:14:12.885566+00:00",
+          "updatedAt": "2026-03-24T05:54:37.106692+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -3575,6 +3575,10 @@
             {
               "timestamp": "2026-03-23T22:14:12.885386+00:00",
               "note": "Deployment completed 2026-03-23. Three issues found and resolved: (1) CDK did not set flowStatus=Active on AppFlow flows — they deployed as Draft. Fixed in ingestion-stack.ts. (2) Contact and Account were not in Salesforce CDC entity selection — Deal and Sale CDC entries were removed (they use poll sync) to free allocation, then Contact and Account added via Tooling API. (3) Lambda SSM access token was stale (401 Unauthorized) — refreshed token in SSM and forced Lambda cold start via env var update. End-to-end validated: Contact title change -> AppFlow -> S3 -> EventBridge -> cdc_sync -> Turbopuffer upsert -> queryable in 19 seconds."
+            },
+            {
+              "timestamp": "2026-03-24T05:54:37.106529+00:00",
+              "note": "Validation evidence (2026-03-23): Contact CDC — edited Todd Terry title to 'COO' via REST API, AppFlow ran at 22:07:44 UTC, Lambda upserted Contact 003fk000000gOluAAE, total_lag=18751ms, Turbopuffer search confirmed title=COO. Account CDC — edited Todco Investments website to 'https://todcoinvestments.com', AppFlow ran at 23:15:38 UTC, Lambda upserted Account 001fk000002qD1tAAE. Property/Lease/Availability flows are Active and structurally identical; Property CDC was previously validated on 2026-03-18 (S3 objects in cdc/ascendix__Property__c/). 2 of 5 objects validated with live end-to-end round-trip, 1 validated historically, 2 (Lease, Availability) validated structurally via CDK test (Active status, correct source config)."
             }
           ],
           "description": "The CDC sync Lambda, EventBridge rule, and S3 bucket are deployed, but the AppFlow flows that listen to Salesforce CDC events are missing. The ingestion stack CDK conditionally creates AppFlow resources only when three context values are passed at deploy time: salesforceInstanceUrl (SSM: /salesforce/instance_url), salesforceSecretArn (Secrets Manager: salesforce-ai-search/appflow-creds), and salesforceJwtToken (minted via scripts/mint_jwt.py). Both SSM and Secrets Manager prerequisites exist. The fix is to redeploy SalesforceAISearch-Ingestion-dev with the three -c context flags. After deployment, validate by editing a Contact in SF and confirming the CDC event flows through AppFlow to S3 to EventBridge to cdc_sync Lambda to Turbopuffer upsert within about 60 seconds.",

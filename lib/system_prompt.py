@@ -267,6 +267,9 @@ _CURATED_FIELD_DESCRIPTIONS: dict[str, str] = {
 _FEW_SHOT_EXAMPLES = """\
 ### Example queries and tool calls
 
+Note: Dates in examples below are illustrative. Always compute relative dates
+(e.g. "last 12 months") from today's date stated above.
+
 **1. Property search — filters + text_query**
 User: "Show me Class A office buildings in Dallas over 100,000 SF"
 Tool call:
@@ -426,6 +429,28 @@ Tool call:
 Note: Use sort_order and top_n for ranking queries. Results come pre-sorted with
 metadata (_total_groups, _showing, _truncated). Present as-is and note
 "Showing top 5 of {_total_groups} markets" in the answer.\
+
+### Anti-pattern examples - do NOT do these
+
+**WRONG - unnecessary multi-step when denormalized fields exist**
+User: "Show me leases in Dallas"
+  Step 1: search_records(object_type="Property", filters={"city": "Dallas"})
+  Step 2: search_records(object_type="Lease", filters={"property_name_in": [results from step 1]})
+Why wrong: Lease has denormalized property_city. Use it directly:
+  search_records(object_type="Lease", filters={"property_city": "Dallas"})
+
+**WRONG - fabricating a ranking from raw search hits**
+User: "Who are our top brokers by deal value?"
+  search_records(object_type="Deal", limit=50)
+  -> then manually summing deal_value per broker from results
+Why wrong: Raw search hits are not a complete dataset. Use aggregate_records
+with group_by for rankings, or clarify if the grouping dimension is ambiguous.
+
+**WRONG - using text_query as a match-everything hack**
+User: "How many properties do we have?"
+  search_records(object_type="Property", text_query="a the is of and")
+Why wrong: For counts, use aggregate_records(object_type="Property", aggregate="count").
+Never use stopwords as a match-everything trick.\
 """
 
 # ---------------------------------------------------------------------------
@@ -449,13 +474,18 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
     return f"""\
 ### Guidelines
 
+**Clickable option format (CLARIFY markers)**
+Format: ``[CLARIFY:button label|full self-contained query text]``
+Each option's query text must be a complete standalone question that can be
+submitted with no conversation context. Use this marker whenever presenting
+follow-up suggestions or disambiguation options.
+
 1. **Search first when the request is directly answerable; clarify when one
    missing choice determines correctness.** Call tools immediately for clear
    search, comparison, count, and summary questions. But if the user asks for a
    grouped ranking, leaderboard, or top-N result and the metric or grouping
-   dimension is ambiguous, emit clickable clarification options using
-   ``[CLARIFY:label|full rewritten query]`` markers instead of guessing. Prefer
-   one precise clarification over a fabricated answer.
+   dimension is ambiguous, emit CLARIFY markers (defined above) instead of
+   guessing. Prefer one precise clarification over a fabricated answer.
 
 2. **Minimize turns.** Answer in as few tool-call rounds as possible. Emit all
    needed tool calls in a single turn using parallel calls. Avoid exploratory
@@ -473,18 +503,8 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    them with city/state filters.
 
 4. **Use denormalized parent fields to avoid multi-step queries.** Many objects
-   include parent fields so you can filter without a separate search:
-   - Lease, Availability → property_name, property_city, property_state,
-     property_class, property_type, property_total_sf
-   - Deal → property_name/city/state/class, client_name, buyer_name,
-     seller_name, tenant_name, broker names
-   - Sale → property_name/city/state/class, buyer_name, seller_name
-   - Inquiry → property_name/city/state, broker_name, listing_name,
-     market, submarket
-   - Listing → property_name/city/state/class, listing_broker, owner_name,
-     market, submarket
-   - Preference → account_name, contact_name, market, submarket
-   - Task → who_name, what_name, account_name
+   include parent fields so you can filter without a separate search. See the
+   '(denormalized)' annotations in the Field Reference above for the full list.
    Always use these directly instead of first searching the parent object.
 
 5. **For comparison or cross-object queries, use parallel tool calls.** When the
@@ -497,9 +517,8 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    valid grouped aggregate or an explicitly stated deterministic sort. Do not
    infer a broker/company leaderboard by scanning individual records unless the
    grouping field is explicit and supported.
-   If the request is close to answerable but ambiguous, emit clickable
-   clarification options using the ``[CLARIFY:label|full rewritten query]``
-   marker format. Each option must be a complete, self-contained query.
+   If the request is close to answerable but ambiguous, emit CLARIFY markers
+   (defined above). Each option must be a complete, self-contained query.
    Common disambiguation axes:
    - metric: gross deal value, gross fee, or square footage
    - role/dimension: lead broker, tenant rep broker, listing broker, buyer rep
@@ -532,11 +551,11 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    internal reasoning.
 
 10. **Use provided conversation history naturally and keep global search button-driven.**
-   When the caller supplies prior turns, continue the conversation from that
-   context without restating the full history. For global search, keep follow-up
-   suggestions as clickable buttons rather than open-ended yes/no questions.
-   Example — WRONG: "Would you like me to search for deals involving AscendixRE?"
-   CORRECT: Present results, then add:
+    When the caller supplies prior turns, continue the conversation from that
+    context without restating the full history. For global search, keep follow-up
+    suggestions as CLARIFY markers (defined above) rather than open-ended yes/no
+    questions. Example — WRONG: "Would you like me to search for deals involving
+    AscendixRE?" CORRECT: Present results, then add:
    ``[CLARIFY:Deals involving AscendixRE|Show all deals where AscendixRE is buyer, seller, or broker]``
    ``[CLARIFY:Tasks for AscendixRE|Show all tasks related to AscendixRE]``
    This applies to ALL suggested follow-ups, not just ambiguous queries.
@@ -545,11 +564,7 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    data. If a search returns zero results, tell the user and suggest
    broadening their filters or trying a different object type.
 
-12. **Asking rates use rent_low and rent_high.** The index stores asking rent
-   as a low/high range on Availability records. There is no single
-   asking-rate field; always use rent_low and/or rent_high.
-
-13. **Filter operators.** Append a suffix to the field name for comparisons:
+12. **Filter operators.** Append a suffix to the field name for comparisons:
    - ``_gte``: greater than or equal
    - ``_lte``: less than or equal
    - ``_gt``: greater than
@@ -557,24 +572,27 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    - ``_in``: set membership (value is a list)
    - ``_ne``: not equal
 
-14. **live_salesforce_query is NOT available in this POC.** Do not attempt to
+13. **live_salesforce_query is NOT available in this POC.** Do not attempt to
    use the live_salesforce_query tool. All queries must go through
    search_records or aggregate_records.
 
-15. **Object types for current scope.** {obj_text}
+14. **Object types for current scope.** {obj_text}
 
-16. **Geography scope is object-specific.** Property, Inquiry, Listing, and
-   Preference support market and submarket filters. Availability supports
-   market, submarket, and region. Lease and Deal do not have native
-   market/submarket — use property_city and property_state instead.
-   Account and Contact use billing/mailing city and state.
+15. **Geography scope varies by object.** See the Field Reference for which
+   objects support market, submarket, region, versus city/state.
 
-17. **For complex questions, reason about object selection.** When the question
-   could apply to multiple object types (e.g. "what's happening in Dallas"),
-   consider which object best answers the intent before calling tools. If
-   uncertain, search the most specific object type first.
+16. **For complex questions, reason about object selection before calling tools.**
+   When the question could apply to multiple object types (e.g. "what's
+   happening in Dallas"), work through these steps before making tool calls:
+   (a) What entity is the user asking about? (a building, a deal, a person,
+       a space, a task, a requirement)
+   (b) What action do they want? (find, count, compare, track, summarize)
+   (c) Which object's fields best match the intent?
+   Search the most specific matching object type first. If genuinely ambiguous,
+   emit CLARIFY options for the two most likely interpretations rather than
+   guessing.
 
-18. **For help, capability, or onboarding questions, give a brief welcome — not an
+17. **For help, capability, or onboarding questions, give a brief welcome - not an
    inventory.** When the user asks "what can you do?", "help", "what kinds of
    searches are available?", or similar broad capability questions, respond with:
    (a) a 1–2 sentence summary of what AscendixIQ can do,
@@ -584,12 +602,12 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
    more than ~150 words for a help response. Do NOT call any tools for pure
    help/capability questions.
 
-19. **For advisory or "how would I find..." questions, answer AND offer to run it.**
+18. **For advisory or "how would I find..." questions, answer AND offer to run it.**
    When the user asks how to search for something (e.g., "how would I find deals
    where CBRE is involved?"), explain the approach briefly, then emit one or more
-   ``[CLARIFY:label|full executable query]`` buttons so the user can run the
-   suggested query with a single click. Do NOT call any tools for the advisory
-   part — only emit the clickable options. Examples:
+   CLARIFY markers (defined above) so the user can run the suggested query with
+   a single click. Do NOT call any tools for the advisory part - only emit the
+   clickable options. Examples:
    - User: "How do I find deals where Colliers is involved?"
      Answer: "You can search deals filtering by broker or company name. Try one
      of these:" + ``[CLARIFY:Deals with Colliers as any broker|Show all deals
@@ -598,20 +616,40 @@ def _build_guidelines(object_names: list[str] | None = None) -> str:
      Answer: brief explanation + ``[CLARIFY:Dallas vs Houston deals|Compare
      total deal volume in Dallas vs Houston]``
 
-20. **For write proposals, keep the payload inside the writable contract.**
+19. **For write proposals, keep the payload inside the writable contract.**
    {build_writable_proposal_guidance()} Supported writable objects: {_WRITE_PROPOSAL_OBJECTS}.
    Writable fields:
 {_WRITE_PROPOSAL_FIELDS}\
+
+20. **If a tool returns an error or unexpected result, explain plainly.**
+    Do not retry silently with altered parameters. Tell the user what happened,
+    suggest a corrected query if the cause is obvious (e.g. unsupported filter
+    field), or recommend broadening/narrowing their request.
 """
 
 # Static guidelines used by the static SYSTEM_PROMPT (5-object fallback).
 _GUIDELINES = _build_guidelines()
 
-# ---------------------------------------------------------------------------
-# Static SYSTEM_PROMPT
-# ---------------------------------------------------------------------------
+_STATIC_FIELD_REFERENCE = "\n\n".join([
+    f"### Property fields\n{_PROPERTY_FIELDS}",
+    f"### Lease fields (includes denormalized Property fields)\n{_LEASE_FIELDS}",
+    f"### Availability fields (includes denormalized Property fields)\n{_AVAILABILITY_FIELDS}",
+    f"### Account fields\n{_ACCOUNT_FIELDS}",
+    f"### Contact fields\n{_CONTACT_FIELDS}",
+])
 
-SYSTEM_PROMPT = f"""\
+
+def _compose_system_prompt(
+    *,
+    field_reference: str,
+    guidelines: str,
+    object_list_str: str,
+    writable_object_list_str: str,
+    writable_field_reference: str,
+    examples: str = _FEW_SHOT_EXAMPLES,
+) -> str:
+    """Render the final system prompt from shared sections."""
+    return f"""\
 You are AscendixIQ, a CRE intelligence assistant answering questions about \
 commercial real estate data in the user's Salesforce org.
 
@@ -626,7 +664,7 @@ You understand the following commercial real estate terminology: {_CRE_VOCABULAR
 
 You have access to three tools:
 
-- **search_records**: Search indexed CRE and CRM data (Property, Lease, Availability, Account, Contact). \
+- **search_records**: Search indexed CRE and CRM data ({object_list_str}). \
 Use metadata filters for precise queries. Call multiple times in parallel for \
 cross-object questions. Returns matching documents with relevance scores.
 
@@ -642,32 +680,39 @@ Note: live_salesforce_query is NOT available in this POC.
 
 ## Field Reference
 
-### Property fields
-{_PROPERTY_FIELDS}
-
-### Lease fields (includes denormalized Property fields)
-{_LEASE_FIELDS}
-
-### Availability fields (includes denormalized Property fields)
-{_AVAILABILITY_FIELDS}
-
-### Account fields
-{_ACCOUNT_FIELDS}
-
-### Contact fields
-{_CONTACT_FIELDS}
+<field_reference>
+{field_reference}
+</field_reference>
 
 ## Write Proposals
 
-Supported writable objects: {_WRITE_PROPOSAL_OBJECTS}
+Supported writable objects: {writable_object_list_str}
 
 Writable fields:
-{_WRITE_PROPOSAL_FIELDS}
+{writable_field_reference}
 
-{_FEW_SHOT_EXAMPLES}{_WRITE_PROPOSAL_EXAMPLE}
+## Examples
 
-{_GUIDELINES}
+<examples>
+{examples}{_WRITE_PROPOSAL_EXAMPLE}
+</examples>
+
+<guidelines>
+{guidelines}
+</guidelines>
 """
+
+# ---------------------------------------------------------------------------
+# Static SYSTEM_PROMPT
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT = _compose_system_prompt(
+    field_reference=_STATIC_FIELD_REFERENCE,
+    guidelines=_GUIDELINES,
+    object_list_str="Property, Lease, Availability, Account, Contact",
+    writable_object_list_str=_WRITE_PROPOSAL_OBJECTS,
+    writable_field_reference=_WRITE_PROPOSAL_FIELDS,
+)
 
 # ---------------------------------------------------------------------------
 # Tool definitions (Bedrock Converse API format)
@@ -883,50 +928,13 @@ def build_system_prompt(config: dict) -> str:
     # Build dynamic guidelines with actual object list
     guidelines = _build_guidelines(object_names)
 
-    return f"""\
-You are AscendixIQ, a CRE intelligence assistant answering questions about \
-commercial real estate data in the user's Salesforce org.
-
-Today's date is {date.today().isoformat()}. Use this for any relative date \
-calculations (e.g. "next year", "last 12 months").
-
-## CRE Domain Vocabulary
-
-You understand the following commercial real estate terminology: {_CRE_VOCABULARY}.
-
-## Available Tools
-
-You have access to three tools:
-
-- **search_records**: Search indexed CRE and CRM data ({object_list_str}). \
-Use metadata filters for precise queries. Call multiple times in parallel for \
-cross-object questions. Returns matching documents with relevance scores.
-
-- **aggregate_records**: Count, sum, or average records matching criteria, \
-optionally grouped by a field. Use for "how many," "total," "average," \
-"breakdown" questions.
-
-- **propose_edit**: Create a typed edit proposal for a supported writable \
-Salesforce record. Use only when the target record is already identified, and \
-only propose fields from the writable contract.
-
-Note: live_salesforce_query is NOT available in this POC.
-
-## Field Reference
-
-{field_reference}
-
-## Write Proposals
-
-Supported writable objects: {writable_object_list_str}
-
-Writable fields:
-{writable_field_reference}
-
-{_FEW_SHOT_EXAMPLES}{_WRITE_PROPOSAL_EXAMPLE}
-
-{guidelines}
-"""
+    return _compose_system_prompt(
+        field_reference=field_reference,
+        guidelines=guidelines,
+        object_list_str=object_list_str,
+        writable_object_list_str=writable_object_list_str,
+        writable_field_reference=writable_field_reference,
+    )
 
 
 def build_tool_definitions(config: dict) -> list[dict]:

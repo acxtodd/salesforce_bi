@@ -52,7 +52,6 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.streamingChunkBuffer = '';
         this.lastRequestBody = null;
         this.lastExchange = null;
-        this._pendingPriorContext = null;
         this.selectedModelId = '';
         this.lastModelUsed = '';
     }
@@ -99,7 +98,6 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     streamingChunkBuffer = '';
     lastRequestBody = null;
     lastExchange = null;
-    _pendingPriorContext = null;
     @track selectedModelId = '';
     @track lastModelUsed = '';
     requestSequence = 0;
@@ -575,11 +573,9 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
     handleClarificationClick(event) {
         const query = event.currentTarget.dataset.query;
         if (query) {
-            this._pendingPriorContext = this.isRecordPage
-                ? null
-                : (this.lastExchange
-                    ? { query: this.lastExchange.query, answer: this.lastExchange.answer }
-                    : null);
+            // Clarification queries are emitted as full standalone queries.
+            // Re-sending prior global-search context can reintroduce ambiguity
+            // and override the user's selected interpretation.
             this.queryText = query;
             this.clarificationOptions = [];
             this.handleSubmit();
@@ -686,13 +682,11 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
             ...(this.selectedModelId ? { modelId: this.selectedModelId } : {}),
             ...(this.isRecordPage && this.conversationHistory.length > 0
                 ? { conversationHistory: this.buildConversationHistoryPayload() }
-                : {}),
-            ...(this._pendingPriorContext ? { priorContext: this._pendingPriorContext } : {})
+                : {})
         };
 
         // Store for retry
         this.lastRequestBody = requestBody;
-        this._pendingPriorContext = null;
 
         await this.runAnswerRequest(requestBody);
     }
@@ -1365,7 +1359,6 @@ export default class AscendixAiSearch extends NavigationMixin(LightningElement) 
         this.clarificationOptions = [];
         this.lastExchange = null;
         this.lastRequestBody = null;
-        this._pendingPriorContext = null;
         this.errorMessage = '';
         this.showRetryButton = false;
         this.showAnswerSection = false;

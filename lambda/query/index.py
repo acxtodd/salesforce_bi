@@ -23,13 +23,16 @@ import json
 import logging
 import os
 import re
-from pathlib import Path
 from typing import Any
 
 import boto3
-import yaml
 
 from lib.query_handler import QueryHandler, QueryResult
+from lib.runtime_config import (
+    RuntimeConfigLoader,
+    bundled_paths_from_env,
+    extract_denorm_config,
+)
 from lib.search_backend import SearchBackend
 from lib.tool_dispatch import build_field_registry
 from lib.turbopuffer_backend import TurbopufferBackend
@@ -41,41 +44,13 @@ logger.setLevel(os.getenv("LOG_LEVEL", "INFO"))
 # Module-level initialisation (runs once on Lambda cold start)
 # ---------------------------------------------------------------------------
 
-# Config loading: look in standard locations, configurable via env var.
-_CONFIG_SEARCH_PATHS = [
-    os.getenv("DENORM_CONFIG_PATH", ""),
-    "denorm_config.yaml",
-    os.path.join(os.path.dirname(__file__), "denorm_config.yaml"),
-    os.path.join(os.path.dirname(__file__), "..", "..", "denorm_config.yaml"),
-]
-
-
-def _load_config() -> dict:
-    """Load denorm_config.yaml from the first path that exists."""
-    for candidate in _CONFIG_SEARCH_PATHS:
-        if not candidate:
-            continue
-        path = Path(candidate).resolve()
-        if path.is_file():
-            logger.info("Loading denorm config from %s", path)
-            with open(path) as fh:
-                return yaml.safe_load(fh)
-    raise FileNotFoundError(
-        "Cannot find denorm_config.yaml. Set DENORM_CONFIG_PATH or place it "
-        "in the project root."
-    )
-
-
-_DENORM_CONFIG: dict = _load_config()
-_FIELD_REGISTRY: dict = build_field_registry(_DENORM_CONFIG)
-
 from lib.system_prompt import build_system_prompt, build_tool_definitions
-_SYSTEM_PROMPT = build_system_prompt(_DENORM_CONFIG)
-_TOOL_DEFINITIONS = build_tool_definitions(_DENORM_CONFIG)
 
 # Session warm-cache: tracks session_ids that have already been warmed.
 # Resets on Lambda cold start, which is acceptable for POC.
 _warmed_sessions: set[str] = set()
+_runtime_context_cache: dict[str, dict[str, Any]] = {}
+_runtime_config_loader: RuntimeConfigLoader | None = None
 
 # Bedrock model ID, configurable via env var.
 _MODEL_ID = os.getenv(
@@ -86,6 +61,45 @@ _CONVERSATION_HISTORY_MAX_TURNS = 10
 _CONVERSATION_HISTORY_MAX_CHARS = 15_000
 _CONVERSATION_HISTORY_MAX_QUERY_CHARS = 500
 _CONVERSATION_HISTORY_MAX_ANSWER_CHARS = 2_000
+
+
+# ---------------------------------------------------------------------------
+# Runtime config helpers
+# ---------------------------------------------------------------------------
+
+
+def _get_runtime_config_loader() -> RuntimeConfigLoader:
+    global _runtime_config_loader
+    if _runtime_config_loader is None:
+        bucket = os.getenv("CONFIG_ARTIFACT_BUCKET", "")
+        _runtime_config_loader = RuntimeConfigLoader(
+            s3_client=boto3.client("s3") if bucket else None,
+            ssm_client=boto3.client("ssm") if bucket else None,
+            bucket=bucket,
+            s3_prefix=os.getenv("CONFIG_ARTIFACT_PREFIX", "config"),
+            bundled_paths=bundled_paths_from_env(__file__),
+        )
+    return _runtime_config_loader
+
+
+def _get_runtime_context(org_id: str) -> dict[str, Any]:
+    runtime_artifact = _get_runtime_config_loader().load(org_id)
+    denorm_config = extract_denorm_config(runtime_artifact)
+    version_id = str(runtime_artifact.get("version_id", "bundled"))
+    cached = _runtime_context_cache.get(org_id)
+    if cached and cached.get("version_id") == version_id:
+        return cached
+
+    context = {
+        "version_id": version_id,
+        "denorm_config": denorm_config,
+        "field_registry": build_field_registry(denorm_config),
+        "system_prompt": build_system_prompt(denorm_config),
+        "tool_definitions": build_tool_definitions(denorm_config),
+    }
+    _runtime_context_cache[org_id] = context
+    logger.info("Loaded runtime config for %s from version %s", org_id, version_id)
+    return context
 
 
 # ---------------------------------------------------------------------------
@@ -288,15 +302,16 @@ def handler(event: dict, context: Any) -> dict:
     sse_parts: list[str] = []
 
     try:
+        runtime_context = _get_runtime_context(org_id)
         effective_model = model_id_override.strip() if model_id_override else _MODEL_ID
         qh = QueryHandler(
             bedrock_client=bedrock_client,
             backend=backend,
             namespace=namespace,
-            field_registry=_FIELD_REGISTRY,
+            field_registry=runtime_context["field_registry"],
             model_id=effective_model,
-            system_prompt=_SYSTEM_PROMPT,
-            tool_definitions=_TOOL_DEFINITIONS,
+            system_prompt=runtime_context["system_prompt"],
+            tool_definitions=runtime_context["tool_definitions"],
         )
         # Prepend record context so the LLM knows which record the user is viewing.
         effective_question = question

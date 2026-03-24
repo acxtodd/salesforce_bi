@@ -77,6 +77,8 @@ _SAMPLE_QUERY_RESULT_DICT = {
 def _reset_warmed_sessions(monkeypatch):
     """Reset the module-level warm-session set between tests."""
     monkeypatch.setattr(_mod, "_warmed_sessions", set())
+    monkeypatch.setattr(_mod, "_runtime_context_cache", {})
+    monkeypatch.setattr(_mod, "_runtime_config_loader", None)
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +226,40 @@ class TestValidRequest:
         assert "citations" not in event_types
         assert "token" in event_types
         assert "done" in event_types
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_runtime_config_loader_controls_query_scope(self, MockQH, MockBackend, mock_boto3, monkeypatch):
+        class FakeLoader:
+            def __init__(self):
+                self.org_ids: list[str] = []
+
+            def load(self, org_id: str):
+                self.org_ids.append(org_id)
+                return {
+                    "version_id": "runtime-v2",
+                    "denorm_config": {
+                        "ascendix__Deal__c": {
+                            "embed_fields": ["Name"],
+                            "metadata_fields": [],
+                            "parents": {},
+                        }
+                    },
+                }
+
+        fake_loader = FakeLoader()
+        monkeypatch.setattr(_mod, "_runtime_config_loader", fake_loader)
+
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        resp = _invoke({"question": "Find deals", "org_id": "00Ddl000003yx57EAA"})
+
+        assert resp["statusCode"] == 200
+        assert fake_loader.org_ids == ["00Ddl000003yx57EAA"]
+        field_registry = MockQH.call_args.kwargs["field_registry"]
+        assert set(field_registry.keys()) == {"deal"}
 
 
 # ---------------------------------------------------------------------------

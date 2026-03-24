@@ -2346,10 +2346,10 @@
         {
           "id": "4.7",
           "title": "Validate expanded corpus with acceptance tests",
-          "status": "pending",
+          "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-19T06:09:43.457686+00:00",
-          "updatedAt": "2026-03-22T15:45:22.955743+00:00",
+          "updatedAt": "2026-03-24T06:44:10.960208+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2357,10 +2357,15 @@
             {
               "timestamp": "2026-03-22T15:45:22.955563+00:00",
               "note": "Dependency on 4.6 cleared — 4.6 completed. This is now unblocked as the next validation work."
+            },
+            {
+              "timestamp": "2026-03-24T06:44:10.960358+00:00",
+              "note": "Starting implementation: adding cross-object acceptance tests, per-object search coverage check, numeric/date filter validation, and LWC smoke test coverage."
             }
           ],
           "description": "Run validate_data.py across the full corpus. Check: per-object record counts match Salesforce, parent fields populated for objects with parent configs, metadata filters work for numeric/date fields, search returns results for each object type. Add new acceptance test cases for cross-object queries: 'find contacts at properties in Dallas', 'show deals related to ACME Corp', 'what leases are expiring this quarter'. Smoke-test via LWC search interface.",
-          "depends_on": []
+          "depends_on": [],
+          "startedAt": "2026-03-24T06:44:10.960356+00:00"
         },
         {
           "id": "4.8",

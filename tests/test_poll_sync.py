@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
 import pytest
+import yaml
 
 # Add project root + lambda to path.
 # Lambda dir must come FIRST so `poll_sync.index` resolves to
@@ -24,6 +25,7 @@ from poll_sync.index import (  # noqa: E402
     parse_watermark,
     _sync_object,
 )
+import poll_sync.index as _poll_sync_mod  # noqa: E402
 
 
 # ===================================================================
@@ -394,3 +396,156 @@ class TestSyncObject:
 
         assert result["records_synced"] == 0
         assert result["error"] == "no config"
+
+
+# ===================================================================
+# Runtime config loading tests (Task 4.9.6)
+# ===================================================================
+
+
+class TestRuntimeConfigLoading:
+    """Verify poll_sync uses RuntimeConfigLoader with safe fallback."""
+
+    def _reset_module_state(self):
+        """Reset module-level caches between tests."""
+        _poll_sync_mod._denorm_config = None
+        _poll_sync_mod._denorm_config_raw_yaml = ""
+        _poll_sync_mod._denorm_config_version = ""
+        _poll_sync_mod._runtime_config_loader = None
+
+    def test_poll_sync_loads_config_from_runtime_loader(self, monkeypatch):
+        """When RuntimeConfigLoader succeeds, poll_sync uses its denorm_config."""
+        self._reset_module_state()
+
+        class FakeLoader:
+            def __init__(self):
+                self.called_org_ids = []
+
+            def load(self, org_id):
+                self.called_org_ids.append(org_id)
+                return {
+                    "version_id": "runtime-v1",
+                    "denorm_config": {
+                        "ascendix__Deal__c": {
+                            "embed_fields": ["Name", "ascendix__NewField__c"],
+                            "metadata_fields": [],
+                            "parents": {},
+                        }
+                    },
+                }
+
+        fake_loader = FakeLoader()
+        monkeypatch.setattr(_poll_sync_mod, "_runtime_config_loader", fake_loader)
+
+        config, raw_yaml = _poll_sync_mod._load_denorm_config("00DTEST")
+
+        assert fake_loader.called_org_ids == ["00DTEST"]
+        assert "ascendix__Deal__c" in config
+        assert "ascendix__NewField__c" in config["ascendix__Deal__c"]["embed_fields"]
+        assert _poll_sync_mod._denorm_config_version == "runtime-v1"
+
+        # Clean up
+        self._reset_module_state()
+
+    def test_poll_sync_falls_back_to_static_yaml_on_loader_error(self, monkeypatch, tmp_path):
+        """When RuntimeConfigLoader raises, poll_sync falls back to static YAML."""
+        self._reset_module_state()
+
+        class FailingLoader:
+            def load(self, org_id):
+                raise RuntimeError("S3 unavailable")
+
+        monkeypatch.setattr(_poll_sync_mod, "_runtime_config_loader", FailingLoader())
+
+        fallback_config = {
+            "ascendix__Property__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": [],
+                "parents": {},
+            }
+        }
+        config_path = tmp_path / "denorm_config.yaml"
+        config_path.write_text(yaml.safe_dump(fallback_config))
+        monkeypatch.setenv("DENORM_CONFIG_PATH", str(config_path))
+
+        config, raw_yaml = _poll_sync_mod._load_denorm_config("00DTEST")
+
+        assert "ascendix__Property__c" in config
+        assert _poll_sync_mod._denorm_config_version == "bundled-fallback"
+
+        # Clean up
+        self._reset_module_state()
+
+    def test_poll_sync_caches_config_after_first_load(self, monkeypatch):
+        """Config is cached at module level; second call does not re-invoke loader."""
+        self._reset_module_state()
+
+        call_count = 0
+
+        class CountingLoader:
+            def load(self, org_id):
+                nonlocal call_count
+                call_count += 1
+                return {
+                    "version_id": "cached-v1",
+                    "denorm_config": {"ascendix__Deal__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}}},
+                }
+
+        monkeypatch.setattr(_poll_sync_mod, "_runtime_config_loader", CountingLoader())
+
+        _poll_sync_mod._load_denorm_config("00DTEST")
+        _poll_sync_mod._load_denorm_config("00DTEST")
+
+        assert call_count == 1
+
+        # Clean up
+        self._reset_module_state()
+
+    def test_runtime_config_honors_new_objects_without_yaml_edit(self, monkeypatch):
+        """A new object added via runtime config is honored by _sync_object."""
+        self._reset_module_state()
+
+        runtime_config = {
+            "ascendix__Deal__c": {
+                "embed_fields": ["Name", "ascendix__Description__c"],
+                "metadata_fields": ["ascendix__Stage__c"],
+                "parents": {},
+            },
+            "ascendix__NewObject__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": [],
+                "parents": {},
+            },
+        }
+
+        # _sync_object accepts denorm_config directly — verify new object is recognized
+        result_known = _sync_object(
+            "ascendix__NewObject__c",
+            denorm_config=runtime_config,
+            sf_client=_make_sf_client_mock([]),
+            bedrock_client=_make_bedrock_mock(),
+            backend=_make_backend_mock(),
+            cloudwatch_client=_make_cloudwatch_mock(),
+            ssm_client=_make_ssm_mock(watermark=None),
+            namespace="org_test",
+            salesforce_org_id="00Dtest",
+            page_size=200,
+        )
+        assert "error" not in result_known
+
+        # Unknown object still skipped
+        result_unknown = _sync_object(
+            "ascendix__Unknown__c",
+            denorm_config=runtime_config,
+            sf_client=_make_sf_client_mock([]),
+            bedrock_client=_make_bedrock_mock(),
+            backend=_make_backend_mock(),
+            cloudwatch_client=_make_cloudwatch_mock(),
+            ssm_client=_make_ssm_mock(watermark=None),
+            namespace="org_test",
+            salesforce_org_id="00Dtest",
+            page_size=200,
+        )
+        assert result_unknown["error"] == "no config"
+
+        self._reset_module_state()

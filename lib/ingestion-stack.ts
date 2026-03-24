@@ -430,12 +430,28 @@ export class IngestionStack extends cdk.Stack {
         POLL_BATCH_SIZE: "200",
         TURBOPUFFER_API_KEY:
           turbopufferApiKeySecret.secretValue.unsafeUnwrap(),
+        CONFIG_ARTIFACT_BUCKET: dataBucket.bucketName,
+        CONFIG_ARTIFACT_PREFIX: "config",
         LOG_LEVEL: "INFO",
         ...(props.auditBucket
           ? { AUDIT_BUCKET: props.auditBucket.bucketName }
           : {}),
       },
     });
+
+    // Grant poll sync read access to config artifacts
+    dataBucket.grantRead(pollSyncLambda, "config/*");
+
+    // Grant poll sync read access to config SSM parameters
+    pollSyncRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["ssm:GetParameter"],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/salesforce-ai-search/config/*`,
+        ],
+      }),
+    );
 
     // Grant poll sync write access to audit bucket
     if (props.auditBucket) {

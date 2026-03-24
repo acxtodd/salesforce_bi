@@ -2508,7 +2508,7 @@ describe('c-ascendix-ai-search', () => {
             expect(element.shadowRoot.querySelector('.clarification-options')).toBeFalsy();
         });
 
-        it('should resubmit with clarification query on pill click', async () => {
+        it('should resubmit clarification queries statelessly on global search', async () => {
             callAnswerEndpoint
                 .mockResolvedValueOnce({
                     answer: 'Which metric did you mean?',
@@ -2558,10 +2558,7 @@ describe('c-ascendix-ai-search', () => {
             const callArgs = callAnswerEndpoint.mock.calls[1][0];
             const payload = JSON.parse(callArgs.requestBodyJson);
             expect(payload.query).toBe('Top 5 markets by deal count');
-            expect(payload.priorContext).toEqual({
-                query: 'Top markets',
-                answer: 'Which metric did you mean?'
-            });
+            expect(payload.priorContext).toBeUndefined();
             expect(payload.conversationHistory).toBeUndefined();
         });
     });

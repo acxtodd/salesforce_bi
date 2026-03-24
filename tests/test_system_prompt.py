@@ -22,6 +22,7 @@ from lib.system_prompt import (
     build_system_prompt,
     build_tool_definitions,
 )
+from scripts.export_agent_prompt import generate_export_document
 
 # =========================================================================
 # Test fixtures
@@ -275,6 +276,9 @@ class TestSystemPrompt:
 
     def test_has_guidelines(self):
         assert "Guidelines" in SYSTEM_PROMPT
+        assert "<guidelines>" in SYSTEM_PROMPT
+        assert "<field_reference>" in SYSTEM_PROMPT
+        assert "<examples>" in SYSTEM_PROMPT
 
     def test_mentions_denormalized_fields(self):
         assert "denormalized" in SYSTEM_PROMPT.lower() or "denorm" in SYSTEM_PROMPT.lower()
@@ -288,7 +292,7 @@ class TestSystemPrompt:
         assert "cite" in SYSTEM_PROMPT.lower()
 
     def test_mentions_geography_scope(self):
-        assert "Geography scope" in SYSTEM_PROMPT
+        assert "Geography scope varies by object" in SYSTEM_PROMPT
         assert "market" in SYSTEM_PROMPT.lower()
         assert "property_city" in SYSTEM_PROMPT
 
@@ -296,6 +300,11 @@ class TestSystemPrompt:
         assert "Do not fabricate grouped rankings" in SYSTEM_PROMPT
         assert "leaderboard" in SYSTEM_PROMPT
         assert "grouped aggregate" in SYSTEM_PROMPT
+        assert "CLARIFY markers (defined above)" in SYSTEM_PROMPT
+
+    def test_mentions_clarify_spec_and_error_handling(self):
+        assert "Clickable option format (CLARIFY markers)" in SYSTEM_PROMPT
+        assert "If a tool returns an error or unexpected result" in SYSTEM_PROMPT
 
     def test_mentions_interpretation_footer(self):
         assert "If interpretation materially affects correctness" in SYSTEM_PROMPT
@@ -310,6 +319,18 @@ class TestSystemPrompt:
         """Static prompt includes the Deal few-shot example."""
         assert "Deal" in SYSTEM_PROMPT
         assert "deal_value_gte" in SYSTEM_PROMPT or "deal closed" in SYSTEM_PROMPT
+
+    def test_has_prompt_quality_examples(self):
+        assert "Note: Dates in examples below are illustrative." in SYSTEM_PROMPT
+        assert "Anti-pattern examples - do NOT do these" in SYSTEM_PROMPT
+        assert "unnecessary multi-step when denormalized fields exist" in SYSTEM_PROMPT
+        assert "using text_query as a match-everything hack" in SYSTEM_PROMPT
+
+    def test_clarify_spec_appears_once(self):
+        assert SYSTEM_PROMPT.count("Clickable option format (CLARIFY markers)") == 1
+
+    def test_removes_standalone_asking_rates_guideline(self):
+        assert "Asking rates use rent_low and rent_high" not in SYSTEM_PROMPT
 
     def test_has_inquiry_few_shot_example(self):
         """Static prompt includes the Inquiry few-shot example."""
@@ -525,6 +546,9 @@ class TestBuildSystemPrompt:
     def test_includes_guidelines(self):
         result = build_system_prompt(SAMPLE_CONFIG)
         assert "Guidelines" in result
+        assert "<guidelines>" in result
+        assert "<field_reference>" in result
+        assert "<examples>" in result
         assert "denormalized" in result.lower() or "denorm" in result.lower()
 
     def test_includes_market_grain_guidance(self):
@@ -554,6 +578,13 @@ class TestBuildSystemPrompt:
         assert "Supported writable objects" in result
         assert "Account, Contact, Task" in result
         assert "Never include denormalized search fields" in result
+
+    def test_includes_prompt_quality_sections(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert "Clickable option format (CLARIFY markers)" in result
+        assert "Note: Dates in examples below are illustrative." in result
+        assert "Anti-pattern examples - do NOT do these" in result
+        assert "If a tool returns an error or unexpected result" in result
 
     def test_includes_cre_vocabulary(self):
         result = build_system_prompt(SAMPLE_CONFIG)
@@ -613,6 +644,27 @@ class TestBuildSystemPrompt:
         assert "record name / building name" in result
         # Check that a curated lease description is present
         assert "lease rate per square foot" in result
+
+    def test_prompt_quality_scaffold_is_present(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert "reason about object selection before calling tools" in result
+        assert "(a) What entity is the user asking about?" in result
+        assert "(b) What action do they want?" in result
+        assert "(c) Which object's fields best match the intent?" in result
+
+    def test_prompt_quality_sections_are_wrapped_once(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert result.count("<field_reference>") == 1
+        assert result.count("<examples>") == 1
+        assert result.count("<guidelines>") == 1
+
+    def test_prompt_quality_clarify_spec_appears_once(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert result.count("Clickable option format (CLARIFY markers)") == 1
+
+    def test_prompt_quality_removes_standalone_asking_rates_guideline(self):
+        result = build_system_prompt(SAMPLE_CONFIG_11)
+        assert "Asking rates use rent_low and rent_high" not in result
 
 
 # =========================================================================
@@ -745,11 +797,13 @@ class TestLeaderboardToolParams:
     def test_clarify_marker_format_in_static_prompt(self):
         """The [CLARIFY:label|query] marker format must be documented in the prompt."""
         assert "[CLARIFY:" in SYSTEM_PROMPT
-        assert "full rewritten query" in SYSTEM_PROMPT
+        assert "full self-contained query text" in SYSTEM_PROMPT
+        assert "CLARIFY markers (defined above)" in SYSTEM_PROMPT
 
     def test_clarify_marker_format_in_dynamic_prompt(self):
         result = build_system_prompt(SAMPLE_CONFIG_11)
         assert "[CLARIFY:" in result
+        assert "CLARIFY markers (defined above)" in result
 
 
 # =========================================================================
@@ -758,7 +812,7 @@ class TestLeaderboardToolParams:
 
 
 class TestHelpResponseGuideline:
-    """Verify guideline 17 (help/onboarding) exists in prompts."""
+    """Verify guideline 18 (help/onboarding) exists in prompts."""
 
     def test_static_prompt_has_help_guidance(self):
         assert "help, capability, or onboarding questions" in SYSTEM_PROMPT
@@ -770,3 +824,35 @@ class TestHelpResponseGuideline:
     def test_guideline_discourages_capability_dumps(self):
         assert "Do NOT enumerate every object type" in SYSTEM_PROMPT
         assert "Do NOT call any tools for pure" in SYSTEM_PROMPT
+
+
+# =========================================================================
+# 7. Prompt export regeneration
+# =========================================================================
+
+
+class TestPromptExport:
+    """Verify the export script renders the same prompt surface deterministically."""
+
+    def test_export_document_summary_counts(self):
+        document, stats = generate_export_document(SAMPLE_CONFIG_11)
+        assert document.startswith("<!-- Auto-generated")
+        assert "SYSTEM PROMPT" in document
+        assert "TOOL DEFINITIONS" in document
+        assert stats.object_types == [
+            "Account",
+            "Availability",
+            "Contact",
+            "Deal",
+            "Inquiry",
+            "Lease",
+            "Listing",
+            "Preference",
+            "Property",
+            "Sale",
+            "Task",
+        ]
+        assert stats.tool_names == ["search_records", "aggregate_records", "propose_edit"]
+        assert stats.guideline_count == 20
+        assert "Tool definitions: 3 tools (search_records, aggregate_records, propose_edit)" in document
+        assert "Guidelines: 20" in document

@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import boto3
 
@@ -67,6 +68,54 @@ def get_org_id(sf_client: SalesforceClient) -> str:
     return result["records"][0]["Id"]
 
 
+POLL_SYNC_LAMBDA_NAME = "salesforce-ai-search-poll-sync"
+
+
+def _make_reindex_callback(
+    lambda_client: Any = None,
+    poll_sync_function_name: str = POLL_SYNC_LAMBDA_NAME,
+) -> Any:
+    """Build a reindex callback that invokes the poll_sync Lambda.
+
+    For seed_new_object actions, invokes with full_sync=True.
+    For reindex actions, invokes with full_sync=True for the affected object.
+    """
+    client = lambda_client or boto3.client("lambda")
+
+    def reindex_callback(
+        object_name: str,
+        action_type: str,
+        full_sync: bool = False,
+    ) -> dict:
+        payload = json.dumps({
+            "objects": [object_name],
+            "full_sync": full_sync or action_type == "seed_new_object",
+        })
+        LOG.info(
+            "Invoking %s for %s (action=%s, full_sync=%s)",
+            poll_sync_function_name,
+            object_name,
+            action_type,
+            full_sync or action_type == "seed_new_object",
+        )
+        response = client.invoke(
+            FunctionName=poll_sync_function_name,
+            InvocationType="RequestResponse",
+            Payload=payload.encode("utf-8"),
+        )
+        response_payload = json.loads(response["Payload"].read())
+        status_code = response_payload.get("statusCode", response.get("StatusCode", 0))
+        if status_code != 200:
+            raise RuntimeError(
+                f"poll_sync Lambda returned {status_code} for {object_name}: "
+                f"{json.dumps(response_payload)}"
+            )
+        LOG.info("Reindex result for %s: %s", object_name, json.dumps(response_payload.get("summary", {})))
+        return response_payload
+
+    return reindex_callback
+
+
 def _build_store(args: argparse.Namespace) -> ConfigArtifactStore:
     return ConfigArtifactStore(
         s3_client=boto3.client("s3"),
@@ -93,6 +142,12 @@ def cmd_compile(args: argparse.Namespace) -> None:
     sf_client = get_sf_client(args)
     org_id = args.org_id or get_org_id(sf_client)
     store = _build_store(args)
+
+    reindex_callback = None
+    if args.apply:
+        poll_fn = getattr(args, "poll_sync_function", POLL_SYNC_LAMBDA_NAME)
+        reindex_callback = _make_reindex_callback(poll_sync_function_name=poll_fn)
+
     result = execute_config_refresh(
         sf=sf_client,
         org_id=org_id,
@@ -100,6 +155,7 @@ def cmd_compile(args: argparse.Namespace) -> None:
         apply=args.apply,
         applied_by="scripts/run_config_refresh.py",
         target_objects=args.objects,
+        reindex_callback=reindex_callback,
     )
 
     compile_result = result["compile_result"]
@@ -199,6 +255,12 @@ def main() -> None:
         ),
     )
     compile_parser.add_argument("--objects", nargs="+", default=None, help="Optional object subset.")
+    compile_parser.add_argument(
+        "--poll-sync-function",
+        default=POLL_SYNC_LAMBDA_NAME,
+        dest="poll_sync_function",
+        help="Lambda function name for targeted reindex (default: %(default)s).",
+    )
 
     # rollback
     rollback_parser = subparsers.add_parser(

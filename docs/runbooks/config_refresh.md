@@ -97,26 +97,16 @@ python3 scripts/run_config_refresh.py compile \
 This runs the targeted apply workflow:
 
 1. Builds an apply plan from the diff
-2. Executes required seed/reindex work for each affected object
-3. Only activates the candidate after all reindex work succeeds
+2. Invokes the `poll_sync` Lambda for each affected object that requires
+   seed or reindex (full_sync=true)
+3. Only activates the candidate after all reindex invocations succeed
 4. Records apply evidence in S3
 
-**Without a reindex callback** (current default for CLI), the apply plan
-is recorded and the operator must run targeted reindex manually:
+The CLI invokes the deployed `salesforce-ai-search-poll-sync` Lambda by
+default. Override with `--poll-sync-function <name>` if needed.
 
-```bash
-# For new objects — run full sync
-python3 scripts/run_poll_sync.py \
-  --objects ascendix__NewObject__c \
-  --full-sync
-
-# For field/relationship changes — targeted reindex
-python3 scripts/run_poll_sync.py \
-  --objects ascendix__Property__c \
-  --full-sync
-```
-
-Then re-run `compile --apply` to activate.
+If a reindex invocation fails, activation is blocked and the error is
+recorded. Fix the issue and re-run `compile --apply`.
 
 ### Step 4: Verify
 

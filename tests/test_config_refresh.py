@@ -672,3 +672,51 @@ def test_rollback_to_version():
 
     assert rollback["rolled_back_to"] == result_v1.version_id
     assert store.resolve_active_version("00DTEST") == result_v1.version_id
+
+
+def test_cli_reindex_callback_invokes_poll_sync_lambda():
+    """Verify _make_reindex_callback invokes the poll_sync Lambda correctly."""
+    import io
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+
+    from run_config_refresh import _make_reindex_callback
+
+    invocations = []
+
+    class FakeLambdaClient:
+        def invoke(self, **kwargs):
+            invocations.append(kwargs)
+            return {
+                "StatusCode": 200,
+                "Payload": io.BytesIO(json.dumps({
+                    "statusCode": 200,
+                    "summary": {"ascendix__Property__c": {"records_synced": 15}},
+                }).encode("utf-8")),
+            }
+
+    callback = _make_reindex_callback(
+        lambda_client=FakeLambdaClient(),
+        poll_sync_function_name="test-poll-sync",
+    )
+
+    result = callback(
+        object_name="ascendix__Property__c",
+        action_type="reindex_field_add",
+        full_sync=False,
+    )
+
+    assert len(invocations) == 1
+    assert invocations[0]["FunctionName"] == "test-poll-sync"
+    payload = json.loads(invocations[0]["Payload"])
+    assert payload["objects"] == ["ascendix__Property__c"]
+    assert payload["full_sync"] is False
+    assert result["statusCode"] == 200
+
+    # seed_new_object should force full_sync=True
+    result2 = callback(
+        object_name="ascendix__NewObj__c",
+        action_type="seed_new_object",
+        full_sync=False,
+    )
+    payload2 = json.loads(invocations[1]["Payload"])
+    assert payload2["full_sync"] is True

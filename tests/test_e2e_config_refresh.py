@@ -330,7 +330,12 @@ class TestObjectAddScenario:
 
 
 class TestRelationshipPathChangeScenario:
-    """Admin adds a Market cross-object filter to Property saved search."""
+    """Admin adds an OwnerLandlord cross-object filter with a new field to Property saved search.
+
+    Uses OwnerLandlord__r.Phone — a field not in the mock baseline's
+    dot_notation_columns — so the parents dict actually changes and the
+    diff classifies as IMPACT_RELATIONSHIP.
+    """
 
     def test_relationship_path_change_end_to_end(self):
         fake_s3 = _FakeS3()
@@ -338,7 +343,7 @@ class TestRelationshipPathChangeScenario:
         baseline = _seed_baseline(fake_s3, fake_ssm)
         store = _store(fake_s3, fake_ssm)
 
-        # Admin adds Market relationship to Property's saved search
+        # Admin adds OwnerLandlord relationship with Phone field to saved search
         rel_change_source = _baseline_source()
         new_template = json.dumps({
             "sectionsList": [
@@ -347,45 +352,68 @@ class TestRelationshipPathChangeScenario:
                     "fieldsList": [{"logicalName": "ascendix__City__c"}],
                 },
                 {
-                    "objectName": "ascendix__Market__c",
-                    "relationship": "ascendix__Market__r",
-                    "fieldsList": [{"logicalName": "Name"}],
+                    "objectName": "Account",
+                    "relationship": "ascendix__OwnerLandlord__r",
+                    "fieldsList": [{"logicalName": "Phone"}],
                 },
             ],
             "resultColumns": [{"logicalName": "Name"}],
         })
         rel_change_source["saved_searches"][0]["ascendix_search__Template__c"] = new_template
 
-        # Compile with mock=True using the new source
-        result = compile_config_artifact(
+        reindex_log = []
+
+        def fake_reindex(object_name, action_type, full_sync=False):
+            reindex_log.append({"object": object_name, "action": action_type})
+            return {"records_synced": 8}
+
+        # Run through the full apply workflow
+        refresh = execute_config_refresh(
             org_id="00DTEST",
+            store=store,
             raw_source=rel_change_source,
-            previous_artifact=store.load_active_artifact("00DTEST"),
             target_objects=["ascendix__Property__c"],
+            apply=True,
+            applied_by="e2e_test",
+            reindex_callback=fake_reindex,
             mock=True,
         )
 
-        # Verify the relationship path change is detected
-        assert result.impact_classification in (IMPACT_RELATIONSHIP, IMPACT_PROMPT_ONLY, IMPACT_FIELD_SCOPE, IMPACT_OBJECT_SCOPE)
+        cr = refresh["compile_result"]
 
-        # The query_scope should now include the Market relationship
-        property_scope = result.query_scope.get("objects", {}).get("ascendix__Property__c", {})
-        assert "ascendix__Market__r" in property_scope.get("relationship_paths", [])
+        # Must classify as relationship_change since parents actually changed
+        assert cr.impact_classification == IMPACT_RELATIONSHIP
+        assert refresh["activated"] is True
+        assert len(reindex_log) > 0
+        assert any(r["action"] == "reindex_relationship" for r in reindex_log)
+
+        # The new parent field should be in the denorm config
+        owner_parents = cr.denorm_config["ascendix__Property__c"]["parents"].get(
+            "ascendix__OwnerLandlord__c", []
+        )
+        assert "Phone" in owner_parents
+
+        # query_scope should include the relationship path
+        property_scope = cr.query_scope.get("objects", {}).get("ascendix__Property__c", {})
+        assert "ascendix__OwnerLandlord__r" in property_scope.get("relationship_paths", [])
 
         # Structural validation
-        report = validate_structural_parity(result.normalized_source, result.artifact)
-        fixture = extract_fixtures(result.normalized_source)
-        assert "ascendix__Market__r" in fixture.relationship_paths.get("ascendix__Property__c", [])
+        report = validate_structural_parity(cr.normalized_source, cr.artifact)
+        fixture = extract_fixtures(cr.normalized_source)
+        assert "ascendix__OwnerLandlord__r" in fixture.relationship_paths.get("ascendix__Property__c", [])
 
         evidence = _record_evidence(
             scenario="relationship_path_change",
-            diff=result.diff,
-            classification=result.impact_classification,
-            activated=False,  # Not activated in this test — just compiled
-            version_id=result.version_id,
+            diff=cr.diff,
+            classification=cr.impact_classification,
+            activated=refresh["activated"],
+            version_id=cr.version_id,
             structural_report=report.to_dict(),
+            reindex_log=reindex_log,
         )
 
+        assert evidence["impact_classification"] == IMPACT_RELATIONSHIP
+        assert evidence["activated"] is True
         assert evidence["structural_parity_evidence"]["passed"] is True
 
 
@@ -513,21 +541,21 @@ class TestEvidenceArtifactGeneration:
         rel_source["saved_searches"][0]["ascendix_search__Template__c"] = json.dumps({
             "sectionsList": [
                 {"objectName": "ascendix__Property__c", "fieldsList": [{"logicalName": "ascendix__City__c"}]},
-                {"objectName": "ascendix__Market__c", "relationship": "ascendix__Market__r",
-                 "fieldsList": [{"logicalName": "Name"}]},
+                {"objectName": "Account", "relationship": "ascendix__OwnerLandlord__r",
+                 "fieldsList": [{"logicalName": "Phone"}]},
             ],
             "resultColumns": [{"logicalName": "Name"}],
         })
 
-        r3 = compile_config_artifact(
-            org_id="00DTEST", raw_source=rel_source,
-            previous_artifact=store3.load_active_artifact("00DTEST"),
-            target_objects=["ascendix__Property__c"], mock=True,
+        r3 = execute_config_refresh(
+            org_id="00DTEST", store=store3,
+            raw_source=rel_source, target_objects=["ascendix__Property__c"],
+            apply=True, reindex_callback=lambda **kw: {"ok": True}, mock=True,
         )
-        report3 = validate_structural_parity(r3.normalized_source, r3.artifact)
+        report3 = validate_structural_parity(r3["compile_result"].normalized_source, r3["compile_result"].artifact)
         all_evidence.append(_record_evidence(
-            "relationship_path_change", r3.diff, r3.impact_classification,
-            False, r3.version_id, report3.to_dict(),
+            "relationship_path_change", r3["compile_result"].diff, r3["compile_result"].impact_classification,
+            r3["activated"], r3["compile_result"].version_id, report3.to_dict(),
         ))
 
         # --- Prompt only ---

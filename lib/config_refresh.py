@@ -574,6 +574,40 @@ def diff_runtime_artifacts(
     }
 
 
+def _extract_relationship_dot_columns(
+    normalized_source: dict[str, Any],
+) -> dict[str, list[str]]:
+    """Extract dot-notation columns from saved search relationship sections.
+
+    Returns a dict mapping primary_object → list of "Relationship__r.Field"
+    strings, suitable for injection into meta.dot_notation_columns.
+    """
+    dot_columns_by_object: dict[str, set[str]] = {}
+    for saved_search in _as_list(normalized_source.get("saved_searches")):
+        primary_object = str(saved_search.get("primary_object", "")).strip()
+        if not primary_object:
+            continue
+        template = _as_dict(saved_search.get("template"))
+        sections = _as_list(template.get("sectionsList"))
+        for section in sections:
+            section = _as_dict(section)
+            relationship = str(section.get("relationship", "")).strip()
+            if not relationship:
+                continue
+            fields = [
+                _normalize_field_name(f)
+                for f in _as_list(section.get("fieldsList"))
+                if _normalize_field_name(f)
+            ]
+            if not fields:
+                fields = ["Name"]
+            for field in fields:
+                dot_columns_by_object.setdefault(primary_object, set()).add(
+                    f"{relationship}.{field}"
+                )
+    return {obj: sorted(cols) for obj, cols in sorted(dot_columns_by_object.items())}
+
+
 def compile_config_artifact(
     *,
     sf: Any | None = None,
@@ -604,6 +638,10 @@ def compile_config_artifact(
     ]
     object_names = list(target_objects or selected_searchable_objects)
 
+    # Extract relationship dot columns from saved searches so they
+    # feed into build_config_for_object's parent-field logic.
+    rel_dot_columns = _extract_relationship_dot_columns(normalized_source)
+
     annotated_configs: dict[str, dict[str, Any]] = {}
     if mock:
         mock_metadata = build_mock_metadata()
@@ -622,6 +660,10 @@ def compile_config_artifact(
                 if meta.name_field:
                     allowlist.add(meta.name_field)
                 meta.ascendix_field_allowlist = allowlist
+            # Inject relationship dot-notation columns from saved searches
+            for dot_col in rel_dot_columns.get(object_name, []):
+                if dot_col not in meta.dot_notation_columns:
+                    meta.dot_notation_columns.append(dot_col)
             annotated_configs[object_name] = build_config_for_object(
                 meta,
                 fetcher,
@@ -649,6 +691,10 @@ def compile_config_artifact(
             object_names = harvester.discover_objects(require_records=False)
         for object_name in object_names:
             meta = harvester.harvest_object(object_name)
+            # Inject relationship dot-notation columns from saved searches
+            for dot_col in rel_dot_columns.get(object_name, []):
+                if dot_col not in meta.dot_notation_columns:
+                    meta.dot_notation_columns.append(dot_col)
             annotated_configs[object_name] = build_config_for_object(
                 meta,
                 harvester,

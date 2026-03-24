@@ -44,7 +44,7 @@
       "summary": "PASS: 3/3 checks passed",
       "total": 3
     },
-    "version_id": "20260324T143252-2cc0947d02a8"
+    "version_id": "20260324T153024-2cc0947d02a8"
   },
   {
     "activated": true,
@@ -86,21 +86,51 @@
       "summary": "PASS: 3/3 checks passed",
       "total": 3
     },
-    "version_id": "20260324T143252-e735304e3c90"
+    "version_id": "20260324T153024-e735304e3c90"
   },
   {
-    "activated": false,
+    "activated": true,
     "diff": {
       "added_objects": [],
-      "auto_apply_eligible": true,
-      "classification": "prompt_only",
+      "auto_apply_eligible": false,
+      "classification": "relationship_change",
       "field_changes": {},
       "prompt_scope_changed": true,
-      "relationship_changes": {},
+      "relationship_changes": {
+        "ascendix__Property__c": {
+          "candidate": {
+            "ascendix__Market__c": [
+              "Name"
+            ],
+            "ascendix__OwnerLandlord__c": [
+              "BillingCity",
+              "Industry",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          },
+          "previous": {
+            "ascendix__Market__c": [
+              "Name"
+            ],
+            "ascendix__OwnerLandlord__c": [
+              "BillingCity",
+              "Industry",
+              "Name"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          }
+        }
+      },
       "removed_objects": [],
-      "requires_apply": false
+      "requires_apply": true
     },
-    "impact_classification": "prompt_only",
+    "impact_classification": "relationship_change",
     "scenario": "relationship_path_change",
     "structural_parity": {
       "failed_count": 0,
@@ -131,7 +161,7 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "version_id": "20260324T143252-ec0b09662515"
+    "version_id": "20260324T153024-f80db915437d"
   },
   {
     "activated": true,
@@ -171,6 +201,6 @@
       "summary": "PASS: 3/3 checks passed",
       "total": 3
     },
-    "version_id": "20260324T143252-28e4005bb19d"
+    "version_id": "20260324T153024-28e4005bb19d"
   }
 ]

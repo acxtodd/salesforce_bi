@@ -113,6 +113,7 @@ const apiStack = new ApiStack(app, `${stackPrefix}-Api-${environment}`, {
   ingestLambda: ingestionStack.ingestLambda,
   // Zero-Config Schema Discovery table
   schemaCacheTable: dataStack.schemaCacheTable,
+  configArtifactBucket: dataStack.dataBucket,
   tags: {
     Project: 'SalesforceAISearch',
     Environment: environment,

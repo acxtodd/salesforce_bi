@@ -2538,14 +2538,19 @@
         {
           "id": "4.9",
           "title": "Systematize Ascendix Search config refresh",
-          "status": "pending",
+          "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:13:40.870049+00:00",
-          "updatedAt": "2026-03-20T07:39:26.024059+00:00",
+          "updatedAt": "2026-03-24T11:30:59.317225+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T11:30:59.317420+00:00",
+              "note": "Implemented subtasks 4.9.1-4.9.5 on branch codex/4-9-control-plane: shared compiler, versioned artifacts, config_refresh entrypoints, impact classification, and /query runtime loading are ready for QA review."
+            }
+          ],
           "description": "Build a config control plane around the actual Ascendix Search payload model so admin changes in Selected Objects, field filters, Default Layout rows, saved searches, relationship paths, and result columns can be detected, compiled into runtime artifacts, classified by impact, and applied without relying on ad hoc manual regeneration. Ascendix Search should be used as an admin-intent signal and structural validation reference, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
           "references": [
             "docs/architecture/ascendix_search_config_refresh_plan.md",
@@ -2561,7 +2566,8 @@
             "Safe changes can be applied without code redeploy, and reindex-heavy changes route through an explicit apply workflow.",
             "Validation uses Ascendix Search as a structural reference for object scope, field allowlists, default columns, and relationship paths while preserving freedom for the NL search system to exceed Ascendix's query-builder patterns."
           ],
-          "technical_context": "The demo org stores Ascendix Search config in ascendix_search__SearchSetting__c.Name plus ascendix_search__Value__c, not in dedicated SelectedObjects/ResultColumns fields. Selected Objects is chunked across multiple rows and must be concatenated before JSON parsing. Default layouts are stored as Default Layout * rows whose Value__c is a JSON array of result-column expressions. Saved searches remain in ascendix_search__Search__c.Template__c and are useful as relationship and filter fixtures for structural validation. This control plane should inform indexing and denorm, not constrain NL query behavior to Ascendix Search parity."
+          "technical_context": "The demo org stores Ascendix Search config in ascendix_search__SearchSetting__c.Name plus ascendix_search__Value__c, not in dedicated SelectedObjects/ResultColumns fields. Selected Objects is chunked across multiple rows and must be concatenated before JSON parsing. Default layouts are stored as Default Layout * rows whose Value__c is a JSON array of result-column expressions. Saved searches remain in ascendix_search__Search__c.Template__c and are useful as relationship and filter fixtures for structural validation. This control plane should inform indexing and denorm, not constrain NL query behavior to Ascendix Search parity.",
+          "startedAt": "2026-03-24T11:30:59.317417+00:00"
         },
         {
           "id": "4.9.1",

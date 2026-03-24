@@ -77,7 +77,15 @@ def main() -> None:
     parser.add_argument("--org-id", default="")
     parser.add_argument("--bucket", default=os.environ.get("CONFIG_ARTIFACT_BUCKET", ""))
     parser.add_argument("--prefix", default=os.environ.get("CONFIG_ARTIFACT_PREFIX", "config"))
-    parser.add_argument("--apply", action="store_true", help="Activate the candidate version even when it requires explicit apply.")
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help=(
+            "Request activation for the candidate version. Non-safe changes are "
+            "still blocked in this slice until targeted rebuild/apply "
+            "orchestration lands."
+        ),
+    )
     parser.add_argument("--objects", nargs="+", default=None, help="Optional object subset to compile.")
     args = parser.parse_args()
 
@@ -110,12 +118,15 @@ def main() -> None:
             "auto_apply_eligible": compile_result.auto_apply_eligible,
             "requires_apply": compile_result.requires_apply,
             "activated": result["activated"],
+            "activation_blocked_reason": result["activation_blocked_reason"],
             "stored_keys": result["stored_keys"],
             "diff": compile_result.diff,
         },
         indent=2,
         sort_keys=True,
     ))
+    if result["activation_blocked_reason"]:
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

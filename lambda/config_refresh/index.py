@@ -56,8 +56,10 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         "auto_apply_eligible": compile_result.auto_apply_eligible,
         "requires_apply": compile_result.requires_apply,
         "activated": refresh_result["activated"],
+        "activation_blocked_reason": refresh_result.get("activation_blocked_reason", ""),
         "stored_keys": refresh_result["stored_keys"],
         "diff": compile_result.diff,
     }
     LOG.info("Config refresh complete: %s", json.dumps(body, sort_keys=True))
-    return {"statusCode": 200, "body": body}
+    status_code = 409 if body["activation_blocked_reason"] else 200
+    return {"statusCode": status_code, "body": body}

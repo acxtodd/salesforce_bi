@@ -19,11 +19,13 @@ from lib.config_refresh import (
     IMPACT_OBJECT_SCOPE,
     IMPACT_PROMPT_ONLY,
     IMPACT_RELATIONSHIP,
+    UNSAFE_APPLY_BLOCK_REASON,
     compile_config_artifact,
     diff_runtime_artifacts,
     execute_config_refresh,
     normalize_ascendix_source,
 )
+from lib.system_prompt import build_system_prompt, build_tool_definitions
 
 
 def _make_raw_source() -> dict:
@@ -82,6 +84,15 @@ def _make_raw_source() -> dict:
             }
         ],
     }
+
+
+def _set_selected_objects(raw_source: dict, selected_objects: list[dict]) -> None:
+    selected_objects_json = json.dumps(selected_objects)
+    for setting in raw_source["search_settings"]:
+        if setting["Name"] == "Selected Objects":
+            setting["ascendix_search__Value__c"] = selected_objects_json[:40]
+        elif setting["Name"] == "Selected Objects1":
+            setting["ascendix_search__Value__c"] = selected_objects_json[40:]
 
 
 class _FakeS3:
@@ -150,6 +161,26 @@ class _FakeRefreshSalesforce:
                         "groupable": True,
                         "calculated": False,
                     },
+                    {
+                        "name": "ascendix__State__c",
+                        "type": "string",
+                        "nameField": False,
+                        "nillable": True,
+                        "createable": True,
+                        "filterable": True,
+                        "groupable": True,
+                        "calculated": False,
+                    },
+                    {
+                        "name": "ascendix__Status__c",
+                        "type": "string",
+                        "nameField": False,
+                        "nillable": False,
+                        "createable": True,
+                        "filterable": True,
+                        "groupable": True,
+                        "calculated": False,
+                    },
                 ],
             }
         if path == "sobjects/ascendix__Property__c/describe/compactLayouts/":
@@ -189,6 +220,19 @@ def test_compile_config_artifact_applies_field_allowlist_and_builds_query_scope(
         "ascendix__City__c",
     ]
     assert result.impact_classification == IMPACT_OBJECT_SCOPE
+
+
+def test_compile_config_artifact_live_path_honors_selected_object_field_allowlist():
+    result = compile_config_artifact(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        raw_source=_make_raw_source(),
+        target_objects=["ascendix__Property__c"],
+    )
+
+    property_config = result.denorm_config["ascendix__Property__c"]
+    assert property_config["embed_fields"] == ["Name"]
+    assert property_config["metadata_fields"] == ["ascendix__City__c"]
 
 
 def test_diff_runtime_artifacts_classifies_scope_changes():
@@ -304,3 +348,93 @@ def test_execute_config_refresh_auto_applies_prompt_only_changes():
     compile_result = refresh["compile_result"]
     assert compile_result.impact_classification == IMPACT_PROMPT_ONLY
     assert refresh["activated"] is True
+
+
+def test_prompt_only_changes_modify_prompt_and_tool_outputs():
+    base_result = compile_config_artifact(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        raw_source=_make_raw_source(),
+        target_objects=["ascendix__Property__c"],
+    )
+    prompt_only_source = _make_raw_source()
+    prompt_only_source["search_settings"][-1]["ascendix_search__Value__c"] = json.dumps(
+        [{"logicalName": "Name"}]
+    )
+    prompt_result = compile_config_artifact(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        raw_source=prompt_only_source,
+        previous_artifact=base_result.artifact,
+        target_objects=["ascendix__Property__c"],
+    )
+
+    assert prompt_result.impact_classification == IMPACT_PROMPT_ONLY
+    assert build_system_prompt(
+        base_result.denorm_config,
+        query_scope=base_result.query_scope,
+    ) != build_system_prompt(
+        prompt_result.denorm_config,
+        query_scope=prompt_result.query_scope,
+    )
+    assert build_tool_definitions(
+        base_result.denorm_config,
+        query_scope=base_result.query_scope,
+    ) != build_tool_definitions(
+        prompt_result.denorm_config,
+        query_scope=prompt_result.query_scope,
+    )
+
+
+def test_execute_config_refresh_blocks_manual_activation_for_non_safe_changes():
+    base_result = compile_config_artifact(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        raw_source=_make_raw_source(),
+        target_objects=["ascendix__Property__c"],
+    )
+    fake_s3 = _FakeS3()
+    fake_ssm = _FakeSSM()
+    store = ConfigArtifactStore(
+        s3_client=fake_s3,
+        ssm_client=fake_ssm,
+        bucket="config-bucket",
+    )
+    store.write_candidate(base_result)
+    store.set_active_version(
+        "00DTEST",
+        base_result.version_id,
+        applied_by="seed",
+        reason="manual_apply",
+    )
+
+    field_change_source = _make_raw_source()
+    _set_selected_objects(
+        field_change_source,
+        [
+            {
+                "name": "ascendix__Property__c",
+                "label": "Property",
+                "isSearchable": True,
+                "isSearchOrResultFieldsFiltered": True,
+                "fields": [
+                    {"name": "Name"},
+                    {"name": "ascendix__City__c"},
+                    {"name": "ascendix__Status__c"},
+                ],
+            }
+        ],
+    )
+    refresh = execute_config_refresh(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        store=store,
+        raw_source=field_change_source,
+        target_objects=["ascendix__Property__c"],
+        apply=True,
+    )
+
+    assert refresh["compile_result"].impact_classification == IMPACT_FIELD_SCOPE
+    assert refresh["activated"] is False
+    assert refresh["activation_blocked_reason"] == UNSAFE_APPLY_BLOCK_REASON
+    assert store.resolve_active_version("00DTEST") == base_result.version_id

@@ -29,6 +29,10 @@ IMPACT_RELATIONSHIP = "relationship_change"
 IMPACT_OBJECT_SCOPE = "object_scope_change"
 
 AUTO_APPLY_IMPACTS = {IMPACT_NONE, IMPACT_PROMPT_ONLY}
+UNSAFE_APPLY_BLOCK_REASON = (
+    "Activation for field-scope, relationship, and object-scope changes is "
+    "blocked until targeted rebuild/apply orchestration lands in 4.9.6+."
+)
 
 _SELECTED_OBJECTS_RE = re.compile(r"^Selected Objects(?P<index>\d+)?$")
 _DEFAULT_LAYOUT_RE = re.compile(r"^Default Layout(?P<suffix>.*)$")
@@ -854,8 +858,9 @@ def execute_config_refresh(
 
     activated = False
     apply_record_key = ""
-    if store is not None and (compile_result.auto_apply_eligible or apply):
-        reason = "auto_apply" if compile_result.auto_apply_eligible and not apply else "manual_apply"
+    activation_blocked_reason = ""
+    if store is not None and compile_result.auto_apply_eligible:
+        reason = "auto_apply"
         apply_record_key = store.set_active_version(
             org_id,
             compile_result.version_id,
@@ -863,10 +868,18 @@ def execute_config_refresh(
             reason=reason,
         )
         activated = True
-
+    elif apply:
+        activation_blocked_reason = UNSAFE_APPLY_BLOCK_REASON
+        LOG.warning(
+            "Blocking manual activation for %s (%s): %s",
+            org_id,
+            compile_result.impact_classification,
+            activation_blocked_reason,
+        )
     return {
         "compile_result": compile_result,
         "stored_keys": stored_keys,
         "activated": activated,
         "apply_record_key": apply_record_key,
+        "activation_blocked_reason": activation_blocked_reason,
     }

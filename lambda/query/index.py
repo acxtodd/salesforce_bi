@@ -85,6 +85,7 @@ def _get_runtime_config_loader() -> RuntimeConfigLoader:
 def _get_runtime_context(org_id: str) -> dict[str, Any]:
     runtime_artifact = _get_runtime_config_loader().load(org_id)
     denorm_config = extract_denorm_config(runtime_artifact)
+    query_scope = runtime_artifact.get("query_scope", {})
     version_id = str(runtime_artifact.get("version_id", "bundled"))
     cached = _runtime_context_cache.get(org_id)
     if cached and cached.get("version_id") == version_id:
@@ -94,8 +95,8 @@ def _get_runtime_context(org_id: str) -> dict[str, Any]:
         "version_id": version_id,
         "denorm_config": denorm_config,
         "field_registry": build_field_registry(denorm_config),
-        "system_prompt": build_system_prompt(denorm_config),
-        "tool_definitions": build_tool_definitions(denorm_config),
+        "system_prompt": build_system_prompt(denorm_config, query_scope=query_scope),
+        "tool_definitions": build_tool_definitions(denorm_config, query_scope=query_scope),
     }
     _runtime_context_cache[org_id] = context
     logger.info("Loaded runtime config for %s from version %s", org_id, version_id)

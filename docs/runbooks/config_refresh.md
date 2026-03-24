@@ -19,6 +19,9 @@ configuration.
   1. active S3 artifact resolved from the SSM pointer
   2. last-known-good cache in `/tmp`
   3. bundled `denorm_config.yaml`
+- `/query` uses `query_scope` fixtures from the active artifact to rebuild
+  admin-facing prompt/tool hints for result columns, saved searches, and
+  relationship paths without changing the denormalized field registry
 - `lambda/config_refresh` and `scripts/run_config_refresh.py` run the same
   compile/store/apply flow.
 
@@ -50,7 +53,10 @@ Current apply policy:
 
 - `none` and `prompt_only` auto-advance the active pointer
 - `field_scope_change`, `relationship_change`, and `object_scope_change` write
-  candidate artifacts but require explicit `--apply` / event `apply=true`
+  candidate artifacts but do not activate in this slice
+- explicit `--apply` / event `apply=true` for those non-safe classifications
+  returns a blocked activation response until targeted rebuild/apply
+  orchestration lands in 4.9.6+
 
 This is intentionally conservative until targeted reindex flows exist.
 
@@ -64,7 +70,7 @@ python3 scripts/run_config_refresh.py \
   --target-org ascendix-beta-sandbox
 ```
 
-Force activation for a change that requires explicit apply:
+Attempt activation for a non-safe change and capture the blocked response:
 
 ```bash
 python3 scripts/run_config_refresh.py \
@@ -72,6 +78,10 @@ python3 scripts/run_config_refresh.py \
   --target-org ascendix-beta-sandbox \
   --apply
 ```
+
+The command exits non-zero when activation is blocked so operators do not
+silently publish field/object/relationship changes ahead of ingestion or
+reindex work.
 
 Limit compilation to a subset while iterating locally:
 

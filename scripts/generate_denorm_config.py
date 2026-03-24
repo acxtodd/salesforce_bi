@@ -639,11 +639,24 @@ class SalesforceHarvester:
             meta.ascendix_parent_refs: Dict[str, Set[str]] = {}  # ref_field → {parent_fields}
 
         normalized_source = self._normalized_ascendix_source or {}
+        field_allowlist: Set[str] = set()
         object_fixtures = _as_dict(
             _as_dict(normalized_source.get("query_scope")).get("objects", {})
         )
         object_fixture = _as_dict(object_fixtures.get(meta.api_name))
-        field_allowlist = set(_as_list(object_fixture.get("field_allowlist")))
+        field_allowlist.update(_as_list(object_fixture.get("field_allowlist")))
+        if not field_allowlist:
+            for selected_object in _as_list(normalized_source.get("selected_objects")):
+                selected_object = _as_dict(selected_object)
+                if selected_object.get("api_name") != meta.api_name:
+                    continue
+                if not selected_object.get("is_field_filtered"):
+                    break
+                field_allowlist.update(
+                    _as_list(selected_object.get("field_allowlist"))
+                    or _as_list(selected_object.get("configured_fields"))
+                )
+                break
         if field_allowlist:
             if meta.name_field:
                 field_allowlist.add(meta.name_field)

@@ -54,6 +54,7 @@ def test_handler_returns_refresh_summary(mock_boto3, MockSalesforceClient, MockS
         ),
         "stored_keys": {"compiled": "config/00DTEST/compiled/test.yaml"},
         "activated": True,
+        "activation_blocked_reason": "",
     }
 
     response = _mod.lambda_handler({}, None)
@@ -64,3 +65,37 @@ def test_handler_returns_refresh_summary(mock_boto3, MockSalesforceClient, MockS
     MockStore.assert_called_once()
     mock_execute.assert_called_once()
     assert mock_store is MockStore.return_value
+
+
+@patch("config_refresh_lambda.execute_config_refresh")
+@patch("config_refresh_lambda.ConfigArtifactStore")
+@patch("config_refresh_lambda.SalesforceClient")
+@patch("config_refresh_lambda.boto3")
+def test_handler_returns_conflict_when_activation_is_blocked(
+    mock_boto3,
+    MockSalesforceClient,
+    MockStore,
+    mock_execute,
+    monkeypatch,
+):
+    monkeypatch.setenv("SALESFORCE_ORG_ID", "00DTEST")
+    monkeypatch.setenv("CONFIG_ARTIFACT_BUCKET", "config-bucket")
+
+    MockSalesforceClient.from_ssm.return_value = MagicMock()
+    mock_execute.return_value = {
+        "compile_result": MagicMock(
+            version_id="20260324T010203Z-abc123def456",
+            impact_classification="field_scope_change",
+            auto_apply_eligible=False,
+            requires_apply=True,
+            diff={"classification": "field_scope_change"},
+        ),
+        "stored_keys": {"compiled": "config/00DTEST/compiled/test.yaml"},
+        "activated": False,
+        "activation_blocked_reason": "blocked",
+    }
+
+    response = _mod.lambda_handler({"apply": True}, None)
+
+    assert response["statusCode"] == 409
+    assert response["body"]["activation_blocked_reason"] == "blocked"

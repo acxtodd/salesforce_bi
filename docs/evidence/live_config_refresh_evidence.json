@@ -1,0 +1,1098 @@
+[
+  {
+    "activated": true,
+    "activation_blocked_reason": "",
+    "actual_classification": "object_scope_change",
+    "apply_plan": {
+      "action_count": 13,
+      "actions": [
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object Account. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "Account",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object Contact. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "Contact",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ContentNote. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ContentNote",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object Lead. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "Lead",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object Task. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "Task",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ascendix__Availability__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ascendix__Availability__c",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ascendix__Deal__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ascendix__Deal__c",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ascendix__Inquiry__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ascendix__Inquiry__c",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ascendix__Lease__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ascendix__Lease__c",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ascendix__Listing__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ascendix__Listing__c",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ascendix__Preference__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ascendix__Preference__c",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ascendix__Property__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ascendix__Property__c",
+          "requires_reindex": true
+        },
+        {
+          "action": "seed_new_object",
+          "description": "Initial data seed required for newly added object ascendix__Sale__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "ascendix__Sale__c",
+          "requires_reindex": true
+        }
+      ],
+      "classification": "object_scope_change",
+      "requires_reindex": true
+    },
+    "classification_match": true,
+    "diff": {
+      "added_objects": [
+        "Account",
+        "Contact",
+        "ContentNote",
+        "Lead",
+        "Task",
+        "ascendix__Availability__c",
+        "ascendix__Deal__c",
+        "ascendix__Inquiry__c",
+        "ascendix__Lease__c",
+        "ascendix__Listing__c",
+        "ascendix__Preference__c",
+        "ascendix__Property__c",
+        "ascendix__Sale__c"
+      ],
+      "auto_apply_eligible": false,
+      "classification": "object_scope_change",
+      "field_changes": {},
+      "prompt_scope_changed": true,
+      "relationship_changes": {},
+      "removed_objects": [],
+      "requires_apply": true
+    },
+    "expected_classification": "object_scope_change",
+    "fixture_summary": {
+      "object_count": 13,
+      "objects": [
+        "Account",
+        "Contact",
+        "ContentNote",
+        "Lead",
+        "Task",
+        "ascendix__Availability__c",
+        "ascendix__Deal__c",
+        "ascendix__Inquiry__c",
+        "ascendix__Lease__c",
+        "ascendix__Listing__c",
+        "ascendix__Preference__c",
+        "ascendix__Property__c",
+        "ascendix__Sale__c"
+      ],
+      "relationship_paths": {
+        "ascendix__Availability__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Deal__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Lease__c": [
+          "ascendix__Property__r"
+        ]
+      }
+    },
+    "reindex_results": [
+      {
+        "action": "seed_new_object",
+        "object": "Account",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "Account",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "Contact",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "Contact",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "ContentNote",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ContentNote",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "Lead",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "Lead",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "Task",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "Task",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "ascendix__Availability__c",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ascendix__Availability__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "ascendix__Deal__c",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ascendix__Deal__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "ascendix__Inquiry__c",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ascendix__Inquiry__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "ascendix__Lease__c",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ascendix__Lease__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "ascendix__Listing__c",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ascendix__Listing__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "ascendix__Preference__c",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ascendix__Preference__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "ascendix__Property__c",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ascendix__Property__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "seed_new_object",
+        "object": "ascendix__Sale__c",
+        "result": {
+          "action": "seed_new_object",
+          "noop": true,
+          "object": "ascendix__Sale__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      }
+    ],
+    "scenario": "baseline_object_scope",
+    "stored_keys": {
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T164044-75e7d0ebea94.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T164044-75e7d0ebea94.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T164044-75e7d0ebea94.json"
+    },
+    "structural_parity_evidence": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 4,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 13 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Availability__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Deal__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Lease__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 4/4 checks passed",
+      "total": 4
+    },
+    "timestamp": "2026-03-24T16:43:51.749405+00:00",
+    "version_id": "20260324T164044-75e7d0ebea94"
+  },
+  {
+    "activated": true,
+    "activation_blocked_reason": "",
+    "actual_classification": "none",
+    "classification_match": true,
+    "diff": {
+      "added_objects": [],
+      "auto_apply_eligible": true,
+      "classification": "none",
+      "field_changes": {},
+      "prompt_scope_changed": false,
+      "relationship_changes": {},
+      "removed_objects": [],
+      "requires_apply": false
+    },
+    "expected_classification": "none",
+    "fixture_summary": {
+      "object_count": 13,
+      "objects": [
+        "Account",
+        "Contact",
+        "ContentNote",
+        "Lead",
+        "Task",
+        "ascendix__Availability__c",
+        "ascendix__Deal__c",
+        "ascendix__Inquiry__c",
+        "ascendix__Lease__c",
+        "ascendix__Listing__c",
+        "ascendix__Preference__c",
+        "ascendix__Property__c",
+        "ascendix__Sale__c"
+      ],
+      "relationship_paths": {
+        "ascendix__Availability__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Deal__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Lease__c": [
+          "ascendix__Property__r"
+        ]
+      }
+    },
+    "scenario": "no_change",
+    "stored_keys": {
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T164352-75e7d0ebea94.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T164352-75e7d0ebea94.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T164352-75e7d0ebea94.json"
+    },
+    "structural_parity_evidence": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 4,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 13 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Availability__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Deal__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Lease__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 4/4 checks passed",
+      "total": 4
+    },
+    "timestamp": "2026-03-24T16:46:57.476187+00:00",
+    "version_id": "20260324T164352-75e7d0ebea94"
+  },
+  {
+    "activated": true,
+    "activation_blocked_reason": "",
+    "actual_classification": "prompt_only",
+    "classification_match": true,
+    "diff": {
+      "added_objects": [],
+      "auto_apply_eligible": true,
+      "classification": "prompt_only",
+      "field_changes": {},
+      "prompt_scope_changed": true,
+      "relationship_changes": {},
+      "removed_objects": [],
+      "requires_apply": false
+    },
+    "expected_classification": "prompt_only",
+    "fixture_summary": {
+      "object_count": 13,
+      "objects": [
+        "Account",
+        "Contact",
+        "ContentNote",
+        "Lead",
+        "Task",
+        "ascendix__Availability__c",
+        "ascendix__Deal__c",
+        "ascendix__Inquiry__c",
+        "ascendix__Lease__c",
+        "ascendix__Listing__c",
+        "ascendix__Preference__c",
+        "ascendix__Property__c",
+        "ascendix__Sale__c"
+      ],
+      "relationship_paths": {
+        "ascendix__Availability__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Deal__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Lease__c": [
+          "ascendix__Property__r"
+        ]
+      }
+    },
+    "scenario": "field_add",
+    "stored_keys": {
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T164658-7cce709a4f6a.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T164658-7cce709a4f6a.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T164658-7cce709a4f6a.json"
+    },
+    "structural_parity_evidence": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 4,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 13 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Availability__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Deal__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Lease__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 4/4 checks passed",
+      "total": 4
+    },
+    "timestamp": "2026-03-24T16:49:58.563850+00:00",
+    "version_id": "20260324T164658-7cce709a4f6a"
+  },
+  {
+    "activated": true,
+    "activation_blocked_reason": "",
+    "actual_classification": "relationship_change",
+    "apply_plan": {
+      "action_count": 2,
+      "actions": [
+        {
+          "action": "reindex_relationship",
+          "candidate_parents": {
+            "ascendix__Listing__c": [
+              "Name"
+            ],
+            "ascendix__Market__c": [
+              "CreatedById",
+              "Name"
+            ],
+            "ascendix__Property__c": [
+              "Name",
+              "RecordTypeId",
+              "ascendix__City__c",
+              "ascendix__PropertyClass__c"
+            ],
+            "ascendix__Region__c": [
+              "Name"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          },
+          "description": "Relationship config changed for ascendix__Availability__c. Targeted reindex required to update parent-field embeddings.",
+          "object": "ascendix__Availability__c",
+          "previous_parents": {
+            "ascendix__Listing__c": [
+              "Name"
+            ],
+            "ascendix__Market__c": [
+              "Name"
+            ],
+            "ascendix__Property__c": [
+              "Name",
+              "RecordTypeId",
+              "ascendix__City__c",
+              "ascendix__PropertyClass__c"
+            ],
+            "ascendix__Region__c": [
+              "Name"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          },
+          "requires_reindex": true
+        },
+        {
+          "action": "reindex_relationship",
+          "candidate_parents": {
+            "ascendix__CBSA__c": [
+              "Name"
+            ],
+            "ascendix__Complex__c": [
+              "Name"
+            ],
+            "ascendix__Country__c": [
+              "Name"
+            ],
+            "ascendix__DeveloperContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__Developer__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__ListingBrokerCompany__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__ListingBrokerContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__Market__c": [
+              "CreatedById",
+              "Name"
+            ],
+            "ascendix__OwnerLandlordContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__OwnerLandlord__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__PropertyManagerContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__PropertyManager__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__Region__c": [
+              "Name"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          },
+          "description": "Relationship config changed for ascendix__Property__c. Targeted reindex required to update parent-field embeddings.",
+          "object": "ascendix__Property__c",
+          "previous_parents": {
+            "ascendix__CBSA__c": [
+              "Name"
+            ],
+            "ascendix__Complex__c": [
+              "Name"
+            ],
+            "ascendix__Country__c": [
+              "Name"
+            ],
+            "ascendix__DeveloperContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__Developer__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__ListingBrokerCompany__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__ListingBrokerContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__Market__c": [
+              "Name"
+            ],
+            "ascendix__OwnerLandlordContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__OwnerLandlord__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__PropertyManagerContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__PropertyManager__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__Region__c": [
+              "Name"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          },
+          "requires_reindex": true
+        }
+      ],
+      "classification": "relationship_change",
+      "requires_reindex": true
+    },
+    "classification_match": true,
+    "diff": {
+      "added_objects": [],
+      "auto_apply_eligible": false,
+      "classification": "relationship_change",
+      "field_changes": {},
+      "prompt_scope_changed": true,
+      "relationship_changes": {
+        "ascendix__Availability__c": {
+          "candidate": {
+            "ascendix__Listing__c": [
+              "Name"
+            ],
+            "ascendix__Market__c": [
+              "CreatedById",
+              "Name"
+            ],
+            "ascendix__Property__c": [
+              "Name",
+              "RecordTypeId",
+              "ascendix__City__c",
+              "ascendix__PropertyClass__c"
+            ],
+            "ascendix__Region__c": [
+              "Name"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          },
+          "previous": {
+            "ascendix__Listing__c": [
+              "Name"
+            ],
+            "ascendix__Market__c": [
+              "Name"
+            ],
+            "ascendix__Property__c": [
+              "Name",
+              "RecordTypeId",
+              "ascendix__City__c",
+              "ascendix__PropertyClass__c"
+            ],
+            "ascendix__Region__c": [
+              "Name"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          }
+        },
+        "ascendix__Property__c": {
+          "candidate": {
+            "ascendix__CBSA__c": [
+              "Name"
+            ],
+            "ascendix__Complex__c": [
+              "Name"
+            ],
+            "ascendix__Country__c": [
+              "Name"
+            ],
+            "ascendix__DeveloperContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__Developer__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__ListingBrokerCompany__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__ListingBrokerContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__Market__c": [
+              "CreatedById",
+              "Name"
+            ],
+            "ascendix__OwnerLandlordContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__OwnerLandlord__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__PropertyManagerContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__PropertyManager__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__Region__c": [
+              "Name"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          },
+          "previous": {
+            "ascendix__CBSA__c": [
+              "Name"
+            ],
+            "ascendix__Complex__c": [
+              "Name"
+            ],
+            "ascendix__Country__c": [
+              "Name"
+            ],
+            "ascendix__DeveloperContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__Developer__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__ListingBrokerCompany__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__ListingBrokerContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__Market__c": [
+              "Name"
+            ],
+            "ascendix__OwnerLandlordContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__OwnerLandlord__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__PropertyManagerContact__c": [
+              "Email",
+              "MobilePhone",
+              "Name",
+              "Phone"
+            ],
+            "ascendix__PropertyManager__c": [
+              "AnnualRevenue",
+              "Industry",
+              "Name",
+              "Phone",
+              "Type",
+              "Website"
+            ],
+            "ascendix__Region__c": [
+              "Name"
+            ],
+            "ascendix__SubMarket__c": [
+              "Name"
+            ]
+          }
+        }
+      },
+      "removed_objects": [],
+      "requires_apply": true
+    },
+    "expected_classification": "relationship_change",
+    "fixture_summary": {
+      "object_count": 13,
+      "objects": [
+        "Account",
+        "Contact",
+        "ContentNote",
+        "Lead",
+        "Task",
+        "ascendix__Availability__c",
+        "ascendix__Deal__c",
+        "ascendix__Inquiry__c",
+        "ascendix__Lease__c",
+        "ascendix__Listing__c",
+        "ascendix__Preference__c",
+        "ascendix__Property__c",
+        "ascendix__Sale__c"
+      ],
+      "relationship_paths": {
+        "ascendix__Availability__c": [
+          "ascendix__Market__r",
+          "ascendix__Property__r"
+        ],
+        "ascendix__Deal__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Lease__c": [
+          "ascendix__Property__r"
+        ]
+      }
+    },
+    "reindex_results": [
+      {
+        "action": "reindex_relationship",
+        "object": "ascendix__Availability__c",
+        "result": {
+          "action": "reindex_relationship",
+          "noop": true,
+          "object": "ascendix__Availability__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      },
+      {
+        "action": "reindex_relationship",
+        "object": "ascendix__Property__c",
+        "result": {
+          "action": "reindex_relationship",
+          "noop": true,
+          "object": "ascendix__Property__c",
+          "statusCode": 200
+        },
+        "status": "completed"
+      }
+    ],
+    "scenario": "relationship_path_change",
+    "stored_keys": {
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T164959-ba9c13d28d3c.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T164959-ba9c13d28d3c.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T164959-ba9c13d28d3c.json"
+    },
+    "structural_parity_evidence": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 4,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 13 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Availability__c",
+          "detail": "All 2 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Deal__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Lease__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 4/4 checks passed",
+      "total": 4
+    },
+    "timestamp": "2026-03-24T16:53:01.233449+00:00",
+    "version_id": "20260324T164959-ba9c13d28d3c"
+  },
+  {
+    "activated": true,
+    "activation_blocked_reason": "",
+    "actual_classification": "none",
+    "classification_match": true,
+    "diff": {
+      "added_objects": [],
+      "auto_apply_eligible": true,
+      "classification": "none",
+      "field_changes": {},
+      "prompt_scope_changed": false,
+      "relationship_changes": {},
+      "removed_objects": [],
+      "requires_apply": false
+    },
+    "expected_classification": "none",
+    "fixture_summary": {
+      "object_count": 13,
+      "objects": [
+        "Account",
+        "Contact",
+        "ContentNote",
+        "Lead",
+        "Task",
+        "ascendix__Availability__c",
+        "ascendix__Deal__c",
+        "ascendix__Inquiry__c",
+        "ascendix__Lease__c",
+        "ascendix__Listing__c",
+        "ascendix__Preference__c",
+        "ascendix__Property__c",
+        "ascendix__Sale__c"
+      ],
+      "relationship_paths": {
+        "ascendix__Availability__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Deal__c": [
+          "ascendix__Property__r"
+        ],
+        "ascendix__Lease__c": [
+          "ascendix__Property__r"
+        ]
+      }
+    },
+    "scenario": "prompt_only_label_change",
+    "stored_keys": {
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T165302-75e7d0ebea94.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T165302-75e7d0ebea94.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T165302-75e7d0ebea94.json"
+    },
+    "structural_parity_evidence": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 4,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 13 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Availability__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Deal__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Lease__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 4/4 checks passed",
+      "total": 4
+    },
+    "timestamp": "2026-03-24T16:56:03.468091+00:00",
+    "version_id": "20260324T165302-75e7d0ebea94"
+  }
+]

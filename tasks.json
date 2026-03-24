@@ -3717,17 +3717,23 @@
         {
           "id": "4.20",
           "title": "System prompt quality and export automation",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-24T06:30:01.176523+00:00",
-          "updatedAt": "2026-03-24T06:31:08.670455+00:00",
+          "updatedAt": "2026-03-24T09:42:39.642371+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "9580c31"
+          ],
           "pull_requests": [],
           "progress_notes": [
             {
               "timestamp": "2026-03-24T06:31:08.670318+00:00",
               "note": "Recommended implementation order: 4.20.2 → 4.20.3 → 4.20.4 → 4.20.1. Make all prompt content changes first, then build the export script so it captures the final state in one pass. Edit lib/system_prompt.py only — not bundle copies. Run scripts/bundle_query.sh after all changes."
+            },
+            {
+              "timestamp": "2026-03-24T09:42:39.642383+00:00",
+              "note": "Task completed, commit: 9580c31"
             }
           ],
           "description": "Prompt engineering review found 8 issues: stale stakeholder export, missing object-selection reasoning scaffold, no negative examples, scattered CLARIFY marker spec, no XML structural tags, date misalignment in examples, field info token redundancy, and no error-handling guideline. Fix all in lib/system_prompt.py and add an automated export script. See docs/specs/task-4.20-system-prompt-quality.md for full spec.",
@@ -3739,19 +3745,27 @@
             "python3 -m pytest tests/test_system_prompt.py -v passes with no failures",
             "python3 scripts/export_agent_prompt.py produces an export matching build_system_prompt() + build_tool_definitions() output",
             "Manual test: 3-5 ambiguous queries tested against updated prompt show model reasoning about object selection before calling tools"
-          ]
+          ],
+          "completedAt": "2026-03-24T09:42:39.642220+00:00"
         },
         {
           "id": "4.20.1",
           "title": "Automate agent prompt export generation",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-24T06:30:10.318686+00:00",
-          "updatedAt": "2026-03-24T06:30:17.553830+00:00",
+          "updatedAt": "2026-03-24T09:42:39.396052+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "9580c31"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T09:42:39.396055+00:00",
+              "note": "Task completed, commit: 9580c31"
+            }
+          ],
           "description": "Create scripts/export_agent_prompt.py that loads denorm_config.yaml, calls build_system_prompt(config) and build_tool_definitions(config), and writes docs/agent_prompt_export.md in the existing format (system prompt block, tool definitions JSON block, footer with date/object count/tool count/guideline count). Add a header note to the export: 'Auto-generated — do not edit manually. Run python3 scripts/export_agent_prompt.py to regenerate.' Script must be runnable standalone. See spec §8 subtask 4.20.1 for details.",
           "parent": "4.20",
           "acceptance_criteria": [
@@ -3761,19 +3775,27 @@
             "Output file contains all few-shot examples including market filter (#2), sort/top_n (#13), and propose_edit (#14)",
             "Output file header contains 'Auto-generated' notice with regeneration command",
             "Footer stats (tool count, object count, guideline count) are computed from the actual output, not hardcoded"
-          ]
+          ],
+          "completedAt": "2026-03-24T09:42:39.395880+00:00"
         },
         {
           "id": "4.20.2",
           "title": "Add object-selection reasoning scaffold and negative examples",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-24T06:30:25.232482+00:00",
-          "updatedAt": "2026-03-24T06:30:31.667059+00:00",
+          "updatedAt": "2026-03-24T09:42:39.454818+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "9580c31"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T09:42:39.454823+00:00",
+              "note": "Task completed, commit: 9580c31"
+            }
+          ],
           "description": "Address production issue where model makes wrong object-type choices on ambiguous queries. Two changes to lib/system_prompt.py: (A) Replace guideline 17 with a structured 3-step reasoning scaffold: (a) what entity is the user asking about, (b) what action do they want, (c) which object's fields match. If genuinely ambiguous, emit CLARIFY options. (B) Append 3 anti-pattern examples after the last positive few-shot example: (1) unnecessary multi-step when denormalized fields exist, (2) fabricating a ranking from raw search hits, (3) using text_query stopwords as match-everything hack. See spec §8 subtask 4.20.2 for exact text.",
           "parent": "4.20",
           "acceptance_criteria": [
@@ -3782,19 +3804,27 @@
             "Anti-patterns cover: unnecessary multi-step with denormalized fields, fabricated ranking from search hits, and text_query stopword hack",
             "test_system_prompt.py has a test asserting the reasoning scaffold text appears in build_system_prompt() output",
             "test_system_prompt.py has a test asserting anti-pattern section appears in build_system_prompt() output"
-          ]
+          ],
+          "completedAt": "2026-03-24T09:42:39.454655+00:00"
         },
         {
           "id": "4.20.3",
           "title": "Prompt structural improvements: XML tags, CLARIFY spec, token dedup",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-24T06:30:39.921973+00:00",
-          "updatedAt": "2026-03-24T06:30:46.903883+00:00",
+          "updatedAt": "2026-03-24T09:42:39.517555+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "9580c31"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T09:42:39.517559+00:00",
+              "note": "Task completed, commit: 9580c31"
+            }
+          ],
           "description": "Three structural changes to lib/system_prompt.py: (A) Wrap Field Reference, Examples, and Guidelines sections in XML tags (<field_reference>, <examples>, <guidelines>) in both build_system_prompt() and SYSTEM_PROMPT. Leave preamble (role, date, vocabulary, tools) unwrapped. (B) Add a formal CLARIFY marker spec block before guideline 1: define the [CLARIFY:label|query] format once, then simplify guidelines 1, 6, 10, 19 to reference it by name instead of re-explaining. (C) Token dedup: remove guideline 12 (rent fields — already in field ref), condense guideline 15 (geography) to one sentence pointing at field ref, replace guideline 4 bullet list with a pointer to (denormalized) annotations in field ref. See spec §8 subtask 4.20.3.",
           "parent": "4.20",
           "acceptance_criteria": [
@@ -3805,39 +3835,56 @@
             "Guideline 4 (denormalized fields) retains the rule but replaces the 7-line object bullet list with a pointer to field reference annotations",
             "Guideline 15 (geography scope) is condensed to a single sentence directing the model to field reference",
             "test_system_prompt.py asserts XML tags are present in build_system_prompt() output"
-          ]
+          ],
+          "completedAt": "2026-03-24T09:42:39.517384+00:00"
         },
         {
           "id": "4.20.4",
           "title": "Edge case coverage: date alignment and error handling guideline",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-24T06:30:53.790624+00:00",
-          "updatedAt": "2026-03-24T06:30:58.629119+00:00",
+          "updatedAt": "2026-03-24T09:42:39.580076+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "9580c31"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T09:42:39.580089+00:00",
+              "note": "Task completed, commit: 9580c31"
+            }
+          ],
           "description": "Two small additions to lib/system_prompt.py: (A) Add a one-line note at the top of _FEW_SHOT_EXAMPLES: 'Note: Dates in examples below are illustrative. Always compute relative dates (e.g. last 12 months) from today'\\''s date stated above.' This prevents the model from copying hardcoded example dates instead of computing from the dynamic date. (B) Add a new guideline (after current last guideline): 'If a tool returns an error or unexpected result, explain plainly. Do not retry silently with altered parameters. Tell the user what happened, suggest a corrected query if the cause is obvious, or recommend broadening/narrowing their request.' See spec §8 subtask 4.20.4.",
           "parent": "4.20",
           "acceptance_criteria": [
             "_FEW_SHOT_EXAMPLES begins with a note that example dates are illustrative and relative dates must be computed from today's date",
             "A new guideline exists covering tool error/unexpected result handling: explain plainly, do not retry silently, suggest corrected query",
             "test_system_prompt.py asserts the date-alignment note appears in build_system_prompt() output"
-          ]
+          ],
+          "completedAt": "2026-03-24T09:42:39.579915+00:00"
         },
         {
           "id": "4.21",
           "title": "Fix clarification follow-up intent persistence",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-24T09:05:38.351186+00:00",
-          "updatedAt": "2026-03-24T09:05:38.351396+00:00",
+          "updatedAt": "2026-03-24T09:42:39.702318+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "9580c31"
+          ],
           "pull_requests": [],
-          "progress_notes": [],
-          "description": "When the user selects a clarification button after an ambiguous query (e.g. 'who are our top brokers by deal value?'), the follow-up query does not faithfully execute the selected interpretation. Observed: selected 'Any broker role by deal value' but follow-up narrowed to listing brokers only. The clarification UX renders correctly — the bug is in how the selected intent is passed back to the query handler. Found during 4.7 LWC smoke test (2026-03-24)."
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T09:42:39.702322+00:00",
+              "note": "Task completed, commit: 9580c31"
+            }
+          ],
+          "description": "When the user selects a clarification button after an ambiguous query (e.g. 'who are our top brokers by deal value?'), the follow-up query does not faithfully execute the selected interpretation. Observed: selected 'Any broker role by deal value' but follow-up narrowed to listing brokers only. The clarification UX renders correctly — the bug is in how the selected intent is passed back to the query handler. Found during 4.7 LWC smoke test (2026-03-24).",
+          "completedAt": "2026-03-24T09:42:39.702133+00:00"
         }
       ]
     },

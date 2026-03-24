@@ -183,7 +183,7 @@ tests:
     category: "cross_object"
     expected:
       tool_used: "search_records"
-      answer_contains_any: ["lease", "expir", "quarter", "2026"]
+      answer_contains_any: ["lease", "expir", "quarter"]
       min_results: 1
       no_error: true
       latency_under: 30

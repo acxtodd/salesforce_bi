@@ -137,7 +137,12 @@ class DataValidator:
         return results
 
     def _check_namespace_exists(self) -> CheckResult:
-        """Check 1: Namespace exists via aggregate count."""
+        """Check 1: Namespace exists via aggregate count.
+
+        Note: Turbopuffer aggregate may cap at 10,000 rows on large
+        namespaces.  The object-type-counts check reports accurate
+        per-object counts via fallback.
+        """
         try:
             agg = self.backend.aggregate(self.namespace)
             count = agg.get("count", 0)
@@ -145,10 +150,11 @@ class DataValidator:
             count = 0
 
         if count > 0:
+            suffix = " (aggregate may cap at 10k)" if count == 10_000 else ""
             return CheckResult(
                 name="Namespace exists",
                 status="PASS",
-                message=f"{count:,} documents found",
+                message=f"{count:,} documents found{suffix}",
                 details={"count": count},
             )
 
@@ -171,7 +177,13 @@ class DataValidator:
         )
 
     def _check_object_type_counts(self) -> CheckResult:
-        """Check 2: Object type counts via aggregate(group_by='object_type')."""
+        """Check 2: Object type counts.
+
+        Uses aggregate(group_by='object_type') as the primary count source.
+        If the aggregate returns capped/partial results (some objects missing
+        from groups despite existing in the index), falls back to per-object
+        aggregate counts so the check doesn't false-fail on large namespaces.
+        """
         if not self.config:
             return CheckResult(
                 name="Object type counts",
@@ -182,14 +194,32 @@ class DataValidator:
         agg = self.backend.aggregate(self.namespace, group_by="object_type")
         groups = agg.get("groups", {})
 
-        # Verify every config object has docs
-        missing = []
-        counts_parts = []
+        # For any config object not present in the grouped aggregate,
+        # run a per-object aggregate to get its count.  Turbopuffer's
+        # group-by can return partial results on large namespaces.
         for obj_name in self.config:
             obj_type = clean_label(obj_name).lower()
-            group_data = groups.get(obj_type, {})
-            count = group_data.get("count", 0)
+            if obj_type not in groups or groups[obj_type].get("count", 0) == 0:
+                try:
+                    obj_agg = self.backend.aggregate(
+                        self.namespace,
+                        filters={"object_type": obj_type},
+                    )
+                    obj_count = obj_agg.get("count", 0)
+                    if obj_count > 0:
+                        groups[obj_type] = {"count": obj_count}
+                except Exception as e:
+                    LOG.debug("Per-object aggregate failed for %s: %s", obj_type, e)
+
+        # Now check for truly missing objects
+        missing = []
+        counts_parts = []
+        total_docs = 0
+        for obj_name in self.config:
+            obj_type = clean_label(obj_name).lower()
+            count = groups.get(obj_type, {}).get("count", 0)
             counts_parts.append(f"{obj_type}: {count:,}")
+            total_docs += count
             if count == 0:
                 missing.append(obj_type)
 
@@ -210,7 +240,7 @@ class DataValidator:
                     LOG.warning("SF count query failed for %s: %s", obj_name, e)
 
         message = " | ".join(counts_parts)
-        details = {"groups": groups}
+        details = {"groups": groups, "total_docs": total_docs}
 
         if missing:
             return CheckResult(
@@ -223,13 +253,13 @@ class DataValidator:
             return CheckResult(
                 name="Object type counts",
                 status="FAIL",
-                message=f"SF count mismatch: {'; '.join(sf_mismatches)}",
+                message=f"SF count mismatch: {'; '.join(sf_mismatches)} (total TP docs: {total_docs:,})",
                 details=details,
             )
         return CheckResult(
             name="Object type counts",
             status="PASS",
-            message=message,
+            message=f"{message} (total: {total_docs:,})",
             details=details,
         )
 
@@ -408,8 +438,9 @@ class DataValidator:
     def _check_numeric_date_filter(self) -> CheckResult:
         """Check: Metadata filters work for numeric and date-typed fields.
 
-        Looks for a numeric metadata field (e.g. TotalBuildingArea, YearBuilt)
-        and verifies that range operators (_gte, _lte) filter correctly.
+        Tests both:
+        - Numeric fields (e.g. TotalBuildingArea, YearBuilt) with _gte range
+        - Date fields (e.g. TermExpirationDate, SaleDate) with _gte range
         """
         if not self.config:
             return CheckResult(
@@ -418,7 +449,6 @@ class DataValidator:
                 message="No config provided",
             )
 
-        # Known numeric fields from denorm_config
         numeric_candidates = [
             "totalbuildingarea", "yearbuilt", "floors", "occupancy",
             "landarea", "leasedsf", "termmonths", "availablesf",
@@ -426,6 +456,65 @@ class DataValidator:
             "mindivisible", "leasetermmin", "leasetermmax",
             "annualrevenue", "numberofemployees",
         ]
+        date_candidates = [
+            "termcommencementdate", "termexpirationdate", "occupancydate",
+            "leasesigned", "closedateestimated", "closedateactual",
+            "listingdate", "saledate", "dateonmarket",
+            "requiredmoveindate", "listingexpiration",
+            "currentleaseexpirationdate", "activitydate", "birthdate",
+        ]
+
+        numeric_result = self._test_range_filter(numeric_candidates, "numeric")
+        date_result = self._test_range_filter(date_candidates, "date")
+
+        parts = []
+        all_details = {}
+
+        if numeric_result:
+            parts.append(f"numeric: {numeric_result['summary']}")
+            all_details["numeric"] = numeric_result
+        if date_result:
+            parts.append(f"date: {date_result['summary']}")
+            all_details["date"] = date_result
+
+        if not parts:
+            return CheckResult(
+                name="Numeric/date filter",
+                status="WARN",
+                message="No numeric or date metadata fields found in config",
+            )
+
+        has_fail = any(
+            r.get("status") == "FAIL" for r in [numeric_result, date_result] if r
+        )
+        has_pass = any(
+            r.get("status") == "PASS" for r in [numeric_result, date_result] if r
+        )
+
+        if has_fail:
+            status = "FAIL"
+        elif has_pass:
+            status = "PASS"
+        else:
+            status = "WARN"
+
+        return CheckResult(
+            name="Numeric/date filter",
+            status=status,
+            message=" | ".join(parts),
+            details=all_details,
+        )
+
+    def _test_range_filter(
+        self, candidates: list[str], label: str,
+    ) -> dict | None:
+        """Test _gte range filter on a candidate field list.
+
+        Returns a dict with status, summary, and details, or None if no
+        candidate field was found.
+        """
+        import re as _re
+        _ISO_DATE_RE = _re.compile(r"^\d{4}-\d{2}-\d{2}")
 
         for obj_name, obj_config in self.config.items():
             obj_type = clean_label(obj_name).lower()
@@ -434,87 +523,98 @@ class DataValidator:
                 for f in obj_config.get("metadata_fields", [])
             ]
 
-            # Find a numeric candidate present in metadata
             target_field = None
-            for cand in numeric_candidates:
+            for cand in candidates:
                 if cand in metadata_fields:
                     target_field = cand
                     break
             if not target_field:
                 continue
 
-            # Sample a doc to get an actual value
+            # Sample docs
             try:
                 sample = self.backend.search(
-                    self.namespace,
-                    text_query="a the is of and",
-                    top_k=5,
+                    self.namespace, text_query="a the is of and", top_k=10,
                     filters={"object_type": obj_type},
                     include_attributes=[target_field],
                 )
             except Exception:
                 try:
                     sample = self.backend.search(
-                        self.namespace,
-                        text_query="a the is of and",
-                        top_k=5,
+                        self.namespace, text_query="a the is of and", top_k=10,
                         filters={"object_type": obj_type},
                         include_attributes=True,
                     )
                 except Exception:
                     continue
 
-            # Find a doc with a non-null numeric value
+            # Find a non-null value
             sample_val = None
+            is_date = False
             for doc in (sample or []):
                 val = doc.get(target_field)
-                if val is not None:
-                    try:
-                        sample_val = float(val)
-                        break
-                    except (ValueError, TypeError):
-                        continue
+                if val is None:
+                    continue
+                if isinstance(val, str) and _ISO_DATE_RE.match(val):
+                    sample_val = val[:10]  # "YYYY-MM-DD"
+                    is_date = True
+                    break
+                try:
+                    sample_val = float(val)
+                    break
+                except (ValueError, TypeError):
+                    continue
 
             if sample_val is None:
                 continue
 
-            # Test _gte filter: ask for docs >= (sample_val - 1)
-            floor_val = sample_val - 1
+            # Build floor value for _gte
+            if is_date:
+                # Use one day before: "2020-09-15" -> "2020-09-14"
+                from datetime import date, timedelta
+                d = date.fromisoformat(str(sample_val))
+                floor_val = (d - timedelta(days=1)).isoformat()
+            else:
+                floor_val = sample_val - 1
+
             filter_key = f"{target_field}_gte"
             try:
                 results = self.backend.search(
-                    self.namespace,
-                    text_query="a the is of and",
-                    top_k=10,
+                    self.namespace, text_query="a the is of and", top_k=10,
                     filters={"object_type": obj_type, filter_key: floor_val},
                     include_attributes=[target_field],
                 )
             except Exception:
                 try:
                     results = self.backend.search(
-                        self.namespace,
-                        text_query="a the is of and",
-                        top_k=10,
+                        self.namespace, text_query="a the is of and", top_k=10,
                         filters={"object_type": obj_type, filter_key: floor_val},
                         include_attributes=True,
                     )
                 except Exception as e:
-                    LOG.warning("Numeric filter search failed for %s.%s: %s",
-                                obj_type, target_field, e)
+                    LOG.warning("%s filter search failed for %s.%s: %s",
+                                label, obj_type, target_field, e)
                     continue
 
             if not results:
-                return CheckResult(
-                    name="Numeric/date filter",
-                    status="FAIL",
-                    message=f"{obj_type}.{target_field} {filter_key}={floor_val} returned 0 results",
-                )
+                return {
+                    "status": "FAIL",
+                    "summary": f"{obj_type}.{target_field} {filter_key}={floor_val} -> 0 results",
+                    "object_type": obj_type, "field": target_field,
+                }
 
-            # Verify all returned docs have value >= floor
+            # Verify all returned docs satisfy the range
             violations = []
             for doc in results:
                 v = doc.get(target_field)
-                if v is not None:
+                if v is None:
+                    continue
+                if is_date:
+                    if str(v)[:10] < str(floor_val):
+                        violations.append(
+                            f"doc {doc.get('id')}: {target_field}={v} < {floor_val}"
+                        )
+                else:
                     try:
                         if float(v) < floor_val:
                             violations.append(
@@ -524,28 +624,22 @@ class DataValidator:
                         pass
 
             if violations:
-                return CheckResult(
-                    name="Numeric/date filter",
-                    status="FAIL",
-                    message=f"{len(violations)} range violation(s) on {obj_type}.{target_field}",
-                    details={"violations": violations[:5]},
-                )
+                return {
+                    "status": "FAIL",
+                    "summary": f"{len(violations)} range violation(s) on {obj_type}.{target_field}",
+                    "violations": violations[:5],
+                }
 
-            return CheckResult(
-                name="Numeric/date filter",
-                status="PASS",
-                message=f"{obj_type}.{target_field} {filter_key}={floor_val} -> "
-                        f"{len(results)} results, all >= floor",
-                details={"object_type": obj_type, "field": target_field,
-                          "filter": filter_key, "floor": floor_val,
-                          "result_count": len(results)},
-            )
+            return {
+                "status": "PASS",
+                "summary": f"{obj_type}.{target_field} {filter_key}={floor_val} -> "
+                           f"{len(results)} results, all pass",
+                "object_type": obj_type, "field": target_field,
+                "filter": filter_key, "floor": str(floor_val),
+                "result_count": len(results),
+            }
 
-        return CheckResult(
-            name="Numeric/date filter",
-            status="WARN",
-            message="No numeric metadata fields found in config for filter check",
-        )
+        return None
 
     def _check_parent_fields(self) -> CheckResult:
         """Check 5: Parent field denormalization consistency.

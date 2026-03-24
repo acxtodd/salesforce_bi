@@ -214,6 +214,49 @@ class TestLatencyThreshold:
 # ===================================================================
 
 
+class TestObjectTypeCountsFallback:
+    """Verify aggregate-cap fallback in object type counts."""
+
+    def test_missing_object_recovered_by_per_object_aggregate(self):
+        """If group-by aggregate omits an object, per-object fallback fills it."""
+        backend = MagicMock()
+        # Group-by aggregate only returns account (property missing)
+        backend.aggregate.side_effect = [
+            {"groups": {"account": {"count": 100}}},  # group-by call
+            {"count": 50},  # per-object fallback for property
+        ]
+        backend.search.return_value = [{"id": "d1"}]
+
+        config = {
+            "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            "Account": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_object_type_counts()
+        # property was recovered via fallback, so not missing
+        assert "Missing" not in result.message
+        assert "property: 50" in result.message
+
+    def test_truly_empty_object_still_fails(self):
+        """If per-object fallback also returns 0, object is truly missing."""
+        backend = MagicMock()
+        backend.aggregate.side_effect = [
+            {"groups": {"account": {"count": 100}}},
+            {"count": 0},  # property truly empty
+        ]
+        backend.search.return_value = [{"id": "d1"}]
+
+        config = {
+            "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            "Account": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_object_type_counts()
+        assert result.status == "FAIL"
+        assert "Missing" in result.message
+        assert "property" in result.message
+
+
 class TestSFCountComparison:
     def test_matching_counts_pass(self):
         backend = MagicMock()
@@ -583,6 +626,7 @@ class TestNumericDateFilter:
         validator = DataValidator(namespace="ns", backend=backend, config=config)
         result = validator._check_numeric_date_filter()
         assert result.status == "PASS"
+        assert "numeric" in result.message
         assert "totalbuildingarea" in result.message
 
     def test_numeric_filter_violation_fail(self):
@@ -606,7 +650,78 @@ class TestNumericDateFilter:
         assert result.status == "FAIL"
         assert "violation" in result.message
 
-    def test_no_numeric_fields_warn(self):
+    def test_date_filter_pass(self):
+        backend = MagicMock()
+        # First call: sample docs with date value; second call: filtered results
+        backend.search.side_effect = [
+            [{"id": "d1", "termexpirationdate": "2025-06-15"}],
+            [
+                {"id": "d1", "termexpirationdate": "2025-06-15"},
+                {"id": "d2", "termexpirationdate": "2026-01-01"},
+            ],
+        ]
+        config = {
+            "ascendix__Lease__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TermExpirationDate__c"],
+                "parents": {},
+            }
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "PASS"
+        assert "date" in result.message
+        assert "termexpirationdate" in result.message
+
+    def test_date_filter_violation_fail(self):
+        backend = MagicMock()
+        backend.search.side_effect = [
+            [{"id": "d1", "termexpirationdate": "2025-06-15"}],
+            [
+                {"id": "d1", "termexpirationdate": "2025-06-15"},
+                {"id": "d2", "termexpirationdate": "2020-01-01"},  # before floor
+            ],
+        ]
+        config = {
+            "ascendix__Lease__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TermExpirationDate__c"],
+                "parents": {},
+            }
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "FAIL"
+        assert "violation" in result.message
+
+    def test_both_numeric_and_date_pass(self):
+        backend = MagicMock()
+        # Numeric sample + filter, then date sample + filter
+        backend.search.side_effect = [
+            [{"id": "d1", "totalbuildingarea": 50000}],
+            [{"id": "d1", "totalbuildingarea": 50000}],
+            [{"id": "d2", "termexpirationdate": "2025-06-15"}],
+            [{"id": "d2", "termexpirationdate": "2025-06-15"}],
+        ]
+        config = {
+            "ascendix__Property__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TotalBuildingArea__c"],
+                "parents": {},
+            },
+            "ascendix__Lease__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TermExpirationDate__c"],
+                "parents": {},
+            },
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "PASS"
+        assert "numeric" in result.message
+        assert "date" in result.message
+
+    def test_no_numeric_or_date_fields_warn(self):
         backend = MagicMock()
         config = {
             "ascendix__Property__c": {
@@ -627,8 +742,6 @@ class TestNumericDateFilter:
 
     def test_all_sample_values_null_skips_to_next_object(self):
         backend = MagicMock()
-        # First object: numeric field but sample values are all null
-        # Second object: no numeric fields
         backend.search.side_effect = [
             [{"id": "d1", "totalbuildingarea": None}],
         ]

@@ -2541,7 +2541,7 @@
           "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:13:40.870049+00:00",
-          "updatedAt": "2026-03-24T11:30:59.317225+00:00",
+          "updatedAt": "2026-03-24T11:31:49.642085+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2549,6 +2549,10 @@
             {
               "timestamp": "2026-03-24T11:30:59.317420+00:00",
               "note": "Implemented subtasks 4.9.1-4.9.5 on branch codex/4-9-control-plane: shared compiler, versioned artifacts, config_refresh entrypoints, impact classification, and /query runtime loading are ready for QA review."
+            },
+            {
+              "timestamp": "2026-03-24T11:31:49.641918+00:00",
+              "note": "PR #13 opened for QA: https://github.com/acxtodd/salesforce_bi/pull/13. Delivered scope is 4.9.1-4.9.5 only; remaining work stays in 4.9.6-4.9.10 (poll_sync runtime loading, targeted reindex/apply orchestration, object seed flow, automatic detection, and live end-to-end validation)."
             }
           ],
           "description": "Build a config control plane around the actual Ascendix Search payload model so admin changes in Selected Objects, field filters, Default Layout rows, saved searches, relationship paths, and result columns can be detected, compiled into runtime artifacts, classified by impact, and applied without relying on ad hoc manual regeneration. Ascendix Search should be used as an admin-intent signal and structural validation reference, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
@@ -2572,14 +2576,19 @@
         {
           "id": "4.9.1",
           "title": "Extract a reusable Ascendix Search config compiler",
-          "status": "pending",
+          "status": "review",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:18.385687+00:00",
-          "updatedAt": "2026-03-20T07:32:24.455472+00:00",
+          "updatedAt": "2026-03-24T11:31:57.038840+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T11:31:57.039022+00:00",
+              "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            }
+          ],
           "description": "Refactor the current generator work into library-grade compile entrypoints that can be invoked by automation instead of only by the CLI. The compiler must normalize the actual Ascendix Search payload shape in the demo org, including chunked SearchSetting rows and saved-search templates. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
           "parent": "4.9",
           "references": [
@@ -2596,14 +2605,19 @@
         {
           "id": "4.9.2",
           "title": "Add versioned config artifact storage and active pointers",
-          "status": "pending",
+          "status": "review",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:25.124044+00:00",
-          "updatedAt": "2026-03-20T07:15:47.406178+00:00",
+          "updatedAt": "2026-03-24T11:31:57.098381+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T11:31:57.098576+00:00",
+              "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            }
+          ],
           "description": "Persist source snapshots, compiled config artifacts, diff/apply records, and active-version pointers so runtime can consume a versioned contract instead of depending only on the bundled repo YAML. See docs/architecture/ascendix_search_config_refresh_plan.md.",
           "parent": "4.9",
           "references": [
@@ -2620,14 +2634,19 @@
         {
           "id": "4.9.3",
           "title": "Implement config_refresh Lambda and local CLI",
-          "status": "pending",
+          "status": "review",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:32.073616+00:00",
-          "updatedAt": "2026-03-20T07:15:47.502648+00:00",
+          "updatedAt": "2026-03-24T11:31:57.158946+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T11:31:57.159118+00:00",
+              "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            }
+          ],
           "description": "Create an automated refresh entrypoint that snapshots Ascendix Search config, compiles a candidate runtime config, and writes the resulting artifacts on a schedule or on-demand. See docs/architecture/ascendix_search_config_refresh_plan.md.",
           "parent": "4.9",
           "references": [
@@ -2645,14 +2664,19 @@
         {
           "id": "4.9.4",
           "title": "Add config diffing and impact classification",
-          "status": "pending",
+          "status": "review",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:42.535179+00:00",
-          "updatedAt": "2026-03-20T07:32:57.506123+00:00",
+          "updatedAt": "2026-03-24T11:31:57.220678+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T11:31:57.220868+00:00",
+              "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            }
+          ],
           "description": "Compare candidate compiled config against the active version and classify changes into none, prompt-only, field-scope, relationship, or object-scope impacts so apply behavior is explicit. Diffing should operate on the normalized Ascendix Search payload model, including Selected Objects fragments, filtered field lists, Default Layout rows, and Search__c templates. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
           "parent": "4.9",
           "references": [
@@ -2672,14 +2696,19 @@
         {
           "id": "4.9.5",
           "title": "Add runtime config loading to query Lambda",
-          "status": "pending",
+          "status": "review",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:46.123383+00:00",
-          "updatedAt": "2026-03-20T07:15:47.697844+00:00",
+          "updatedAt": "2026-03-24T11:31:57.279597+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-24T11:31:57.279770+00:00",
+              "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            }
+          ],
           "description": "Teach the /query runtime to load the active compiled config from control-plane storage with safe fallback, so prompt and tool scope can change without a code redeploy. See docs/architecture/ascendix_search_config_refresh_plan.md.",
           "parent": "4.9",
           "references": [

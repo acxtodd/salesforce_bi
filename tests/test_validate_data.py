@@ -214,16 +214,94 @@ class TestLatencyThreshold:
 # ===================================================================
 
 
-class TestSFCountComparison:
-    def test_matching_counts_pass(self):
+class TestNativeCountObjectTypes:
+    """Verify per-object counts use native aggregate_by."""
+
+    def _make_validator(self, config, sf_client=None):
         backend = MagicMock()
-        backend.aggregate.return_value = {
-            "groups": {"property": {"count": 100}}
+        # _ns().query() returns a result with .aggregations dict
+        mock_ns = MagicMock()
+        backend._ns.return_value = mock_ns
+        backend.search.return_value = [{"id": "d1"}]
+        return backend, mock_ns, DataValidator(
+            namespace="ns", backend=backend, config=config, sf_client=sf_client,
+        )
+
+    def test_exact_counts_pass(self):
+        config = {
+            "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            "Account": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
         }
+        backend, mock_ns, validator = self._make_validator(config)
+        # namespace exists count, then per-object counts
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 100}
+        mock_ns.query.return_value = mock_result
+
+        result = validator._check_object_type_counts()
+        assert result.status == "PASS"
+        assert "property: 100" in result.message
+        assert "account: 100" in result.message
+        assert "total: 200" in result.message
+
+    def test_missing_object_fails(self):
+        config = {
+            "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            "Account": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+        }
+        backend, mock_ns, validator = self._make_validator(config)
+        # Property returns 0, Account returns 100
+        mock_result_zero = MagicMock()
+        mock_result_zero.aggregations = {"count": 0}
+        mock_result_100 = MagicMock()
+        mock_result_100.aggregations = {"count": 100}
+        mock_ns.query.side_effect = [mock_result_zero, mock_result_100]
+
+        result = validator._check_object_type_counts()
+        assert result.status == "FAIL"
+        assert "Missing" in result.message
+        assert "property" in result.message
+
+    def test_sf_mismatch_fails(self):
+        sf = MagicMock()
+        sf.query.return_value = {"totalSize": 200}
+        config = {
+            "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+        }
+        backend, mock_ns, validator = self._make_validator(config, sf_client=sf)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 100}
+        mock_ns.query.return_value = mock_result
+
+        result = validator._check_object_type_counts()
+        assert result.status == "FAIL"
+        assert "SF=200 vs TP=100" in result.message
+
+    def test_namespace_exists_uses_native_count(self):
+        config = {}
+        backend, mock_ns, validator = self._make_validator(config)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 24649}
+        mock_ns.query.return_value = mock_result
+
+        result = validator._check_namespace_exists()
+        assert result.status == "PASS"
+        assert "24,649" in result.message
+
+
+class TestSFCountComparison:
+    def _make_validator(self, config, sf_client=None):
+        backend = MagicMock()
+        mock_ns = MagicMock()
+        backend._ns.return_value = mock_ns
         backend.search.return_value = [{"id": "doc1"}]
+        return mock_ns, DataValidator(
+            namespace="ns", backend=backend, config=config, sf_client=sf_client,
+        )
+
+    def test_matching_counts_pass(self):
         sf = MagicMock()
         sf.query.return_value = {"totalSize": 100}
-
         config = {
             "ascendix__Property__c": {
                 "embed_fields": ["Name"],
@@ -231,21 +309,17 @@ class TestSFCountComparison:
                 "parents": {},
             }
         }
-        validator = DataValidator(
-            namespace="ns", backend=backend, config=config, sf_client=sf,
-        )
+        mock_ns, validator = self._make_validator(config, sf_client=sf)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 100}
+        mock_ns.query.return_value = mock_result
+
         result = validator._check_object_type_counts()
         assert result.status == "PASS"
 
     def test_mismatched_counts_fail(self):
-        backend = MagicMock()
-        backend.aggregate.return_value = {
-            "groups": {"property": {"count": 90}}
-        }
-        backend.search.return_value = [{"id": "doc1"}]
         sf = MagicMock()
         sf.query.return_value = {"totalSize": 100}
-
         config = {
             "ascendix__Property__c": {
                 "embed_fields": ["Name"],
@@ -253,20 +327,16 @@ class TestSFCountComparison:
                 "parents": {},
             }
         }
-        validator = DataValidator(
-            namespace="ns", backend=backend, config=config, sf_client=sf,
-        )
+        mock_ns, validator = self._make_validator(config, sf_client=sf)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 90}
+        mock_ns.query.return_value = mock_result
+
         result = validator._check_object_type_counts()
         assert result.status == "FAIL"
         assert "SF count mismatch" in result.message
 
     def test_no_sf_client_skips_comparison(self):
-        backend = MagicMock()
-        backend.aggregate.return_value = {
-            "groups": {"property": {"count": 100}}
-        }
-        backend.search.return_value = [{"id": "doc1"}]
-
         config = {
             "ascendix__Property__c": {
                 "embed_fields": ["Name"],
@@ -274,11 +344,12 @@ class TestSFCountComparison:
                 "parents": {},
             }
         }
-        validator = DataValidator(
-            namespace="ns", backend=backend, config=config,
-        )
+        mock_ns, validator = self._make_validator(config)
+        mock_result = MagicMock()
+        mock_result.aggregations = {"count": 100}
+        mock_ns.query.return_value = mock_result
+
         result = validator._check_object_type_counts()
-        # No SF client, so only TP counts matter; should PASS if count > 0
         assert result.status == "PASS"
 
 
@@ -504,6 +575,214 @@ class TestMetadataFilter:
 # ===================================================================
 # Hybrid attribute matching
 # ===================================================================
+
+
+# ===================================================================
+# Per-object search coverage
+# ===================================================================
+
+
+class TestPerObjectSearch:
+    def test_all_objects_covered_pass(self):
+        backend = MagicMock()
+        backend.search.return_value = [{"id": "d1"}]
+        config = {
+            "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            "ascendix__Lease__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_per_object_search()
+        assert result.status == "PASS"
+        assert "2/2" in result.message
+
+    def test_one_object_empty_fail(self):
+        backend = MagicMock()
+        backend.search.side_effect = [
+            [{"id": "d1"}],  # Property has docs
+            [],               # Lease has none
+        ]
+        config = {
+            "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+            "ascendix__Lease__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_per_object_search()
+        assert result.status == "FAIL"
+        assert "lease" in result.message
+
+    def test_no_config_skip(self):
+        backend = MagicMock()
+        validator = DataValidator(namespace="ns", backend=backend)
+        result = validator._check_per_object_search()
+        assert result.status == "SKIP"
+
+    def test_search_exception_treated_as_empty(self):
+        backend = MagicMock()
+        backend.search.side_effect = Exception("timeout")
+        config = {
+            "ascendix__Property__c": {"embed_fields": ["Name"], "metadata_fields": [], "parents": {}},
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_per_object_search()
+        assert result.status == "FAIL"
+        assert "property" in result.message
+
+
+# ===================================================================
+# Numeric/date filter verification
+# ===================================================================
+
+
+class TestNumericDateFilter:
+    def test_numeric_filter_pass(self):
+        backend = MagicMock()
+        # First call: sample docs; second call: filtered results
+        backend.search.side_effect = [
+            [{"id": "d1", "totalbuildingarea": 50000}],
+            [
+                {"id": "d1", "totalbuildingarea": 50000},
+                {"id": "d2", "totalbuildingarea": 60000},
+            ],
+        ]
+        config = {
+            "ascendix__Property__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TotalBuildingArea__c"],
+                "parents": {},
+            }
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "PASS"
+        assert "numeric" in result.message
+        assert "totalbuildingarea" in result.message
+
+    def test_numeric_filter_violation_fail(self):
+        backend = MagicMock()
+        backend.search.side_effect = [
+            [{"id": "d1", "totalbuildingarea": 50000}],
+            [
+                {"id": "d1", "totalbuildingarea": 50000},
+                {"id": "d2", "totalbuildingarea": 10},  # below floor
+            ],
+        ]
+        config = {
+            "ascendix__Property__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TotalBuildingArea__c"],
+                "parents": {},
+            }
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "FAIL"
+        assert "violation" in result.message
+
+    def test_date_filter_pass(self):
+        backend = MagicMock()
+        # First call: sample docs with date value; second call: filtered results
+        backend.search.side_effect = [
+            [{"id": "d1", "termexpirationdate": "2025-06-15"}],
+            [
+                {"id": "d1", "termexpirationdate": "2025-06-15"},
+                {"id": "d2", "termexpirationdate": "2026-01-01"},
+            ],
+        ]
+        config = {
+            "ascendix__Lease__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TermExpirationDate__c"],
+                "parents": {},
+            }
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "PASS"
+        assert "date" in result.message
+        assert "termexpirationdate" in result.message
+
+    def test_date_filter_violation_fail(self):
+        backend = MagicMock()
+        backend.search.side_effect = [
+            [{"id": "d1", "termexpirationdate": "2025-06-15"}],
+            [
+                {"id": "d1", "termexpirationdate": "2025-06-15"},
+                {"id": "d2", "termexpirationdate": "2020-01-01"},  # before floor
+            ],
+        ]
+        config = {
+            "ascendix__Lease__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TermExpirationDate__c"],
+                "parents": {},
+            }
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "FAIL"
+        assert "violation" in result.message
+
+    def test_both_numeric_and_date_pass(self):
+        backend = MagicMock()
+        # Numeric sample + filter, then date sample + filter
+        backend.search.side_effect = [
+            [{"id": "d1", "totalbuildingarea": 50000}],
+            [{"id": "d1", "totalbuildingarea": 50000}],
+            [{"id": "d2", "termexpirationdate": "2025-06-15"}],
+            [{"id": "d2", "termexpirationdate": "2025-06-15"}],
+        ]
+        config = {
+            "ascendix__Property__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TotalBuildingArea__c"],
+                "parents": {},
+            },
+            "ascendix__Lease__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TermExpirationDate__c"],
+                "parents": {},
+            },
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "PASS"
+        assert "numeric" in result.message
+        assert "date" in result.message
+
+    def test_no_numeric_or_date_fields_warn(self):
+        backend = MagicMock()
+        config = {
+            "ascendix__Property__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": [],
+                "parents": {},
+            }
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "WARN"
+
+    def test_no_config_skip(self):
+        backend = MagicMock()
+        validator = DataValidator(namespace="ns", backend=backend)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "SKIP"
+
+    def test_all_sample_values_null_skips_to_next_object(self):
+        backend = MagicMock()
+        backend.search.side_effect = [
+            [{"id": "d1", "totalbuildingarea": None}],
+        ]
+        config = {
+            "ascendix__Property__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": ["ascendix__TotalBuildingArea__c"],
+                "parents": {},
+            }
+        }
+        validator = DataValidator(namespace="ns", backend=backend, config=config)
+        result = validator._check_numeric_date_filter()
+        assert result.status == "WARN"
 
 
 class TestHybridSearch:

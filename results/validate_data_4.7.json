@@ -1,0 +1,4796 @@
+{
+  "namespace": "org_00Ddl000003yx57EAA",
+  "query_text": "office lease Dallas",
+  "results": [
+    {
+      "name": "Namespace exists",
+      "status": "PASS",
+      "message": "24,649 documents found",
+      "details": {
+        "count": 24649
+      },
+      "duration_ms": 664.5
+    },
+    {
+      "name": "Object type counts",
+      "status": "PASS",
+      "message": "property: 2,470 | lease: 483 | availability: 527 | account: 4,757 | contact: 6,625 | deal: 2,391 | sale: 55 | inquiry: 2,340 | listing: 1,763 | preference: 3,209 | task: 29 (total: 24,649)",
+      "details": {
+        "groups": {
+          "property": {
+            "count": 2470
+          },
+          "lease": {
+            "count": 483
+          },
+          "availability": {
+            "count": 527
+          },
+          "account": {
+            "count": 4757
+          },
+          "contact": {
+            "count": 6625
+          },
+          "deal": {
+            "count": 2391
+          },
+          "sale": {
+            "count": 55
+          },
+          "inquiry": {
+            "count": 2340
+          },
+          "listing": {
+            "count": 1763
+          },
+          "preference": {
+            "count": 3209
+          },
+          "task": {
+            "count": 29
+          }
+        },
+        "total_docs": 24649
+      },
+      "duration_ms": 5814.92
+    },
+    {
+      "name": "System fields",
+      "status": "PASS",
+      "message": "5/5 docs have all system fields",
+      "details": {},
+      "duration_ms": 351.02
+    },
+    {
+      "name": "Metadata filter",
+      "status": "PASS",
+      "message": "name=York Town, city=Tblisi -> 1 results, all match",
+      "details": {},
+      "duration_ms": 413.36
+    },
+    {
+      "name": "Numeric/date filter",
+      "status": "PASS",
+      "message": "numeric: lease.termmonths termmonths_gte=47.0 -> 10 results, all pass | date: lease.termcommencementdate termcommencementdate_gte=2020-09-14 -> 10 results, all pass",
+      "details": {
+        "numeric": {
+          "status": "PASS",
+          "summary": "lease.termmonths termmonths_gte=47.0 -> 10 results, all pass",
+          "object_type": "lease",
+          "field": "termmonths",
+          "filter": "termmonths_gte",
+          "floor": "47.0",
+          "result_count": 10
+        },
+        "date": {
+          "status": "PASS",
+          "summary": "lease.termcommencementdate termcommencementdate_gte=2020-09-14 -> 10 results, all pass",
+          "object_type": "lease",
+          "field": "termcommencementdate",
+          "filter": "termcommencementdate_gte",
+          "floor": "2020-09-14",
+          "result_count": 10
+        }
+      },
+      "duration_ms": 784.51
+    },
+    {
+      "name": "Parent fields",
+      "status": "FAIL",
+      "message": "property: 4/10 market OK | property: 4/10 region OK | availability: 2/10 listing OK | availability: 10/10 market OK | availability: 10/10 region OK | deal: 8/10 client OK | deal: 4/10 buyer OK | deal: 5/10 tenant OK | deal: 1/10 ownerlandlord OK | sale: 5/10 buyer OK | sale: 5/10 seller OK | inquiry: 9/10 listing OK | listing: 10/10 listingbrokercompany OK | listing: 10/10 listingbrokercontact OK | listing: 1/10 ownerlandlord OK | preference: 10/10 account OK | preference: 10/10 contact OK | task: 6/10 who OK | task: 3/10 what OK | task: 5/10 account OK | property: 0/10 cbsa keys (sparse \u2014 SF has 0/2470 FKs populated) | property: 0/10 complex keys (sparse \u2014 SF has 0/2470 FKs populated) | property: 0/10 country keys (sparse \u2014 SF has 0/2470 FKs populated) | property: 0/10 developercontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 4/2470 FKs populated) | property: 0/10 developer keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 6/2470 FKs populated) | property: 5 docs have partial listingbrokercompany keys (null source fields: listingbrokercompany_annualrevenue, listingbrokercompany_industry) | property: 4 docs have partial listingbrokercontact keys (null source fields: listingbrokercontact_mobilephone) | property: 1 docs have partial ownerlandlordcontact keys (null source fields: ownerlandlordcontact_mobilephone, ownerlandlordcontact_phone) | property: 3 docs have partial ownerlandlord keys (null source fields: ownerlandlord_annualrevenue, ownerlandlord_phone, ownerlandlord_website) | property: 0/10 propertymanagercontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 23/2470 FKs populated) | property: 1 docs have partial propertymanager keys (null source fields: propertymanager_annualrevenue, propertymanager_industry, propertymanager_phone, propertymanager_type, propertymanager_website) | property: 0/10 submarket keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 28/2470 FKs populated) | lease: 8 docs have partial property keys (null source fields: property_totalbuildingarea) | lease: 0/10 listingbrokercompany keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 39/483 FKs populated) | lease: 0/10 listingbrokercontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 30/483 FKs populated) | lease: 0/10 originatingdeal keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 50/483 FKs populated) | lease: 0/10 ownerlandlordcontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 32/483 FKs populated) | lease: 6 docs have partial tenant keys (null source fields: tenant_annualrevenue, tenant_phone, tenant_website) | lease: 3 docs have partial tenantcontact keys (null source fields: tenantcontact_mobilephone) | lease: 0/10 tenantrepbrokercontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 11/483 FKs populated) | lease: 0/10 tenantrepbroker keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 12/483 FKs populated) | lease: 1 docs have partial ownerlandlord keys (null source fields: ownerlandlord_annualrevenue, ownerlandlord_phone, ownerlandlord_website) | availability: 10 docs have partial property keys (null source fields: property_propertysubtype, property_totalbuildingarea) | availability: 0/10 submarket keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 128/527 FKs populated) | account: 0/10 parent keys (sparse \u2014 SF has 0/4757 FKs populated) | contact: 9 docs have partial account keys (null source fields: account_annualrevenue) | contact: 0/10 reportsto keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 2/6625 FKs populated) | deal: 0/10 seller keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 55/2391 FKs populated) | deal: 0/10 tenantrepbroker keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 20/2391 FKs populated) | deal: 0/10 listingbrokercompany keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 174/2391 FKs populated) | deal: 0/10 buyerrep keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 18/2391 FKs populated) | deal: 0/10 leadbrokercompany keys (sparse \u2014 SF has 0/2391 FKs populated) | sale: 6 docs have partial property keys (null source fields: property_propertyclass) | sale: 0/10 sellingbroker keys (sparse \u2014 SF has 0/55 FKs populated) | inquiry: 2 docs have partial property keys (null source fields: property_city, property_state) | inquiry: 0/10 availability keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 37/2340 FKs populated) | inquiry: 0/10 brokercompany keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 49/2340 FKs populated) | inquiry: 0/10 market keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 41/2340 FKs populated) | inquiry: 0/10 submarket keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 1/2340 FKs populated) | listing: 10 docs have partial property keys (null source fields: property_propertyclass) | listing: 0/10 market keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 8/1763 FKs populated) | listing: 0/10 submarket keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 8/1763 FKs populated) | preference: 0/10 market keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 57/3209 FKs populated) | preference: 0/10 submarket keys (sparse \u2014 SF has 0/3209 FKs populated) | deal: 4/10 docs have inconsistent partial property keys",
+      "details": {
+        "passes": [
+          "property: 4/10 market OK",
+          "property: 4/10 region OK",
+          "availability: 2/10 listing OK",
+          "availability: 10/10 market OK",
+          "availability: 10/10 region OK",
+          "deal: 8/10 client OK",
+          "deal: 4/10 buyer OK",
+          "deal: 5/10 tenant OK",
+          "deal: 1/10 ownerlandlord OK",
+          "sale: 5/10 buyer OK",
+          "sale: 5/10 seller OK",
+          "inquiry: 9/10 listing OK",
+          "listing: 10/10 listingbrokercompany OK",
+          "listing: 10/10 listingbrokercontact OK",
+          "listing: 1/10 ownerlandlord OK",
+          "preference: 10/10 account OK",
+          "preference: 10/10 contact OK",
+          "task: 6/10 who OK",
+          "task: 3/10 what OK",
+          "task: 5/10 account OK"
+        ],
+        "warns": [
+          "property: 0/10 cbsa keys (sparse \u2014 SF has 0/2470 FKs populated)",
+          "property: 0/10 complex keys (sparse \u2014 SF has 0/2470 FKs populated)",
+          "property: 0/10 country keys (sparse \u2014 SF has 0/2470 FKs populated)",
+          "property: 0/10 developercontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 4/2470 FKs populated)",
+          "property: 0/10 developer keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 6/2470 FKs populated)",
+          "property: 5 docs have partial listingbrokercompany keys (null source fields: listingbrokercompany_annualrevenue, listingbrokercompany_industry)",
+          "property: 4 docs have partial listingbrokercontact keys (null source fields: listingbrokercontact_mobilephone)",
+          "property: 1 docs have partial ownerlandlordcontact keys (null source fields: ownerlandlordcontact_mobilephone, ownerlandlordcontact_phone)",
+          "property: 3 docs have partial ownerlandlord keys (null source fields: ownerlandlord_annualrevenue, ownerlandlord_phone, ownerlandlord_website)",
+          "property: 0/10 propertymanagercontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 23/2470 FKs populated)",
+          "property: 1 docs have partial propertymanager keys (null source fields: propertymanager_annualrevenue, propertymanager_industry, propertymanager_phone, propertymanager_type, propertymanager_website)",
+          "property: 0/10 submarket keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 28/2470 FKs populated)",
+          "lease: 8 docs have partial property keys (null source fields: property_totalbuildingarea)",
+          "lease: 0/10 listingbrokercompany keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 39/483 FKs populated)",
+          "lease: 0/10 listingbrokercontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 30/483 FKs populated)",
+          "lease: 0/10 originatingdeal keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 50/483 FKs populated)",
+          "lease: 0/10 ownerlandlordcontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 32/483 FKs populated)",
+          "lease: 6 docs have partial tenant keys (null source fields: tenant_annualrevenue, tenant_phone, tenant_website)",
+          "lease: 3 docs have partial tenantcontact keys (null source fields: tenantcontact_mobilephone)",
+          "lease: 0/10 tenantrepbrokercontact keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 11/483 FKs populated)",
+          "lease: 0/10 tenantrepbroker keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 12/483 FKs populated)",
+          "lease: 1 docs have partial ownerlandlord keys (null source fields: ownerlandlord_annualrevenue, ownerlandlord_phone, ownerlandlord_website)",
+          "availability: 10 docs have partial property keys (null source fields: property_propertysubtype, property_totalbuildingarea)",
+          "availability: 0/10 submarket keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 128/527 FKs populated)",
+          "account: 0/10 parent keys (sparse \u2014 SF has 0/4757 FKs populated)",
+          "contact: 9 docs have partial account keys (null source fields: account_annualrevenue)",
+          "contact: 0/10 reportsto keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 2/6625 FKs populated)",
+          "deal: 0/10 seller keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 55/2391 FKs populated)",
+          "deal: 0/10 tenantrepbroker keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 20/2391 FKs populated)",
+          "deal: 0/10 listingbrokercompany keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 174/2391 FKs populated)",
+          "deal: 0/10 buyerrep keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 18/2391 FKs populated)",
+          "deal: 0/10 leadbrokercompany keys (sparse \u2014 SF has 0/2391 FKs populated)",
+          "sale: 6 docs have partial property keys (null source fields: property_propertyclass)",
+          "sale: 0/10 sellingbroker keys (sparse \u2014 SF has 0/55 FKs populated)",
+          "inquiry: 2 docs have partial property keys (null source fields: property_city, property_state)",
+          "inquiry: 0/10 availability keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 37/2340 FKs populated)",
+          "inquiry: 0/10 brokercompany keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 49/2340 FKs populated)",
+          "inquiry: 0/10 market keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 41/2340 FKs populated)",
+          "inquiry: 0/10 submarket keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 1/2340 FKs populated)",
+          "listing: 10 docs have partial property keys (null source fields: property_propertyclass)",
+          "listing: 0/10 market keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 8/1763 FKs populated)",
+          "listing: 0/10 submarket keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 8/1763 FKs populated)",
+          "preference: 0/10 market keys (sparse or low-incidence \u2014 sampled SF records have 0/10 populated; SF has 57/3209 FKs populated)",
+          "preference: 0/10 submarket keys (sparse \u2014 SF has 0/3209 FKs populated)"
+        ],
+        "fails": [
+          "deal: 4/10 docs have inconsistent partial property keys"
+        ]
+      },
+      "duration_ms": 44707.38
+    },
+    {
+      "name": "Per-object search",
+      "status": "PASS",
+      "message": "11/11 object types return results: property, lease, availability, account, contact, deal, sale, inquiry, listing, preference, task",
+      "details": {
+        "covered": [
+          "property",
+          "lease",
+          "availability",
+          "account",
+          "contact",
+          "deal",
+          "sale",
+          "inquiry",
+          "listing",
+          "preference",
+          "task"
+        ],
+        "empty": []
+      },
+      "duration_ms": 1953.99
+    },
+    {
+      "name": "BM25 search",
+      "status": "PASS",
+      "message": "\"office lease Dallas\" -> 10 results",
+      "details": {},
+      "duration_ms": 139.06
+    },
+    {
+      "name": "Hybrid search",
+      "status": "PASS",
+      "message": "5/5 results have attrs matching query terms",
+      "details": {
+        "matched": [
+          [
+            "a0Tfk000000F20gEAC",
+            "name",
+            "Kaufman Lease Inquiry"
+          ],
+          [
+            "a0Tfk000000F20gEAC",
+            "property_name",
+            "Office Alpha"
+          ],
+          [
+            "a0Tfk000000F20gEAC",
+            "property_city",
+            "Dallas"
+          ],
+          [
+            "a0Tfk000000F20gEAC",
+            "listing_name",
+            "Office Alpha Lease Listing"
+          ],
+          [
+            "a0Tfk000000F20gEAC",
+            "propertytype",
+            "Office"
+          ],
+          [
+            "a0Zfk0000009FIcEAM",
+            "name",
+            "Dallas County Assessors Office"
+          ],
+          [
+            "a0Zfk0000009FIcEAM",
+            "account_name",
+            "Dallas County Assessors Office"
+          ],
+          [
+            "a0Zfk0000009FIcEAM",
+            "saleorlease",
+            "Lease"
+          ],
+          [
+            "a0Tfk000000F20CEAS",
+            "property_name",
+            "Office Alpha"
+          ],
+          [
+            "a0Tfk000000F20CEAS",
+            "property_city",
+            "Dallas"
+          ]
+        ]
+      },
+      "duration_ms": 1704.77
+    },
+    {
+      "name": "Warm latency",
+      "status": "FAIL",
+      "message": "p50=147ms, p95=190ms (< 50ms)",
+      "details": {
+        "p50": 146.8680419930024,
+        "p95": 189.64041699655354,
+        "latencies": [
+          145.76633399701677,
+          145.0135839986615,
+          146.89941599499434,
+          189.64041699655354,
+          146.8680419930024
+        ]
+      },
+      "duration_ms": 774.22
+    }
+  ],
+  "telemetry_events": [
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 5,
+        "include_attributes": [
+          "id",
+          "text",
+          "object_type",
+          "last_modified",
+          "salesforce_org_id"
+        ]
+      },
+      "result_count": 5,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 4365
+      },
+      "performance": {
+        "client_total_ms": 350.3855000017211,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.78158300032374,
+        "client_body_read_ms": 201.9352089992026,
+        "client_deserialize_ms": 0.48308300029020756,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "name",
+          "city",
+          "state",
+          "propertyclass",
+          "propertysubtype",
+          "description",
+          "street",
+          "buildingstatus",
+          "totalbuildingarea",
+          "yearbuilt",
+          "floors",
+          "postalcode",
+          "county",
+          "occupancy",
+          "landarea",
+          "constructiontype",
+          "tenancy",
+          "geolocationlatitude",
+          "geolocationlongitude"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 845
+      },
+      "performance": {
+        "client_total_ms": 266.45533299597446,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.13829100178555,
+        "client_body_read_ms": 120.99499999021646,
+        "client_deserialize_ms": 0.13295799726620317,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "And",
+          [
+            [
+              "name",
+              "Eq",
+              "York Town"
+            ],
+            [
+              "city",
+              "Eq",
+              "Tblisi"
+            ]
+          ]
+        ],
+        "include_attributes": [
+          "name",
+          "city"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 37
+      },
+      "performance": {
+        "client_total_ms": 146.45237500371877,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.7730830006767,
+        "client_body_read_ms": 0.1388749951729551,
+        "client_deserialize_ms": 0.23416700423695147,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "totalbuildingarea"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 145.85641700250562,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.15587499772664,
+        "client_body_read_ms": 0.14220899902284145,
+        "client_deserialize_ms": 0.24987499637063593,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "termmonths"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 260
+      },
+      "performance": {
+        "client_total_ms": 145.13516699662432,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.6430420037359,
+        "client_body_read_ms": 0.11124998854938895,
+        "client_deserialize_ms": 0.15900000289548188,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 21,
+        "server_total_ms": 21
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "And",
+          [
+            [
+              "object_type",
+              "Eq",
+              "lease"
+            ],
+            [
+              "termmonths",
+              "Gte",
+              47.0
+            ]
+          ]
+        ],
+        "include_attributes": [
+          "termmonths"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 300
+      },
+      "performance": {
+        "client_total_ms": 145.40608400420751,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.98516700405162,
+        "client_body_read_ms": 0.08804199751466513,
+        "client_deserialize_ms": 0.14020899834576994,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "termcommencementdate"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 270
+      },
+      "performance": {
+        "client_total_ms": 198.18120800482575,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 197.68287500482984,
+        "client_body_read_ms": 0.10962499072775245,
+        "client_deserialize_ms": 0.1525000116089359,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "And",
+          [
+            [
+              "object_type",
+              "Eq",
+              "lease"
+            ],
+            [
+              "termcommencementdate",
+              "Gte",
+              "2020-09-14"
+            ]
+          ]
+        ],
+        "include_attributes": [
+          "termcommencementdate"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 320
+      },
+      "performance": {
+        "client_total_ms": 148.4773749980377,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.83491699199658,
+        "client_body_read_ms": 0.13608300650957972,
+        "client_deserialize_ms": 0.22037500457372516,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 63448
+      },
+      "performance": {
+        "client_total_ms": 271.93616700242274,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.1786250040168,
+        "client_body_read_ms": 123.46141699526925,
+        "client_deserialize_ms": 0.9574580035405234,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 63448
+      },
+      "performance": {
+        "client_total_ms": 272.7213329926599,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 150.29133298958186,
+        "client_body_read_ms": 121.66445900220424,
+        "client_deserialize_ms": 0.5662909970851615,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 25,
+        "server_total_ms": 25
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 63448
+      },
+      "performance": {
+        "client_total_ms": 276.38562499487307,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.93204198940657,
+        "client_body_read_ms": 121.6095830022823,
+        "client_deserialize_ms": 6.653125004959293,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 63448
+      },
+      "performance": {
+        "client_total_ms": 336.4957500016317,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.21937499416526,
+        "client_body_read_ms": 188.08225000975654,
+        "client_deserialize_ms": 0.8632499957457185,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 63448
+      },
+      "performance": {
+        "client_total_ms": 269.74633400095627,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.44412500294857,
+        "client_body_read_ms": 121.43308400118258,
+        "client_deserialize_ms": 0.6106250075390562,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "listingbrokercompany_name",
+          "listingbrokercompany_type",
+          "listingbrokercompany_phone",
+          "listingbrokercompany_website",
+          "listingbrokercompany_industry",
+          "listingbrokercompany_annualrevenue"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 365
+      },
+      "performance": {
+        "client_total_ms": 149.5070420060074,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 148.96375000535045,
+        "client_body_read_ms": 0.12058299034833908,
+        "client_deserialize_ms": 0.1810000103432685,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "listingbrokercontact_name",
+          "listingbrokercontact_phone",
+          "listingbrokercontact_email",
+          "listingbrokercontact_mobilephone"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 414
+      },
+      "performance": {
+        "client_total_ms": 145.44604100228753,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.93362499342766,
+        "client_body_read_ms": 0.10625000868458301,
+        "client_deserialize_ms": 0.18166600784752518,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "ownerlandlordcontact_name",
+          "ownerlandlordcontact_phone",
+          "ownerlandlordcontact_email",
+          "ownerlandlordcontact_mobilephone"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 271
+      },
+      "performance": {
+        "client_total_ms": 181.73579200811218,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 180.92900000920054,
+        "client_body_read_ms": 0.17816699983086437,
+        "client_deserialize_ms": 0.29104200075380504,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "ownerlandlord_name",
+          "ownerlandlord_type",
+          "ownerlandlord_phone",
+          "ownerlandlord_website",
+          "ownerlandlord_industry",
+          "ownerlandlord_annualrevenue"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 273
+      },
+      "performance": {
+        "client_total_ms": 147.710792007274,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.9075829954818,
+        "client_body_read_ms": 0.14700001338496804,
+        "client_deserialize_ms": 0.28070900589227676,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "market_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 265
+      },
+      "performance": {
+        "client_total_ms": 145.77691699378192,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.30641699093394,
+        "client_body_read_ms": 0.1050830032909289,
+        "client_deserialize_ms": 0.1612920023035258,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "propertymanagercontact_name",
+          "propertymanagercontact_phone",
+          "propertymanagercontact_email",
+          "propertymanagercontact_mobilephone"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 229.06520799733698,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 228.36420800013002,
+        "client_body_read_ms": 0.13524999667424709,
+        "client_deserialize_ms": 0.24133299302775413,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 63448
+      },
+      "performance": {
+        "client_total_ms": 270.0467920076335,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.60458400996868,
+        "client_body_read_ms": 121.45762499130797,
+        "client_deserialize_ms": 0.6815420056227595,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "region_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 258
+      },
+      "performance": {
+        "client_total_ms": 146.23166700766888,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.50766699539963,
+        "client_body_read_ms": 0.14704100613016635,
+        "client_deserialize_ms": 0.24758400104474276,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ],
+        "include_attributes": [
+          "submarket_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 148.24112500355113,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.1839580044616,
+        "client_body_read_ms": 0.21987500076647848,
+        "client_deserialize_ms": 0.36691699642688036,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "property_name",
+          "property_city",
+          "property_state",
+          "property_propertyclass",
+          "property_propertysubtype",
+          "property_totalbuildingarea"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 613
+      },
+      "performance": {
+        "client_total_ms": 266.9934169971384,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.70358399942052,
+        "client_body_read_ms": 120.83016599353869,
+        "client_deserialize_ms": 0.20312500419095159,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "listingbrokercompany_name",
+          "listingbrokercompany_type",
+          "listingbrokercompany_phone",
+          "listingbrokercompany_website",
+          "listingbrokercompany_industry",
+          "listingbrokercompany_annualrevenue"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 145.23604199348483,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.67587499530055,
+        "client_body_read_ms": 0.11279199679847807,
+        "client_deserialize_ms": 0.19862499902956188,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "listingbrokercontact_name",
+          "listingbrokercontact_phone",
+          "listingbrokercontact_email",
+          "listingbrokercontact_mobilephone"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 144.7006669914117,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.30895900295582,
+        "client_body_read_ms": 0.08095799421425909,
+        "client_deserialize_ms": 0.1399999891873449,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "originatingdeal_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 146.92904098774306,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.4459159906255,
+        "client_body_read_ms": 0.1003340003080666,
+        "client_deserialize_ms": 0.1635410008020699,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "ownerlandlordcontact_name",
+          "ownerlandlordcontact_phone",
+          "ownerlandlordcontact_email",
+          "ownerlandlordcontact_mobilephone"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 197.3376669920981,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 196.65779199567623,
+        "client_body_read_ms": 0.14233299589250237,
+        "client_deserialize_ms": 0.24491699878126383,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "tenant_name",
+          "tenant_type",
+          "tenant_phone",
+          "tenant_website",
+          "tenant_industry",
+          "tenant_annualrevenue"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 455
+      },
+      "performance": {
+        "client_total_ms": 192.24262499483302,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 191.72841699037235,
+        "client_body_read_ms": 0.10133300384040922,
+        "client_deserialize_ms": 0.18612500571180135,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "tenantcontact_name",
+          "tenantcontact_phone",
+          "tenantcontact_email",
+          "tenantcontact_mobilephone"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 313
+      },
+      "performance": {
+        "client_total_ms": 144.47479200316593,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 143.9275419979822,
+        "client_body_read_ms": 0.11691699910443276,
+        "client_deserialize_ms": 0.18825000734068453,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 21,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "tenantrepbrokercontact_name",
+          "tenantrepbrokercontact_phone",
+          "tenantrepbrokercontact_email",
+          "tenantrepbrokercontact_mobilephone"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 145.2215829922352,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.63512500515208,
+        "client_body_read_ms": 0.1152079930761829,
+        "client_deserialize_ms": 0.19737498951144516,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 21,
+        "server_total_ms": 21
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 45978
+      },
+      "performance": {
+        "client_total_ms": 1332.6004580012523,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 159.4555829942692,
+        "client_body_read_ms": 1172.294250005507,
+        "client_deserialize_ms": 0.560125001356937,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ],
+        "include_attributes": [
+          "ownerlandlord_name",
+          "ownerlandlord_type",
+          "ownerlandlord_phone",
+          "ownerlandlord_website",
+          "ownerlandlord_industry",
+          "ownerlandlord_annualrevenue"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 251
+      },
+      "performance": {
+        "client_total_ms": 148.74766700086184,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 148.19370800978504,
+        "client_body_read_ms": 0.12274998880457133,
+        "client_deserialize_ms": 0.1620419934624806,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "availability"
+        ],
+        "include_attributes": [
+          "property_name",
+          "property_city",
+          "property_state",
+          "property_propertyclass",
+          "property_propertysubtype",
+          "property_totalbuildingarea"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 506
+      },
+      "performance": {
+        "client_total_ms": 145.1113329967484,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.63762499508448,
+        "client_body_read_ms": 0.14091600314714015,
+        "client_deserialize_ms": 0.1417500025127083,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "availability"
+        ],
+        "include_attributes": [
+          "listing_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 280
+      },
+      "performance": {
+        "client_total_ms": 176.5910419926513,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 175.94504199223593,
+        "client_body_read_ms": 0.13508299889508635,
+        "client_deserialize_ms": 0.2229590027127415,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "availability"
+        ],
+        "include_attributes": [
+          "market_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 390
+      },
+      "performance": {
+        "client_total_ms": 146.6957079974236,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.04620799946133,
+        "client_body_read_ms": 0.14987500617280602,
+        "client_deserialize_ms": 0.21466700127348304,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "availability"
+        ],
+        "include_attributes": [
+          "submarket_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 146.87066699843854,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.37462499376852,
+        "client_body_read_ms": 0.10466700769029558,
+        "client_deserialize_ms": 0.167042002431117,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "availability"
+        ],
+        "include_attributes": [
+          "region_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 300
+      },
+      "performance": {
+        "client_total_ms": 146.25762499053963,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.6743749877205,
+        "client_body_read_ms": 0.102625010185875,
+        "client_deserialize_ms": 0.21104200277477503,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "account"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 51005
+      },
+      "performance": {
+        "client_total_ms": 270.23087500128895,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.58112499839626,
+        "client_body_read_ms": 122.00491600378882,
+        "client_deserialize_ms": 0.4684169980464503,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "contact"
+        ],
+        "include_attributes": [
+          "account_name",
+          "account_type",
+          "account_phone",
+          "account_website",
+          "account_industry",
+          "account_annualrevenue"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 590
+      },
+      "performance": {
+        "client_total_ms": 146.3092920021154,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.42079200327862,
+        "client_body_read_ms": 0.207582997973077,
+        "client_deserialize_ms": 0.2939590049209073,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "contact"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 47622
+      },
+      "performance": {
+        "client_total_ms": 1367.1662079868838,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 194.3592909956351,
+        "client_body_read_ms": 1172.0608750038082,
+        "client_deserialize_ms": 0.5120829882798716,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": [
+          "property_name",
+          "property_city",
+          "property_state",
+          "property_propertyclass"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 459
+      },
+      "performance": {
+        "client_total_ms": 266.7234999971697,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.03612500266172,
+        "client_body_read_ms": 121.34795798920095,
+        "client_deserialize_ms": 0.14870900486130267,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": [
+          "client_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 383
+      },
+      "performance": {
+        "client_total_ms": 146.196333997068,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.552084009978,
+        "client_body_read_ms": 0.1324159966316074,
+        "client_deserialize_ms": 0.21941699378658086,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": [
+          "buyer_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 297
+      },
+      "performance": {
+        "client_total_ms": 146.37383400986437,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.61262499773875,
+        "client_body_read_ms": 0.1557500072522089,
+        "client_deserialize_ms": 0.25562501105014235,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": [
+          "seller_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 145.8554590062704,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.26270900387317,
+        "client_body_read_ms": 0.12120799510739744,
+        "client_deserialize_ms": 0.20000000949949026,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": [
+          "tenant_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 346
+      },
+      "performance": {
+        "client_total_ms": 146.42483300121967,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.7734160067048,
+        "client_body_read_ms": 0.13183399278204888,
+        "client_deserialize_ms": 0.2290419943165034,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": [
+          "ownerlandlord_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 235
+      },
+      "performance": {
+        "client_total_ms": 189.1310840001097,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 188.79554199520499,
+        "client_body_read_ms": 0.0714170018909499,
+        "client_deserialize_ms": 0.11041699326597154,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": [
+          "tenantrepbroker_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 145.62745900184382,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.99295900168363,
+        "client_body_read_ms": 0.126499988255091,
+        "client_deserialize_ms": 0.22608401195611805,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": [
+          "listingbrokercompany_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 413.5966250032652,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 412.93962499185,
+        "client_body_read_ms": 0.14075000945013016,
+        "client_deserialize_ms": 0.22191701282281429,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 275,
+        "server_total_ms": 276
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": [
+          "buyerrep_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 227.11641700880136,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 226.38758301036432,
+        "client_body_read_ms": 0.14841699157841504,
+        "client_deserialize_ms": 0.2874589990824461,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 24,
+        "server_total_ms": 24
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 45688
+      },
+      "performance": {
+        "client_total_ms": 273.04000000003725,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 151.3412090134807,
+        "client_body_read_ms": 120.89424999430776,
+        "client_deserialize_ms": 0.5794999888166785,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 24
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "sale"
+        ],
+        "include_attributes": [
+          "property_name",
+          "property_city",
+          "property_state",
+          "property_propertyclass"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 489
+      },
+      "performance": {
+        "client_total_ms": 266.2794589996338,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.17441698990297,
+        "client_body_read_ms": 120.72195801010821,
+        "client_deserialize_ms": 0.16845900972839445,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "sale"
+        ],
+        "include_attributes": [
+          "buyer_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 355
+      },
+      "performance": {
+        "client_total_ms": 186.10904199886136,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 185.58937500347383,
+        "client_body_read_ms": 0.10491699504200369,
+        "client_deserialize_ms": 0.17162499716505408,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "sale"
+        ],
+        "include_attributes": [
+          "seller_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 308
+      },
+      "performance": {
+        "client_total_ms": 146.93945800536312,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.39237499795854,
+        "client_body_read_ms": 0.13187500007916242,
+        "client_deserialize_ms": 0.1747920032357797,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 21,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "sale"
+        ],
+        "include_attributes": true
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 44525
+      },
+      "performance": {
+        "client_total_ms": 273.72395899146795,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.87541699095163,
+        "client_body_read_ms": 126.03079200198408,
+        "client_deserialize_ms": 0.5757920007454231,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "inquiry"
+        ],
+        "include_attributes": [
+          "property_name",
+          "property_city",
+          "property_state"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 512
+      },
+      "performance": {
+        "client_total_ms": 297.36125000636093,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 176.7602909967536,
+        "client_body_read_ms": 120.07329201151151,
+        "client_deserialize_ms": 0.2352090086787939,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "inquiry"
+        ],
+        "include_attributes": [
+          "availability_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 168.15166700689588,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 167.50241699628532,
+        "client_body_read_ms": 0.1336249988526106,
+        "client_deserialize_ms": 0.21587499941233546,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 44,
+        "server_total_ms": 44
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "inquiry"
+        ],
+        "include_attributes": [
+          "listing_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 530
+      },
+      "performance": {
+        "client_total_ms": 146.28129100310616,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.34137499867938,
+        "client_body_read_ms": 0.21554100385401398,
+        "client_deserialize_ms": 0.3301660035504028,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "inquiry"
+        ],
+        "include_attributes": [
+          "brokercompany_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 146.20483299950138,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.5995830037864,
+        "client_body_read_ms": 0.11641699529718608,
+        "client_deserialize_ms": 0.22929199622012675,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 21,
+        "server_total_ms": 21
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "inquiry"
+        ],
+        "include_attributes": [
+          "market_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 147.71562500391155,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.9616669928655,
+        "client_body_read_ms": 0.12199999764561653,
+        "client_deserialize_ms": 0.2824160037562251,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "inquiry"
+        ],
+        "include_attributes": [
+          "submarket_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 145.75479199993424,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.12150001246482,
+        "client_body_read_ms": 0.12291698658373207,
+        "client_deserialize_ms": 0.21579199528787285,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "listing"
+        ],
+        "include_attributes": [
+          "property_name",
+          "property_city",
+          "property_state",
+          "property_propertyclass"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 503
+      },
+      "performance": {
+        "client_total_ms": 147.04508299473673,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.3322499912465,
+        "client_body_read_ms": 0.14870800077915192,
+        "client_deserialize_ms": 0.25158299831673503,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "listing"
+        ],
+        "include_attributes": [
+          "listingbrokercompany_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 422
+      },
+      "performance": {
+        "client_total_ms": 266.6957920009736,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.25520800088998,
+        "client_body_read_ms": 120.99970898998436,
+        "client_deserialize_ms": 0.191833998542279,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "listing"
+        ],
+        "include_attributes": [
+          "listingbrokercontact_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 337
+      },
+      "performance": {
+        "client_total_ms": 231.12454199872445,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 230.41583399754018,
+        "client_body_read_ms": 0.16454100841656327,
+        "client_deserialize_ms": 0.23304199567064643,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "listing"
+        ],
+        "include_attributes": [
+          "ownerlandlord_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 243
+      },
+      "performance": {
+        "client_total_ms": 146.9985000003362,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.5487499915762,
+        "client_body_read_ms": 0.27683300140779465,
+        "client_deserialize_ms": 0.419708012486808,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 21,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "listing"
+        ],
+        "include_attributes": [
+          "market_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 233.5149169957731,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 232.98237500421237,
+        "client_body_read_ms": 0.1185830042231828,
+        "client_deserialize_ms": 0.17920898972079158,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "listing"
+        ],
+        "include_attributes": [
+          "submarket_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 180.08304199611302,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 178.9937919966178,
+        "client_body_read_ms": 0.2707499952521175,
+        "client_deserialize_ms": 0.3394579980522394,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 24
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "preference"
+        ],
+        "include_attributes": [
+          "account_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 535
+      },
+      "performance": {
+        "client_total_ms": 224.51558300235774,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 223.62004200113006,
+        "client_body_read_ms": 0.17316600133199245,
+        "client_deserialize_ms": 0.3767080052057281,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "preference"
+        ],
+        "include_attributes": [
+          "contact_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 342
+      },
+      "performance": {
+        "client_total_ms": 146.10891698976047,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.4709169920534,
+        "client_body_read_ms": 0.14008300786372274,
+        "client_deserialize_ms": 0.20816699543502182,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "preference"
+        ],
+        "include_attributes": [
+          "market_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 144.97812499757856,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.5956249954179,
+        "client_body_read_ms": 0.0824590097181499,
+        "client_deserialize_ms": 0.12579098984133452,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 21,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "preference"
+        ],
+        "include_attributes": [
+          "submarket_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 147.76591600093525,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.2882079979172,
+        "client_body_read_ms": 0.09879199205897748,
+        "client_deserialize_ms": 0.15675000031478703,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 23,
+        "server_total_ms": 24
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "task"
+        ],
+        "include_attributes": [
+          "who_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 291
+      },
+      "performance": {
+        "client_total_ms": 192.94166700274218,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 191.83954200707376,
+        "client_body_read_ms": 0.30154199339449406,
+        "client_deserialize_ms": 0.360332996933721,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "task"
+        ],
+        "include_attributes": [
+          "what_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 253
+      },
+      "performance": {
+        "client_total_ms": 146.55341699835844,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.07816698844545,
+        "client_body_read_ms": 0.10762500460259616,
+        "client_deserialize_ms": 0.15529200027231127,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 10,
+        "filters": [
+          "object_type",
+          "Eq",
+          "task"
+        ],
+        "include_attributes": [
+          "account_name"
+        ]
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 329
+      },
+      "performance": {
+        "client_total_ms": 145.59358300175518,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.05137500236742,
+        "client_body_read_ms": 0.11491699842736125,
+        "client_deserialize_ms": 0.1889160048449412,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "property"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 233.7199579924345,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 233.10754098929465,
+        "client_body_read_ms": 0.12516700371634215,
+        "client_deserialize_ms": 0.20933299674652517,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "lease"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 146.04829200834502,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.25145800143946,
+        "client_body_read_ms": 0.1972090103663504,
+        "client_deserialize_ms": 0.24933399981819093,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "availability"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 146.34833300078753,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.9152910101693,
+        "client_body_read_ms": 0.09479199070483446,
+        "client_deserialize_ms": 0.13499999477062374,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "account"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 226.45541701058391,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 225.8365000016056,
+        "client_body_read_ms": 0.12729200534522533,
+        "client_deserialize_ms": 0.20308401144575328,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "contact"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 145.9639579989016,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.48333299171645,
+        "client_body_read_ms": 0.10400000610388815,
+        "client_deserialize_ms": 0.15620799968019128,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "deal"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 145.43483300076332,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.98129099956714,
+        "client_body_read_ms": 0.10420900071039796,
+        "client_deserialize_ms": 0.14575000386685133,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "sale"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 233.11241599731147,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 232.6959159981925,
+        "client_body_read_ms": 0.09249999129679054,
+        "client_deserialize_ms": 0.12704099935945123,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 23
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "inquiry"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 145.8513329998823,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.22624999517575,
+        "client_body_read_ms": 0.13333300012163818,
+        "client_deserialize_ms": 0.20820800273213536,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "listing"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 146.5885000070557,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.8088340004906,
+        "client_body_read_ms": 0.1561250101076439,
+        "client_deserialize_ms": 0.25933299912139773,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "preference"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 233.95079199690372,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 232.90454199013766,
+        "client_body_read_ms": 0.12745799904223531,
+        "client_deserialize_ms": 0.323416999890469,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1,
+        "filters": [
+          "object_type",
+          "Eq",
+          "task"
+        ]
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 147.7523750072578,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 147.1580830111634,
+        "client_body_read_ms": 0.12724999396596104,
+        "client_deserialize_ms": 0.19975000759586692,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "office lease Dallas"
+        ],
+        "top_k": 10
+      },
+      "result_count": 10,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 220
+      },
+      "performance": {
+        "client_total_ms": 138.8159589987481,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 138.34670900541823,
+        "client_body_read_ms": 0.09520798630546778,
+        "client_deserialize_ms": 0.15733399777673185,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 15,
+        "server_total_ms": 15
+      }
+    },
+    {
+      "operation": "hybrid_search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "queries": [
+          {
+            "rank_by": [
+              "text",
+              "BM25",
+              "office lease Dallas"
+            ],
+            "top_k": 5,
+            "include_attributes": true
+          },
+          {
+            "rank_by": [
+              "vector",
+              "ANN",
+              [
+                0.005302806850522757,
+                0.03458074852824211,
+                0.0031253427732735872,
+                -0.026040980592370033,
+                0.02655876986682415,
+                -0.06775473803281784,
+                0.0036719234194606543,
+                -0.006065539084374905,
+                0.002797571709379554,
+                0.03617708384990692,
+                -0.0008149986970238388,
+                -0.04217972606420517,
+                -0.002528267679736018,
+                -0.06488154083490372,
+                -0.024733439087867737,
+                0.02117224968969822,
+                0.028689725324511528,
+                -0.0075759440660476685,
+                0.022679995745420456,
+                0.016151148825883865,
+                0.06731180846691132,
+                0.04496489465236664,
+                0.0019772578962147236,
+                -0.0036608499940484762,
+                0.03495635837316513,
+                0.04194054380059242,
+                -0.02800760790705681,
+                0.017770515754818916,
+                0.04404536634683609,
+                -0.0011835198383778334,
+                -0.018149666488170624,
+                0.019265860319137573,
+                0.05116065591573715,
+                0.012774218805134296,
+                0.04297523573040962,
+                -0.0008787811966612935,
+                -0.012298507615923882,
+                0.029726190492510796,
+                0.020535308867692947,
+                0.012349002063274384,
+                0.014328474178910255,
+                -0.00849237572401762,
+                -0.0019068311667069793,
+                0.041164521127939224,
+                0.01092098280787468,
+                -0.025824828073382378,
+                0.03888252377510071,
+                0.03163257986307144,
+                0.03156702592968941,
+                -0.0159580297768116,
+                0.01782366819679737,
+                0.033740948885679245,
+                -0.015616443008184433,
+                0.059992704540491104,
+                -0.04723803326487541,
+                0.005680186673998833,
+                -0.05173824355006218,
+                -0.022341594099998474,
+                0.029375387355685234,
+                -0.05576717108488083,
+                0.05971460044384003,
+                0.026721326634287834,
+                0.021046455949544907,
+                -0.012678544968366623,
+                0.02996714785695076,
+                -0.001162259024567902,
+                0.030300233513116837,
+                -0.08356925845146179,
+                0.002457398222759366,
+                -0.013911672867834568,
+                -0.07024049013853073,
+                -0.03009825572371483,
+                -0.07371485978364944,
+                0.011984024196863174,
+                -0.002234824001789093,
+                -0.07546267658472061,
+                0.008459155447781086,
+                0.012940761633217335,
+                0.03273548558354378,
+                -0.03776278719305992,
+                -0.006576685234904289,
+                0.039601851254701614,
+                0.03531424701213837,
+                0.04814250394701958,
+                0.010493993759155273,
+                0.0012047806521877646,
+                0.026952538639307022,
+                -0.05677351728081703,
+                -0.02652023546397686,
+                0.017809493467211723,
+                0.01416680309921503,
+                -4.252167127560824e-05,
+                -0.03148242458701134,
+                -0.037780504673719406,
+                -0.018381765112280846,
+                -0.0419192798435688,
+                0.001282737124711275,
+                -0.07483194023370743,
+                0.0070196189917624,
+                -0.04719340801239014,
+                0.022061217576265335,
+                -0.02876768261194229,
+                -0.020297011360526085,
+                -0.0126714576035738,
+                0.03332636132836342,
+                0.027628455311059952,
+                0.04726815223693848,
+                0.06830043345689774,
+                -0.014871068298816681,
+                -0.043783146888017654,
+                -0.027717042714357376,
+                -0.025683090090751648,
+                -0.0676165446639061,
+                -0.010324128903448582,
+                0.05079656466841698,
+                0.0025123220402747393,
+                -0.0035594182554632425,
+                -0.012834457680583,
+                -0.0072213755920529366,
+                0.0072428579442203045,
+                -0.04887157306075096,
+                -0.02388300560414791,
+                -0.018744969740509987,
+                -0.026976456865668297,
+                -0.07297515869140625,
+                -0.015073931775987148,
+                -0.013190576806664467,
+                -0.02431752346456051,
+                0.03174353763461113,
+                0.026307404041290283,
+                -0.002289083320647478,
+                -0.0533788688480854,
+                -0.025707893073558807,
+                0.027015434578061104,
+                -0.02346310392022133,
+                -0.03790098428726196,
+                -0.09568975865840912,
+                -0.0584283173084259,
+                0.03316336125135422,
+                0.06478530913591385,
+                -0.05003383383154869,
+                -0.03807195648550987,
+                -0.0011055634822696447,
+                0.008837420493364334,
+                0.0643211156129837,
+                -0.00026221698499284685,
+                -0.037194062024354935,
+                -0.053295597434043884,
+                -0.027633771300315857,
+                0.009710000827908516,
+                0.017866188660264015,
+                0.0002126083563780412,
+                0.006257772445678711,
+                0.024987682700157166,
+                -0.04793565347790718,
+                0.007051621098071337,
+                -0.016075849533081055,
+                0.014007568359375,
+                -0.049086395651102066,
+                0.020506076514720917,
+                0.0024737869389355183,
+                0.0008183207246474922,
+                0.002554843667894602,
+                -0.031887710094451904,
+                0.024042461067438126,
+                0.03734820336103439,
+                -0.001025835401378572,
+                -0.008408661000430584,
+                0.0044275689870119095,
+                -0.04745418578386307,
+                -0.01486132387071848,
+                0.025039948523044586,
+                -0.000800824782345444,
+                -0.045551784336566925,
+                8.327160321641713e-05,
+                0.018373293802142143,
+                -0.003956287167966366,
+                0.014030379243195057,
+                -0.00417421106249094,
+                -0.026366978883743286,
+                -0.021655932068824768,
+                -0.013606934808194637,
+                0.04646201431751251,
+                0.004773057531565428,
+                0.023280614987015724,
+                0.006280804984271526,
+                -0.047015681862831116,
+                0.036185722798109055,
+                -0.0546903982758522,
+                0.032004646956920624,
+                0.012512887828052044,
+                0.06725865602493286,
+                0.014312085695564747,
+                -0.04810618236660957,
+                -0.024586385115981102,
+                -0.03328738361597061,
+                -0.007731857243925333,
+                0.05647055059671402,
+                -0.014271335676312447,
+                0.06361950933933258,
+                -0.02521180734038353,
+                -0.009645332582294941,
+                -0.048947758972644806,
+                0.0063233268447220325,
+                -0.00407145032659173,
+                -0.004315949976444244,
+                -0.009935896843671799,
+                -0.032253243029117584,
+                -0.016066106036305428,
+                -0.04405953735113144,
+                0.031754832714796066,
+                0.0019241055706515908,
+                -0.03229875490069389,
+                0.033003903925418854,
+                -0.017809493467211723,
+                -0.043564558029174805,
+                -0.0020419261418282986,
+                -0.014067585580050945,
+                0.11068391054868698,
+                0.007094032131135464,
+                0.004610057920217514,
+                -0.034938640892505646,
+                0.005690816789865494,
+                0.05163548141717911,
+                0.008260278031229973,
+                -0.021080119535326958,
+                0.0500444620847702,
+                -0.020050739869475365,
+                -0.017210647463798523,
+                0.04068969562649727,
+                -0.021465547382831573,
+                0.0010559548391029239,
+                -0.0006094772834330797,
+                0.01906919851899147,
+                -0.05666101351380348,
+                -0.0009765104623511434,
+                -0.009117355570197105,
+                -0.0038694720715284348,
+                0.0048589869402348995,
+                0.013498194515705109,
+                -0.01724962517619133,
+                0.05328673869371414,
+                -0.04841446503996849,
+                0.016385016962885857,
+                0.008309443481266499,
+                0.008176563307642937,
+                0.027954455465078354,
+                -0.01934647560119629,
+                -0.019152801483869553,
+                -0.06554006785154343,
+                0.0005822368548251688,
+                -0.04058516398072243,
+                0.044006384909152985,
+                0.005237252451479435,
+                -0.02620752342045307,
+                0.002697468502447009,
+                0.020938822999596596,
+                -0.015557616017758846,
+                0.06974107772111893,
+                -0.0065306201577186584,
+                0.017880363389849663,
+                0.02294398471713066,
+                0.005252755247056484,
+                -0.003548787673935294,
+                0.006382680032402277,
+                0.025384994223713875,
+                -0.02207760699093342,
+                0.024300692602992058,
+                -0.012093871831893921,
+                -0.0446016900241375,
+                0.007210080977529287,
+                0.04404536634683609,
+                0.020107435062527657,
+                0.004649036098271608,
+                -0.014436107128858566,
+                -0.009710886515676975,
+                0.07499759644269943,
+                0.009585093706846237,
+                0.019864708185195923,
+                0.020025935024023056,
+                0.029843125492334366,
+                0.0224301815032959,
+                -0.012604796327650547,
+                -0.007607835344970226,
+                0.020699195563793182,
+                -0.03420868515968323,
+                0.047234490513801575,
+                -0.011831655167043209,
+                0.010247723199427128,
+                -0.023305419832468033,
+                -0.0027940282598137856,
+                0.05487775802612305,
+                -0.005629692226648331,
+                0.021445095539093018,
+                -0.07806624472141266,
+                0.0355117991566658,
+                -0.029364757239818573,
+                0.018943404778838158,
+                -0.03394823893904686,
+                -0.01054537482559681,
+                -0.0017717363080009818,
+                0.015449540689587593,
+                -0.007770835421979427,
+                0.0377415269613266,
+                -0.028935996815562248,
+                -0.006463293917477131,
+                -0.004740280564874411,
+                0.04841446503996849,
+                0.013268533162772655,
+                -0.03938215598464012,
+                -0.020012646913528442,
+                -0.022905893623828888,
+                0.007076314650475979,
+                -0.013008087873458862,
+                -0.0029698729049414396,
+                -0.0011126503814011812,
+                0.03095400519669056,
+                0.09822329133749008,
+                0.01495965477079153,
+                0.026285478845238686,
+                -0.028050128370523453,
+                0.003734820056706667,
+                -0.034760139882564545,
+                0.00968076754361391,
+                0.03090616688132286,
+                -0.019744230434298515,
+                0.04359091445803642,
+                -0.009539028629660606,
+                -0.029538387432694435,
+                -0.028601137921214104,
+                0.014648715034127235,
+                0.0013784108450636268,
+                0.002051670802757144,
+                0.007069227751344442,
+                -0.03826773166656494,
+                -0.04875973239541054,
+                0.07427647709846497,
+                -0.07126543670892715,
+                0.002530039520934224,
+                0.03794405981898308,
+                -0.03988886997103691,
+                -0.029595082625746727,
+                0.015998778864741325,
+                -0.0038145482540130615,
+                0.04546364024281502,
+                0.023046744987368584,
+                -0.026696521788835526,
+                0.017299233004450798,
+                -0.0084724435582757,
+                0.011519829742610455,
+                -0.003433624980971217,
+                0.012962022796273232,
+                -0.0025123220402747393,
+                -0.03467287868261337,
+                -0.003130547236651182,
+                0.03251490741968155,
+                -0.046307649463415146,
+                -0.05607899650931358,
+                -0.030610287562012672,
+                -0.015187323093414307,
+                -0.036219604313373566,
+                0.01498888898640871,
+                0.03784605860710144,
+                -0.009710886515676975,
+                0.022398291155695915,
+                0.017370102927088737,
+                0.013676032423973083,
+                0.006466837599873543,
+                -0.07573818415403366,
+                0.0011870632879436016,
+                -0.025323426350951195,
+                -0.016420451924204826,
+                0.02156025916337967,
+                -0.025539135560393333,
+                0.0024680288042873144,
+                0.004369101952761412,
+                -0.028373027220368385,
+                -0.019825728610157967,
+                0.04030345752835274,
+                0.006052250973880291,
+                0.03904198110103607,
+                -0.024616504088044167,
+                -0.01760042831301689,
+                0.026026805862784386,
+                0.05319726839661598,
+                -0.03361692652106285,
+                0.004649036098271608,
+                0.01295227836817503,
+                0.017738623544573784,
+                0.030743610113859177,
+                -0.02316722460091114,
+                0.008535339497029781,
+                0.044934775680303574,
+                -0.026471512392163277,
+                -0.06741102784872055,
+                0.03389597311615944,
+                -0.026700066402554512,
+                -0.034765008836984634,
+                0.00699835829436779,
+                0.006840673740953207,
+                0.03400670737028122,
+                0.03481196239590645,
+                -0.08164869993925095,
+                -0.011684601195156574,
+                0.003582450794056058,
+                -0.05341430380940437,
+                0.029208844527602196,
+                -0.022378800436854362,
+                0.023525115102529526,
+                0.0025158654898405075,
+                -0.01664014719426632,
+                -0.011098024435341358,
+                0.017192043364048004,
+                0.02792256325483322,
+                -0.029453344643115997,
+                0.07358109951019287,
+                0.0040182978846132755,
+                -0.06331653892993927,
+                0.002239474793896079,
+                -0.019110390916466713,
+                0.036444615572690964,
+                -0.010945786722004414,
+                -0.008374997414648533,
+                0.011257501319050789,
+                -0.011452503502368927,
+                -0.0004872274585068226,
+                0.006296750623732805,
+                0.029999038204550743,
+                -0.03555155172944069,
+                -0.03379764407873154,
+                -0.013613135553896427,
+                -0.02663451060652733,
+                -0.0748983845114708,
+                0.006209935527294874,
+                -0.0013447478413581848,
+                0.02329833246767521,
+                -0.003520440077409148,
+                0.0013890413101762533,
+                0.020555684342980385,
+                0.0674872100353241,
+                -0.014547283761203289,
+                -0.04480721056461334,
+                -0.0421779565513134,
+                0.03719937428832054,
+                0.024159396067261696,
+                -0.012295849621295929,
+                -0.024726351723074913,
+                -0.0034885487984865904,
+                -0.06277793645858765,
+                0.044568028301000595,
+                0.04478152096271515,
+                -0.010664966888725758,
+                -0.005879064090549946,
+                -0.02225123718380928,
+                0.0115481773391366,
+                0.000683004327584058,
+                -0.005865775980055332,
+                -0.018571339547634125,
+                -0.02713591232895851,
+                0.004459460265934467,
+                0.03842807561159134,
+                0.029396647587418556,
+                0.0030597886070609093,
+                0.01882292702794075,
+                -0.03224560245871544,
+                0.004985665902495384,
+                0.003493863856419921,
+                -0.055220622569322586,
+                0.006516445893794298,
+                0.032614123076200485,
+                -0.000800824782345444,
+                -0.024092070758342743,
+                -0.019988728687167168,
+                -0.023353256285190582,
+                0.08783736824989319,
+                -0.05062204971909523,
+                0.0040422165766358376,
+                0.01707245223224163,
+                0.0021296271588653326,
+                0.04409497231245041,
+                0.013426660560071468,
+                -0.015591278672218323,
+                -0.02611539326608181,
+                0.012678544968366623,
+                0.01988065242767334,
+                -0.014514063484966755,
+                0.009255550801753998,
+                -0.01519441045820713,
+                0.03890024125576019,
+                -0.030114201828837395,
+                0.02264987677335739,
+                -0.009631158784031868,
+                0.06433883309364319,
+                0.00980478897690773,
+                0.013057696633040905,
+                0.040062058717012405,
+                -0.025977198034524918,
+                -0.008181878365576267,
+                0.007868281565606594,
+                -0.07663290947675705,
+                0.03505203127861023,
+                0.00361257023178041,
+                -0.01474793255329132,
+                0.004362015053629875,
+                0.02453766204416752,
+                -0.007350048050284386,
+                0.02084270678460598,
+                0.003920963499695063,
+                0.01776697114109993,
+                0.0404912605881691,
+                -0.007007438223809004,
+                -0.00930515956133604,
+                0.04129385948181152,
+                -0.006188674829900265,
+                0.007673389744013548,
+                0.011027286760509014,
+                -0.03547370433807373,
+                0.08275426179170609,
+                -0.013351804576814175,
+                -0.04123716428875923,
+                -0.008445867337286472,
+                0.01739136315882206,
+                -0.013146283105015755,
+                -0.0016645462019369006,
+                0.005600458476692438,
+                0.03697967901825905,
+                0.016949757933616638,
+                -0.002373240888118744,
+                -0.003926167730242014,
+                0.008121639490127563,
+                -0.05893503502011299,
+                0.0037737982347607613,
+                -0.005559708457440138,
+                0.03871243819594383,
+                0.06965802609920502,
+                -0.006737913005053997,
+                -0.00669007608667016,
+                -0.005315208807587624,
+                0.007997618056833744,
+                -0.007292466703802347,
+                -0.030176213011145592,
+                0.015098736621439457,
+                -0.004369101952761412,
+                0.03526464104652405,
+                0.04082080349326134,
+                -0.003088136436417699,
+                -0.03636311739683151,
+                -0.015321975573897362,
+                -0.02760719507932663,
+                0.004148742184042931,
+                0.044956035912036896,
+                0.02279549092054367,
+                -0.0385175496339798,
+                -0.01997317187488079,
+                0.018408341333270073,
+                0.036713920533657074,
+                0.0029756310395896435,
+                0.11661568284034729,
+                -0.04050189256668091,
+                0.03558355197310448,
+                0.02602326311171055,
+                0.04708300530910492,
+                0.004698644857853651,
+                0.06807011365890503,
+                0.015180236659944057,
+                0.00385175459086895,
+                -0.04598718881607056,
+                0.001723899389617145,
+                0.02016855962574482,
+                0.05281900241971016,
+                -0.04065249115228653,
+                -0.03164498507976532,
+                -0.025442132726311684,
+                -0.040811944752931595,
+                -0.03595561906695366,
+                -0.042011409997940063,
+                -0.07673744112253189,
+                -0.017619917169213295,
+                -0.0003720646200235933,
+                -0.042348042130470276,
+                -0.014788682572543621,
+                0.02208026312291622,
+                0.006789293605834246,
+                0.00012756501382682472,
+                0.003431853139773011,
+                -0.011192058213055134,
+                -0.06285057961940765,
+                -0.015848182141780853,
+                0.042160239070653915,
+                -0.030573081225156784,
+                0.04817705228924751,
+                -0.027295369654893875,
+                -0.03943885117769241,
+                -0.0006201076903380454,
+                -0.015463714487850666,
+                -0.0380338653922081,
+                0.02465902641415596,
+                -0.0422581247985363,
+                -0.0006939669838175178,
+                -0.0040182978846132755,
+                -0.0503961518406868,
+                0.003107625525444746,
+                -0.0038836458697915077,
+                0.008951697498559952,
+                -0.019194992259144783,
+                -0.0021438009571284056,
+                -0.03925193101167679,
+                0.02172148786485195,
+                0.009719745256006718,
+                -0.005371904466301203,
+                0.0013961282093077898,
+                -0.0230963546782732,
+                0.014528237283229828,
+                0.011277987621724606,
+                -0.01246593613177538,
+                0.03540283441543579,
+                0.019101088866591454,
+                -0.027132369577884674,
+                -0.03671923652291298,
+                0.0062475851736962795,
+                0.00300309294834733,
+                -0.012579327449202538,
+                -0.030842384323477745,
+                -0.014889671467244625,
+                -0.026636283844709396,
+                0.01503672543913126,
+                -0.019496185705065727,
+                -0.01730942167341709,
+                -0.018684731796383858,
+                0.020400159060955048,
+                0.006801695562899113,
+                0.016174180433154106,
+                0.02543504536151886,
+                0.013553782366216183,
+                0.009060659445822239,
+                -0.015375127084553242,
+                -0.047843966633081436,
+                -0.004264569375663996,
+                -0.019673360511660576,
+                -0.025725610554218292,
+                -0.006909771356731653,
+                -0.017075994983315468,
+                -0.05235835164785385,
+                -0.0519171878695488,
+                -0.02356763556599617,
+                -0.02064117044210434,
+                -0.007147184107452631,
+                -0.023663310334086418,
+                0.01746223308146,
+                -0.05641651153564453,
+                -0.007933835498988628,
+                0.02577344700694084,
+                0.0126482043415308,
+                0.015527497045695782,
+                -0.029927505180239677,
+                0.029164550825953484,
+                0.010634846985340118,
+                -0.011227493174374104,
+                -0.008153530769050121,
+                -0.012265398167073727,
+                -0.006851304322481155,
+                -0.01185601670295,
+                -0.03746159374713898,
+                0.0015657719923183322,
+                0.006218794267624617,
+                0.026500744745135307,
+                -0.04134169593453407,
+                0.03860967978835106,
+                0.02219276875257492,
+                -0.01633540913462639,
+                -0.013527206145226955,
+                -0.04831879213452339,
+                0.05462440103292465,
+                -0.01445028092712164,
+                0.0009354767389595509,
+                -0.04303902015089989,
+                0.019003644585609436,
+                0.02516219951212406,
+                0.0035257551353424788,
+                -0.00768224848434329,
+                -0.004053732845932245,
+                0.02253294177353382,
+                0.000511145917698741,
+                0.02935279719531536,
+                -0.025408471003174782,
+                -0.01409371942281723,
+                0.0009939441224560142,
+                -0.00648455461487174,
+                0.00043053191620856524,
+                0.031581200659275055,
+                0.012515544891357422,
+                0.058190904557704926,
+                -0.009248463436961174,
+                0.021702883765101433,
+                -0.0033551149535924196,
+                0.0038818742614239454,
+                -0.00010984764958266169,
+                0.019708795472979546,
+                0.01794990338385105,
+                -0.04824083670973778,
+                0.04154278710484505,
+                -0.02146635763347149,
+                -0.006213036365807056,
+                0.024785704910755157,
+                0.08508409559726715,
+                0.03126760199666023,
+                -0.07168799638748169,
+                -0.012142594903707504,
+                0.018103601410984993,
+                -0.01997455582022667,
+                -0.018652839586138725,
+                0.011756355874240398,
+                -0.0479360967874527,
+                -0.030831754207611084,
+                0.004907709546387196,
+                -0.01822850853204727,
+                0.0066329375840723515,
+                -0.010843026451766491,
+                0.022772125899791718,
+                -8.504334255121648e-05,
+                0.005223078653216362,
+                -0.016222018748521805,
+                0.03955932706594467,
+                0.020474184304475784,
+                0.057475123554468155,
+                0.02461296133697033,
+                0.03494107723236084,
+                0.04653642699122429,
+                -0.03678833320736885,
+                0.004234449937939644,
+                0.03854235261678696,
+                -0.004955546464771032,
+                0.015281225554645061,
+                0.006271060556173325,
+                0.03677593171596527,
+                0.02906179055571556,
+                0.009119126945734024,
+                0.026604391634464264,
+                0.030325038358569145,
+                0.02713591232895851,
+                0.00885868165642023,
+                0.002287311712279916,
+                -0.013114391826093197,
+                0.024623258039355278,
+                0.009825163520872593,
+                -0.007692879065871239,
+                0.030114201828837395,
+                0.03925104811787605,
+                0.05581323429942131,
+                0.030573081225156784,
+                -0.02305649034678936,
+                -0.005736882332712412,
+                -0.0017717363080009818,
+                0.046022623777389526,
+                -0.04432529956102371,
+                -0.034045685082674026,
+                0.04082966223359108,
+                0.045990731567144394,
+                -0.01544245332479477,
+                -0.015275910496711731,
+                0.03057662397623062,
+                0.00827755220234394,
+                0.023379167541861534,
+                0.0004261025751475245,
+                -0.032502058893442154,
+                0.010585515759885311,
+                0.0016512582078576088,
+                0.058013733476400375,
+                0.0031333155930042267,
+                -0.018077025189995766,
+                0.028220215812325478,
+                0.06471090018749237,
+                0.049006227403879166,
+                0.048843227326869965,
+                -0.05402732640504837,
+                0.01047539059072733,
+                -0.03452582657337189,
+                0.0278198029845953,
+                0.05805625393986702,
+                -0.0052159917540848255,
+                -0.010859857313334942,
+                -0.02367394044995308,
+                0.05811649188399315,
+                -0.03900477662682533,
+                -0.045462753623723984,
+                0.022919179871678352,
+                0.034400034695863724,
+                0.014375868253409863,
+                0.01441484596580267,
+                0.05008366331458092,
+                0.04791572317481041,
+                0.03498116135597229,
+                -0.0333440788090229,
+                -0.050005484372377396,
+                -0.03467287868261337,
+                0.07287749648094177,
+                0.006307381205260754,
+                0.04151178151369095,
+                0.04273073747754097,
+                -0.01737719029188156,
+                0.011406438425183296,
+                0.0037914765998721123,
+                -0.0242462120950222,
+                0.02452215924859047,
+                -0.018527047708630562,
+                0.00465257978066802,
+                -0.014882585033774376,
+                0.015286540612578392,
+                -0.0010772156529128551,
+                -0.062489137053489685,
+                0.02352157048881054,
+                0.05194332078099251,
+                -0.05251703038811684,
+                -0.026861293241381645,
+                -0.0311542097479105,
+                -0.030176213011145592,
+                0.054385215044021606,
+                -0.04971491917967796,
+                -0.030897751450538635,
+                -0.01955288276076317,
+                0.030385276302695274,
+                0.05531714856624603,
+                0.002847180236130953,
+                -0.007404529023915529,
+                -0.003956287167966366,
+                0.03696373477578163,
+                0.0033860094845294952,
+                -0.038907330483198166,
+                -0.01603775843977928,
+                0.04224085062742233,
+                0.04586316645145416,
+                0.01990368589758873,
+                -0.029072420671582222,
+                0.013989629223942757,
+                0.06498728692531586,
+                -0.06160415709018707,
+                -0.010335506871342659,
+                -0.054470259696245193,
+                0.02662210911512375,
+                -0.012434931471943855,
+                0.024688923731446266,
+                -0.030346298590302467,
+                -0.07471766322851181,
+                0.028291085734963417,
+                -0.006066425237804651,
+                0.027235129848122597,
+                -0.009485876187682152,
+                0.034181222319602966,
+                -0.026770049706101418,
+                -0.011246982030570507,
+                0.04522179812192917,
+                0.004562221001833677,
+                0.019816869869828224,
+                -0.01648777909576893,
+                -0.015944741666316986,
+                0.08479087054729462,
+                0.024715721607208252,
+                -0.053755421191453934,
+                -0.06967353075742722,
+                0.01399671658873558,
+                -0.047633130103349686,
+                0.023975135758519173,
+                -0.03882937505841255,
+                0.02040685899555683,
+                -0.0028631258755922318,
+                0.030091168358922005,
+                0.006817641202360392,
+                -0.0033875596709549427,
+                0.044661927968263626,
+                0.002696582581847906,
+                -0.021565575152635574,
+                0.02357826754450798,
+                0.015057986602187157,
+                -0.06165642291307449,
+                -0.021921692416071892,
+                0.05181974172592163,
+                -0.015767347067594528,
+                0.04687837138772011,
+                -0.032603491097688675,
+                0.025620635598897934,
+                0.0012154111173003912,
+                0.03444787114858627,
+                -0.014766535721719265,
+                -0.052859753370285034,
+                -0.0005014013731852174,
+                -0.022536486387252808,
+                -0.005132720340043306,
+                0.020070228725671768,
+                -0.006204620469361544,
+                -0.011076895520091057,
+                -0.002902104053646326,
+                0.07022631168365479,
+                -0.009850854054093361,
+                -0.046925321221351624,
+                -0.009873886592686176,
+                -0.007434205152094364,
+                0.03208277001976967,
+                -0.025469152256846428,
+                -0.011665111407637596,
+                -0.03228989616036415,
+                0.037298593670129776,
+                -0.037922244518995285,
+                -0.051862265914678574,
+                -0.04516510292887688,
+                -0.0205237939953804,
+                -0.02137068286538124,
+                -0.006179816089570522,
+                0.015212570317089558,
+                0.012143480591475964,
+                0.04543440416455269,
+                -0.09680235385894775,
+                0.007320814300328493,
+                -0.044087886810302734,
+                0.0044151670299470425,
+                0.045494645833969116,
+                0.023983994498848915,
+                0.04427923262119293,
+                -0.04482492804527283,
+                -0.001980801345780492,
+                -0.0200206208974123,
+                -0.01225332822650671,
+                -0.0343787707388401,
+                -0.007036450784653425,
+                0.01848452538251877,
+                -0.03786554932594299,
+                -0.005782947409898043,
+                -0.03100184164941311,
+                0.033577948808670044,
+                -0.009035855531692505,
+                0.03466047719120979,
+                0.00475534051656723,
+                0.018496926873922348,
+                0.030491581186652184,
+                -0.01601649634540081,
+                -0.025117019191384315,
+                0.019276490435004234,
+                0.041185781359672546,
+                -0.02765326015651226,
+                0.02421254850924015,
+                0.027093391865491867,
+                0.06070677191019058,
+                -0.012838001362979412,
+                0.020530881360173225,
+                -0.002809973666444421,
+                0.011647394858300686,
+                0.03271333873271942,
+                0.03143591806292534,
+                0.03914828598499298,
+                0.028090879321098328,
+                0.007731857243925333,
+                -0.055430542677640915,
+                0.046238772571086884,
+                -0.005830784328281879,
+                0.05493711307644844,
+                0.010729635134339333,
+                -0.058013733476400375,
+                0.02356763556599617,
+                0.01970525085926056,
+                -0.0312693752348423,
+                -0.037532463669776917,
+                -0.024251526221632957,
+                0.010103769600391388,
+                -0.014206224121153355,
+                0.04891586676239967,
+                0.01462568249553442,
+                0.022738464176654816,
+                0.011880377307534218,
+                0.027189064770936966,
+                0.0024808738380670547,
+                0.005998213309794664,
+                0.01668444089591503,
+                -0.03322138637304306,
+                0.035243380814790726,
+                0.011998197995126247,
+                0.0054215132258832455,
+                0.028574561700224876,
+                0.042360443621873856,
+                -0.023677483201026917,
+                -0.035137075930833817,
+                0.01278839260339737,
+                -0.03440357744693756,
+                -0.00046773836947977543,
+                -0.01271663699299097,
+                -0.03465161845088005,
+                -0.020504305139183998,
+                0.04803531616926193,
+                0.0034159075003117323,
+                0.00099217239767313,
+                -0.02425861358642578,
+                0.036067236214876175,
+                0.026452023535966873,
+                0.02281641960144043,
+                0.02021772600710392,
+                0.030934514477849007,
+                0.01726512797176838,
+                0.003151918761432171,
+                -0.029049387201666832,
+                0.01466953381896019,
+                0.013888640329241753,
+                -0.01917107217013836,
+                -0.03719937428832054,
+                -0.007221597246825695,
+                0.02723158709704876,
+                -0.012947848998010159,
+                0.00252472423017025,
+                -0.0006945206550881267,
+                -0.004454145208001137,
+                -0.006980640813708305,
+                -0.007731857243925333,
+                0.03785846009850502,
+                0.0061908895149827,
+                0.019441816955804825,
+                -0.01916487142443657,
+                0.01789453625679016,
+                -0.021081004291772842,
+                0.017044102773070335,
+                -0.023737723007798195,
+                -0.023677483201026917,
+                -0.022706571966409683,
+                -0.03072899393737316,
+                0.0031660927925258875,
+                -0.02827691100537777,
+                0.041033413261175156,
+                0.014675291255116463
+              ]
+            ],
+            "top_k": 5,
+            "include_attributes": true
+          }
+        ]
+      },
+      "result_count": 5,
+      "billing": {
+        "billable_logical_bytes_queried": 512000000,
+        "billable_logical_bytes_returned": 44471
+      },
+      "performance": {
+        "client_total_ms": 268.5247920016991,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.32949999556877,
+        "client_body_read_ms": 121.42933299764991,
+        "client_deserialize_ms": 1.5125000063562766,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 17,
+        "server_total_ms": 18
+      },
+      "raw_result_counts": [
+        5,
+        5
+      ]
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 145.58949999627657,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 145.04916699661408,
+        "client_body_read_ms": 0.12199999764561653,
+        "client_deserialize_ms": 0.16404199413955212,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 144.79212499281857,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 144.14554099494126,
+        "client_body_read_ms": 0.12191699352115393,
+        "client_deserialize_ms": 0.23712500114925206,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 21,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 146.62587500060908,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.1166250082897,
+        "client_body_read_ms": 0.1041249925037846,
+        "client_deserialize_ms": 0.17258299340028316,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 189.43187499826308,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 188.84000000252854,
+        "client_body_read_ms": 0.15045799955260009,
+        "client_deserialize_ms": 0.17645899788476527,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 22
+      }
+    },
+    {
+      "operation": "search",
+      "namespace": "org_00Ddl000003yx57EAA",
+      "request": {
+        "rank_by": [
+          "text",
+          "BM25",
+          "a the is of and"
+        ],
+        "top_k": 1
+      },
+      "result_count": 1,
+      "billing": {
+        "billable_logical_bytes_queried": 256000000,
+        "billable_logical_bytes_returned": 22
+      },
+      "performance": {
+        "client_total_ms": 146.6472089960007,
+        "client_compress_ms": 0.0,
+        "client_response_ms": 146.02458399895113,
+        "client_body_read_ms": 0.1323329925071448,
+        "client_deserialize_ms": 0.1910840073833242,
+        "approx_namespace_size": 32133,
+        "cache_hit_ratio": 1.0,
+        "cache_temperature": "hot",
+        "exhaustive_search_count": 7484,
+        "query_execution_ms": 22,
+        "server_total_ms": 23
+      }
+    }
+  ]
+}

@@ -2541,7 +2541,7 @@
           "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:13:40.870049+00:00",
-          "updatedAt": "2026-03-24T11:31:49.642085+00:00",
+          "updatedAt": "2026-03-24T14:17:30.485496+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2553,6 +2553,10 @@
             {
               "timestamp": "2026-03-24T11:31:49.641918+00:00",
               "note": "PR #13 opened for QA: https://github.com/acxtodd/salesforce_bi/pull/13. Delivered scope is 4.9.1-4.9.5 only; remaining work stays in 4.9.6-4.9.10 (poll_sync runtime loading, targeted reindex/apply orchestration, object seed flow, automatic detection, and live end-to-end validation)."
+            },
+            {
+              "timestamp": "2026-03-24T14:17:30.485644+00:00",
+              "note": "4.9.1-4.9.5 merged to main in 8bc582d62f7b4b644d4b5f221160ed4af079589e via PR #13. Remaining scope stays in 4.9.6-4.9.10."
             }
           ],
           "description": "Build a config control plane around the actual Ascendix Search payload model so admin changes in Selected Objects, field filters, Default Layout rows, saved searches, relationship paths, and result columns can be detected, compiled into runtime artifacts, classified by impact, and applied without relying on ad hoc manual regeneration. Ascendix Search should be used as an admin-intent signal and structural validation reference, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
@@ -2576,17 +2580,25 @@
         {
           "id": "4.9.1",
           "title": "Extract a reusable Ascendix Search config compiler",
-          "status": "review",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:18.385687+00:00",
-          "updatedAt": "2026-03-24T11:31:57.038840+00:00",
+          "updatedAt": "2026-03-24T14:17:17.661457+00:00",
           "files_modified": [],
-          "commits": [],
-          "pull_requests": [],
+          "commits": [
+            "8bc582d62f7b4b644d4b5f221160ed4af079589e"
+          ],
+          "pull_requests": [
+            "13"
+          ],
           "progress_notes": [
             {
               "timestamp": "2026-03-24T11:31:57.039022+00:00",
               "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            },
+            {
+              "timestamp": "2026-03-24T14:17:17.661462+00:00",
+              "note": "Task completed, commit: 8bc582d6, PR: 13"
             }
           ],
           "description": "Refactor the current generator work into library-grade compile entrypoints that can be invoked by automation instead of only by the CLI. The compiler must normalize the actual Ascendix Search payload shape in the demo org, including chunked SearchSetting rows and saved-search templates. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
@@ -2600,22 +2612,31 @@
             "The compiler normalizes ascendix_search__SearchSetting__c.Name plus ascendix_search__Value__c, including ordered concatenation of Selected Objects* fragments and parsing of Default Layout * rows into per-object result-column fixtures.",
             "Compiled output includes object scope, field allowlists, denorm config, and query-scope inputs derived from Ascendix Search plus Salesforce metadata."
           ],
-          "technical_context": "Current code and tests still assume dedicated SearchSetting fields such as ascendix_search__SelectedObjects__c and ascendix_search__ResultColumns__c. The demo org instead uses SearchSetting Name plus Value__c. Update the extraction boundary so downstream config refresh, diffing, and tests all consume one normalized payload model."
+          "technical_context": "Current code and tests still assume dedicated SearchSetting fields such as ascendix_search__SelectedObjects__c and ascendix_search__ResultColumns__c. The demo org instead uses SearchSetting Name plus Value__c. Update the extraction boundary so downstream config refresh, diffing, and tests all consume one normalized payload model.",
+          "completedAt": "2026-03-24T14:17:17.661275+00:00"
         },
         {
           "id": "4.9.2",
           "title": "Add versioned config artifact storage and active pointers",
-          "status": "review",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:25.124044+00:00",
-          "updatedAt": "2026-03-24T11:31:57.098381+00:00",
+          "updatedAt": "2026-03-24T14:17:20.587456+00:00",
           "files_modified": [],
-          "commits": [],
-          "pull_requests": [],
+          "commits": [
+            "8bc582d62f7b4b644d4b5f221160ed4af079589e"
+          ],
+          "pull_requests": [
+            "13"
+          ],
           "progress_notes": [
             {
               "timestamp": "2026-03-24T11:31:57.098576+00:00",
               "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            },
+            {
+              "timestamp": "2026-03-24T14:17:20.587461+00:00",
+              "note": "Task completed, commit: 8bc582d6, PR: 13"
             }
           ],
           "description": "Persist source snapshots, compiled config artifacts, diff/apply records, and active-version pointers so runtime can consume a versioned contract instead of depending only on the bundled repo YAML. See docs/architecture/ascendix_search_config_refresh_plan.md.",
@@ -2629,22 +2650,31 @@
           "acceptance_criteria": [
             "Versioned source, compiled, and apply artifacts are persisted per org with stable naming.",
             "An active-version pointer and last-known-good metadata can be resolved without reading repo-local YAML."
-          ]
+          ],
+          "completedAt": "2026-03-24T14:17:20.587291+00:00"
         },
         {
           "id": "4.9.3",
           "title": "Implement config_refresh Lambda and local CLI",
-          "status": "review",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:32.073616+00:00",
-          "updatedAt": "2026-03-24T11:31:57.158946+00:00",
+          "updatedAt": "2026-03-24T14:17:22.960086+00:00",
           "files_modified": [],
-          "commits": [],
-          "pull_requests": [],
+          "commits": [
+            "8bc582d62f7b4b644d4b5f221160ed4af079589e"
+          ],
+          "pull_requests": [
+            "13"
+          ],
           "progress_notes": [
             {
               "timestamp": "2026-03-24T11:31:57.159118+00:00",
               "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            },
+            {
+              "timestamp": "2026-03-24T14:17:22.960096+00:00",
+              "note": "Task completed, commit: 8bc582d6, PR: 13"
             }
           ],
           "description": "Create an automated refresh entrypoint that snapshots Ascendix Search config, compiles a candidate runtime config, and writes the resulting artifacts on a schedule or on-demand. See docs/architecture/ascendix_search_config_refresh_plan.md.",
@@ -2659,22 +2689,31 @@
           "acceptance_criteria": [
             "config_refresh can run on a schedule and on demand, producing a candidate compiled config artifact.",
             "CLI and Lambda paths share the same compile logic and write the same artifact shape."
-          ]
+          ],
+          "completedAt": "2026-03-24T14:17:22.959904+00:00"
         },
         {
           "id": "4.9.4",
           "title": "Add config diffing and impact classification",
-          "status": "review",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:42.535179+00:00",
-          "updatedAt": "2026-03-24T11:31:57.220678+00:00",
+          "updatedAt": "2026-03-24T14:17:25.284859+00:00",
           "files_modified": [],
-          "commits": [],
-          "pull_requests": [],
+          "commits": [
+            "8bc582d62f7b4b644d4b5f221160ed4af079589e"
+          ],
+          "pull_requests": [
+            "13"
+          ],
           "progress_notes": [
             {
               "timestamp": "2026-03-24T11:31:57.220868+00:00",
               "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            },
+            {
+              "timestamp": "2026-03-24T14:17:25.284866+00:00",
+              "note": "Task completed, commit: 8bc582d6, PR: 13"
             }
           ],
           "description": "Compare candidate compiled config against the active version and classify changes into none, prompt-only, field-scope, relationship, or object-scope impacts so apply behavior is explicit. Diffing should operate on the normalized Ascendix Search payload model, including Selected Objects fragments, filtered field lists, Default Layout rows, and Search__c templates. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
@@ -2691,22 +2730,31 @@
             "Diff output identifies added or removed objects, filtered-field changes, default-column changes, relationship-path changes, and prompt-only changes from the normalized Ascendix Search source model.",
             "Impact classification is persisted alongside the candidate config and is consumable by apply logic and operators."
           ],
-          "technical_context": "Classify on normalized business signals, not raw row churn. For example, Selected Objects fragment count changes without semantic object-set changes should be a no-op, while a field list change inside a filtered object descriptor should be field-scope. Saved-search relationship deltas should classify from Template__c sections, not from string-level JSON diffs alone."
+          "technical_context": "Classify on normalized business signals, not raw row churn. For example, Selected Objects fragment count changes without semantic object-set changes should be a no-op, while a field list change inside a filtered object descriptor should be field-scope. Saved-search relationship deltas should classify from Template__c sections, not from string-level JSON diffs alone.",
+          "completedAt": "2026-03-24T14:17:25.284691+00:00"
         },
         {
           "id": "4.9.5",
           "title": "Add runtime config loading to query Lambda",
-          "status": "review",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:14:46.123383+00:00",
-          "updatedAt": "2026-03-24T11:31:57.279597+00:00",
+          "updatedAt": "2026-03-24T14:17:27.640616+00:00",
           "files_modified": [],
-          "commits": [],
-          "pull_requests": [],
+          "commits": [
+            "8bc582d62f7b4b644d4b5f221160ed4af079589e"
+          ],
+          "pull_requests": [
+            "13"
+          ],
           "progress_notes": [
             {
               "timestamp": "2026-03-24T11:31:57.279770+00:00",
               "note": "Delivered in PR #13 for QA review: https://github.com/acxtodd/salesforce_bi/pull/13"
+            },
+            {
+              "timestamp": "2026-03-24T14:17:27.640622+00:00",
+              "note": "Task completed, commit: 8bc582d6, PR: 13"
             }
           ],
           "description": "Teach the /query runtime to load the active compiled config from control-plane storage with safe fallback, so prompt and tool scope can change without a code redeploy. See docs/architecture/ascendix_search_config_refresh_plan.md.",
@@ -2721,7 +2769,8 @@
           "acceptance_criteria": [
             "Query Lambda loads active config from control-plane storage with fallback to last-known-good and bundled config.",
             "Prompt and tool scope can change from config refresh without shipping a new Lambda bundle."
-          ]
+          ],
+          "completedAt": "2026-03-24T14:17:27.640362+00:00"
         },
         {
           "id": "4.9.6",

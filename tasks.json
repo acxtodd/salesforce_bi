@@ -3556,12 +3556,14 @@
         {
           "id": "4.18",
           "title": "Deploy AppFlow CDC flows to activate real-time reindexing",
-          "status": "in_progress",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T18:57:31.730667+00:00",
-          "updatedAt": "2026-03-24T05:54:37.106692+00:00",
+          "updatedAt": "2026-03-24T05:57:32.737793+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "441fed1"
+          ],
           "pull_requests": [],
           "progress_notes": [
             {
@@ -3579,6 +3581,10 @@
             {
               "timestamp": "2026-03-24T05:54:37.106529+00:00",
               "note": "Validation evidence (2026-03-23): Contact CDC — edited Todd Terry title to 'COO' via REST API, AppFlow ran at 22:07:44 UTC, Lambda upserted Contact 003fk000000gOluAAE, total_lag=18751ms, Turbopuffer search confirmed title=COO. Account CDC — edited Todco Investments website to 'https://todcoinvestments.com', AppFlow ran at 23:15:38 UTC, Lambda upserted Account 001fk000002qD1tAAE. Property/Lease/Availability flows are Active and structurally identical; Property CDC was previously validated on 2026-03-18 (S3 objects in cdc/ascendix__Property__c/). 2 of 5 objects validated with live end-to-end round-trip, 1 validated historically, 2 (Lease, Availability) validated structurally via CDK test (Active status, correct source config)."
+            },
+            {
+              "timestamp": "2026-03-24T05:57:32.737796+00:00",
+              "note": "Task completed, commit: 441fed1"
             }
           ],
           "description": "The CDC sync Lambda, EventBridge rule, and S3 bucket are deployed, but the AppFlow flows that listen to Salesforce CDC events are missing. The ingestion stack CDK conditionally creates AppFlow resources only when three context values are passed at deploy time: salesforceInstanceUrl (SSM: /salesforce/instance_url), salesforceSecretArn (Secrets Manager: salesforce-ai-search/appflow-creds), and salesforceJwtToken (minted via scripts/mint_jwt.py). Both SSM and Secrets Manager prerequisites exist. The fix is to redeploy SalesforceAISearch-Ingestion-dev with the three -c context flags. After deployment, validate by editing a Contact in SF and confirming the CDC event flows through AppFlow to S3 to EventBridge to cdc_sync Lambda to Turbopuffer upsert within about 60 seconds.",
@@ -3587,7 +3593,8 @@
             "End-to-end validation: edit a Contact field in SF, observe the change reindexed in Turbopuffer within 60 seconds without manual bulk load",
             "Write-back edits made via the propose_edit flow (task 4.17) are automatically reindexed — no manual intervention needed after the user clicks Save"
           ],
-          "startedAt": "2026-03-23T22:14:02.334404+00:00"
+          "startedAt": "2026-03-23T22:14:02.334404+00:00",
+          "completedAt": "2026-03-24T05:57:32.737645+00:00"
         },
         {
           "id": "4.19",

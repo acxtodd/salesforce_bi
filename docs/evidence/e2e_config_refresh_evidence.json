@@ -1,0 +1,176 @@
+[
+  {
+    "activated": true,
+    "diff": {
+      "added_objects": [],
+      "auto_apply_eligible": false,
+      "classification": "field_scope_change",
+      "field_changes": {
+        "ascendix__Property__c": {
+          "added_fields": [
+            "ascendix__State__c"
+          ],
+          "removed_fields": []
+        }
+      },
+      "prompt_scope_changed": true,
+      "relationship_changes": {},
+      "removed_objects": [],
+      "requires_apply": true
+    },
+    "impact_classification": "field_scope_change",
+    "scenario": "field_add",
+    "structural_parity": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 3,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 1 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "field_allowlist_parity:ascendix__Property__c",
+          "detail": "All 3 allowlisted fields covered",
+          "passed": true
+        },
+        {
+          "check": "default_column_parity:ascendix__Property__c",
+          "detail": "All 2 default columns covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 3/3 checks passed",
+      "total": 3
+    },
+    "version_id": "20260324T143252-2cc0947d02a8"
+  },
+  {
+    "activated": true,
+    "diff": {
+      "added_objects": [
+        "ascendix__Lease__c"
+      ],
+      "auto_apply_eligible": false,
+      "classification": "object_scope_change",
+      "field_changes": {},
+      "prompt_scope_changed": true,
+      "relationship_changes": {},
+      "removed_objects": [],
+      "requires_apply": true
+    },
+    "impact_classification": "object_scope_change",
+    "scenario": "object_add",
+    "structural_parity": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 3,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 2 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "field_allowlist_parity:ascendix__Property__c",
+          "detail": "All 2 allowlisted fields covered",
+          "passed": true
+        },
+        {
+          "check": "default_column_parity:ascendix__Property__c",
+          "detail": "All 2 default columns covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 3/3 checks passed",
+      "total": 3
+    },
+    "version_id": "20260324T143252-e735304e3c90"
+  },
+  {
+    "activated": false,
+    "diff": {
+      "added_objects": [],
+      "auto_apply_eligible": true,
+      "classification": "prompt_only",
+      "field_changes": {},
+      "prompt_scope_changed": true,
+      "relationship_changes": {},
+      "removed_objects": [],
+      "requires_apply": false
+    },
+    "impact_classification": "prompt_only",
+    "scenario": "relationship_path_change",
+    "structural_parity": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 4,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 1 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "field_allowlist_parity:ascendix__Property__c",
+          "detail": "All 2 allowlisted fields covered",
+          "passed": true
+        },
+        {
+          "check": "default_column_parity:ascendix__Property__c",
+          "detail": "All 2 default columns covered",
+          "passed": true
+        },
+        {
+          "check": "relationship_path_parity:ascendix__Property__c",
+          "detail": "All 1 relationship paths covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 4/4 checks passed",
+      "total": 4
+    },
+    "version_id": "20260324T143252-ec0b09662515"
+  },
+  {
+    "activated": true,
+    "diff": {
+      "added_objects": [],
+      "auto_apply_eligible": true,
+      "classification": "prompt_only",
+      "field_changes": {},
+      "prompt_scope_changed": true,
+      "relationship_changes": {},
+      "removed_objects": [],
+      "requires_apply": false
+    },
+    "impact_classification": "prompt_only",
+    "scenario": "prompt_only_change",
+    "structural_parity": {
+      "failed_count": 0,
+      "passed": true,
+      "passed_count": 3,
+      "results": [
+        {
+          "check": "object_scope_parity",
+          "detail": "All 1 searchable objects present in runtime config",
+          "passed": true
+        },
+        {
+          "check": "field_allowlist_parity:ascendix__Property__c",
+          "detail": "All 2 allowlisted fields covered",
+          "passed": true
+        },
+        {
+          "check": "default_column_parity:ascendix__Property__c",
+          "detail": "All 1 default columns covered",
+          "passed": true
+        }
+      ],
+      "summary": "PASS: 3/3 checks passed",
+      "total": 3
+    },
+    "version_id": "20260324T143252-28e4005bb19d"
+  }
+]

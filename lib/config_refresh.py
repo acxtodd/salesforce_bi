@@ -1152,7 +1152,7 @@ def rollback_to_version(
 
 def execute_config_refresh(
     *,
-    sf: Any,
+    sf: Any = None,
     org_id: str,
     store: ConfigArtifactStore | None,
     apply: bool = False,
@@ -1161,6 +1161,7 @@ def execute_config_refresh(
     target_objects: list[str] | None = None,
     namespace_prefix: str = "ascendix__",
     reindex_callback: Any | None = None,
+    mock: bool = False,
 ) -> dict[str, Any]:
     """Run the full config refresh flow and optionally activate the result.
 
@@ -1177,6 +1178,7 @@ def execute_config_refresh(
         previous_artifact=previous_artifact,
         target_objects=target_objects,
         namespace_prefix=namespace_prefix,
+        mock=mock,
     )
 
     stored_keys: dict[str, str] = {}

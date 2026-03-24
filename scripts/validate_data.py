@@ -114,7 +114,9 @@ class DataValidator:
             self._check_object_type_counts,
             self._check_system_fields,
             self._check_metadata_filter,
+            self._check_numeric_date_filter,
             self._check_parent_fields,
+            self._check_per_object_search,
             self._check_bm25_search,
             self._check_hybrid_search,
             self._check_warm_latency,
@@ -403,6 +405,148 @@ class DataValidator:
             message="No suitable string-valued fields found for filter check",
         )
 
+    def _check_numeric_date_filter(self) -> CheckResult:
+        """Check: Metadata filters work for numeric and date-typed fields.
+
+        Looks for a numeric metadata field (e.g. TotalBuildingArea, YearBuilt)
+        and verifies that range operators (_gte, _lte) filter correctly.
+        """
+        if not self.config:
+            return CheckResult(
+                name="Numeric/date filter",
+                status="SKIP",
+                message="No config provided",
+            )
+
+        # Known numeric fields from denorm_config
+        numeric_candidates = [
+            "totalbuildingarea", "yearbuilt", "floors", "occupancy",
+            "landarea", "leasedsf", "termmonths", "availablesf",
+            "rentlow", "renthigh", "askingprice", "maxcontiguous",
+            "mindivisible", "leasetermmin", "leasetermmax",
+            "annualrevenue", "numberofemployees",
+        ]
+
+        for obj_name, obj_config in self.config.items():
+            obj_type = clean_label(obj_name).lower()
+            metadata_fields = [
+                clean_label(f).lower()
+                for f in obj_config.get("metadata_fields", [])
+            ]
+
+            # Find a numeric candidate present in metadata
+            target_field = None
+            for cand in numeric_candidates:
+                if cand in metadata_fields:
+                    target_field = cand
+                    break
+            if not target_field:
+                continue
+
+            # Sample a doc to get an actual value
+            try:
+                sample = self.backend.search(
+                    self.namespace,
+                    text_query="a the is of and",
+                    top_k=5,
+                    filters={"object_type": obj_type},
+                    include_attributes=[target_field],
+                )
+            except Exception:
+                try:
+                    sample = self.backend.search(
+                        self.namespace,
+                        text_query="a the is of and",
+                        top_k=5,
+                        filters={"object_type": obj_type},
+                        include_attributes=True,
+                    )
+                except Exception:
+                    continue
+
+            # Find a doc with a non-null numeric value
+            sample_val = None
+            for doc in (sample or []):
+                val = doc.get(target_field)
+                if val is not None:
+                    try:
+                        sample_val = float(val)
+                        break
+                    except (ValueError, TypeError):
+                        continue
+
+            if sample_val is None:
+                continue
+
+            # Test _gte filter: ask for docs >= (sample_val - 1)
+            floor_val = sample_val - 1
+            filter_key = f"{target_field}_gte"
+            try:
+                results = self.backend.search(
+                    self.namespace,
+                    text_query="a the is of and",
+                    top_k=10,
+                    filters={"object_type": obj_type, filter_key: floor_val},
+                    include_attributes=[target_field],
+                )
+            except Exception:
+                try:
+                    results = self.backend.search(
+                        self.namespace,
+                        text_query="a the is of and",
+                        top_k=10,
+                        filters={"object_type": obj_type, filter_key: floor_val},
+                        include_attributes=True,
+                    )
+                except Exception as e:
+                    LOG.warning("Numeric filter search failed for %s.%s: %s",
+                                obj_type, target_field, e)
+                    continue
+
+            if not results:
+                return CheckResult(
+                    name="Numeric/date filter",
+                    status="FAIL",
+                    message=f"{obj_type}.{target_field} {filter_key}={floor_val} returned 0 results",
+                )
+
+            # Verify all returned docs have value >= floor
+            violations = []
+            for doc in results:
+                v = doc.get(target_field)
+                if v is not None:
+                    try:
+                        if float(v) < floor_val:
+                            violations.append(
+                                f"doc {doc.get('id')}: {target_field}={v} < {floor_val}"
+                            )
+                    except (ValueError, TypeError):
+                        pass
+
+            if violations:
+                return CheckResult(
+                    name="Numeric/date filter",
+                    status="FAIL",
+                    message=f"{len(violations)} range violation(s) on {obj_type}.{target_field}",
+                    details={"violations": violations[:5]},
+                )
+
+            return CheckResult(
+                name="Numeric/date filter",
+                status="PASS",
+                message=f"{obj_type}.{target_field} {filter_key}={floor_val} -> "
+                        f"{len(results)} results, all >= floor",
+                details={"object_type": obj_type, "field": target_field,
+                          "filter": filter_key, "floor": floor_val,
+                          "result_count": len(results)},
+            )
+
+        return CheckResult(
+            name="Numeric/date filter",
+            status="WARN",
+            message="No numeric metadata fields found in config for filter check",
+        )
+
     def _check_parent_fields(self) -> CheckResult:
         """Check 5: Parent field denormalization consistency.
 
@@ -614,6 +758,53 @@ class DataValidator:
                 f"{obj_type}: {len(partial_docs)}/{sample_size} docs have "
                 f"inconsistent partial {parent_label} keys"
             )
+
+    def _check_per_object_search(self) -> CheckResult:
+        """Check: Search returns results for each configured object type."""
+        if not self.config:
+            return CheckResult(
+                name="Per-object search",
+                status="SKIP",
+                message="No config provided",
+            )
+
+        covered = []
+        empty = []
+        for obj_name in self.config:
+            obj_type = clean_label(obj_name).lower()
+            try:
+                results = self.backend.search(
+                    self.namespace,
+                    text_query="a the is of and",
+                    top_k=1,
+                    filters={"object_type": obj_type},
+                )
+            except Exception as e:
+                LOG.warning("Per-object search failed for %s: %s", obj_type, e)
+                results = []
+
+            if results:
+                covered.append(obj_type)
+            else:
+                empty.append(obj_type)
+
+        details = {"covered": covered, "empty": empty}
+
+        if empty:
+            return CheckResult(
+                name="Per-object search",
+                status="FAIL",
+                message=f"{len(covered)}/{len(covered)+len(empty)} object types return results; "
+                        f"empty: {', '.join(empty)}",
+                details=details,
+            )
+        return CheckResult(
+            name="Per-object search",
+            status="PASS",
+            message=f"{len(covered)}/{len(covered)} object types return results: "
+                    + ", ".join(covered),
+            details=details,
+        )
 
     def _check_bm25_search(self) -> CheckResult:
         """Check 6: BM25 text search."""

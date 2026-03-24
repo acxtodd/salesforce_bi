@@ -155,6 +155,40 @@ tests:
       latency_under: 30
 
   # =========================================================================
+  # Cross-object expanded corpus (3 tests — Task 4.7)
+  # =========================================================================
+
+  - id: "cross-04"
+    question: "find contacts at properties in Dallas"
+    category: "cross_object"
+    expected:
+      tool_used: "search_records"
+      answer_contains_any: ["contact", "Dallas", "propert"]
+      min_results: 1
+      no_error: true
+      latency_under: 30
+
+  - id: "cross-05"
+    question: "show deals related to ACME Corp"
+    category: "cross_object"
+    expected:
+      tool_used: "search_records"
+      answer_contains_any: ["deal", "ACME"]
+      min_results: 1
+      no_error: true
+      latency_under: 30
+
+  - id: "cross-06"
+    question: "what leases are expiring this quarter"
+    category: "cross_object"
+    expected:
+      tool_used: "search_records"
+      answer_contains_any: ["lease", "expir", "quarter", "2026"]
+      min_results: 1
+      no_error: true
+      latency_under: 30
+
+  # =========================================================================
   # Natural language / semantic (2 tests)
   # =========================================================================
 

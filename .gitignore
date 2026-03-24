@@ -68,3 +68,4 @@ temp_check*/
 # Lambda bundle artifacts
 lambda/poll_sync/.bundle/
 lambda/cdc_sync/.bundle/
+lambda/config_refresh/.bundle/

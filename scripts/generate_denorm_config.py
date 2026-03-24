@@ -39,6 +39,10 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 try:
     import yaml
 except ImportError:
@@ -293,7 +297,13 @@ class SalesforceHarvester:
 
     # ----- Top-level entry point -----
 
-    def __init__(self, sf, *, ascendix_search: bool = True):
+    def __init__(
+        self,
+        sf,
+        *,
+        ascendix_search: bool = True,
+        normalized_ascendix_source: Optional[Dict[str, Any]] = None,
+    ):
         """
         Args:
             sf: simple_salesforce.Salesforce instance
@@ -301,6 +311,7 @@ class SalesforceHarvester:
         """
         self.sf = sf
         self._ascendix_search = ascendix_search
+        self._normalized_ascendix_source = normalized_ascendix_source or {}
         self._template_parser = None  # lazy-loaded
 
     def harvest_object(self, obj_api_name: str) -> ObjectMetadata:
@@ -627,28 +638,64 @@ class SalesforceHarvester:
         if not hasattr(meta, "ascendix_parent_refs"):
             meta.ascendix_parent_refs: Dict[str, Set[str]] = {}  # ref_field → {parent_fields}
 
-        # Query saved searches for this object
-        try:
-            soql = (
-                "SELECT Id, Name, ascendix_search__Template__c, "
-                "ascendix_search__ObjectName__c "
-                "FROM ascendix_search__Search__c "
-                f"WHERE ascendix_search__ObjectName__c = '{meta.api_name}' "
-                "LIMIT 100"
-            )
-            result = _as_dict(self.sf.query(soql))
-            records = _as_list(result.get("records"))
-        except Exception as e:
-            if "INVALID_TYPE" in str(e) or "doesn't exist" in str(e):
-                print(f"  Info: Ascendix Search package not installed — skipping T5")
-                return
-            print(f"  Warning: Ascendix Search query failed for {meta.api_name}: {e}")
-            records = []
+        normalized_source = self._normalized_ascendix_source or {}
+        field_allowlist: Set[str] = set()
+        object_fixtures = _as_dict(
+            _as_dict(normalized_source.get("query_scope")).get("objects", {})
+        )
+        object_fixture = _as_dict(object_fixtures.get(meta.api_name))
+        field_allowlist.update(_as_list(object_fixture.get("field_allowlist")))
+        if not field_allowlist:
+            for selected_object in _as_list(normalized_source.get("selected_objects")):
+                selected_object = _as_dict(selected_object)
+                if selected_object.get("api_name") != meta.api_name:
+                    continue
+                if not selected_object.get("is_field_filtered"):
+                    break
+                field_allowlist.update(
+                    _as_list(selected_object.get("field_allowlist"))
+                    or _as_list(selected_object.get("configured_fields"))
+                )
+                break
+        if field_allowlist:
+            if meta.name_field:
+                field_allowlist.add(meta.name_field)
+            meta.ascendix_field_allowlist = field_allowlist
+
+        records: List[Dict[str, Any]] = []
+        if normalized_source:
+            saved_searches = _as_list(normalized_source.get("saved_searches"))
+            records = [
+                search
+                for search in saved_searches
+                if meta.api_name in set(_as_list(search.get("target_objects")))
+                or search.get("primary_object") == meta.api_name
+            ]
+        else:
+            try:
+                soql = (
+                    "SELECT Id, Name, ascendix_search__Template__c, "
+                    "ascendix_search__ObjectName__c "
+                    "FROM ascendix_search__Search__c "
+                    f"WHERE ascendix_search__ObjectName__c = '{meta.api_name}' "
+                    "LIMIT 100"
+                )
+                result = _as_dict(self.sf.query(soql))
+                records = _as_list(result.get("records"))
+            except Exception as e:
+                if "INVALID_TYPE" in str(e) or "doesn't exist" in str(e):
+                    print(f"  Info: Ascendix Search package not installed — skipping T5")
+                    return
+                print(f"  Warning: Ascendix Search query failed for {meta.api_name}: {e}")
+                records = []
 
         # Process saved search templates
         if parser and records:
             for rec in records:
-                template_json = rec.get("ascendix_search__Template__c")
+                template_json = (
+                    rec.get("template_json")
+                    or rec.get("ascendix_search__Template__c")
+                )
                 search_name = rec.get("Name", "Unknown")
                 if not template_json:
                     continue
@@ -696,58 +743,65 @@ class SalesforceHarvester:
                 except Exception:
                     pass
 
-        # Query SearchSetting for result columns scoped to this object.
-        # SearchSetting__c stores one row per (LayoutName, ObjectKeyPrefix).
-        # We use the 3-char key prefix to match settings to this object.
-        try:
-            key_prefix = ""
+        if normalized_source:
+            result_columns = set(_as_list(object_fixture.get("result_columns")))
+            for col_name in result_columns:
+                if col_name and col_name in meta.fields:
+                    fs = meta.ensure_field_score(col_name)
+                    fs.ascendix_result_appearances += 1
+        else:
+            # Query SearchSetting for result columns scoped to this object.
+            # SearchSetting__c stores one row per (LayoutName, ObjectKeyPrefix).
+            # We use the 3-char key prefix to match settings to this object.
             try:
-                describe = _as_dict(
-                    self.sf.restful(f"sobjects/{meta.api_name}/describe")
-                )
-                key_prefix = describe.get("keyPrefix", "")
-            except Exception:
-                pass
-
-            if key_prefix:
-                soql_settings = (
-                    "SELECT Id, ascendix_search__ResultColumns__c "
-                    "FROM ascendix_search__SearchSetting__c "
-                    "WHERE ascendix_search__LayoutName__c = 'Default Layout' "
-                    f"AND ascendix_search__ObjectKeyPrefix__c = '{key_prefix}' "
-                    "LIMIT 5"
-                )
-            else:
-                # Fallback: fetch all Default Layout rows and filter client-side
-                soql_settings = (
-                    "SELECT Id, ascendix_search__ResultColumns__c, "
-                    "ascendix_search__ObjectKeyPrefix__c "
-                    "FROM ascendix_search__SearchSetting__c "
-                    "WHERE ascendix_search__LayoutName__c = 'Default Layout' "
-                    "LIMIT 50"
-                )
-
-            setting_result = _as_dict(self.sf.query(soql_settings))
-            for setting_rec in _as_list(setting_result.get("records")):
-                result_cols_json = setting_rec.get("ascendix_search__ResultColumns__c")
-                if not result_cols_json:
-                    continue
+                key_prefix = ""
                 try:
-                    cols = _json.loads(result_cols_json)
-                    if isinstance(cols, list):
-                        for col_entry in cols:
-                            col_name = (
-                                col_entry
-                                if isinstance(col_entry, str)
-                                else col_entry.get("fieldName", "")
-                            )
-                            if col_name and col_name in meta.fields:
-                                fs = meta.ensure_field_score(col_name)
-                                fs.ascendix_result_appearances += 1
+                    describe = _as_dict(
+                        self.sf.restful(f"sobjects/{meta.api_name}/describe")
+                    )
+                    key_prefix = describe.get("keyPrefix", "")
                 except Exception:
                     pass
-        except Exception as e:
-            print(f"  Warning: SearchSetting query failed: {e}")
+
+                if key_prefix:
+                    soql_settings = (
+                        "SELECT Id, ascendix_search__ResultColumns__c "
+                        "FROM ascendix_search__SearchSetting__c "
+                        "WHERE ascendix_search__LayoutName__c = 'Default Layout' "
+                        f"AND ascendix_search__ObjectKeyPrefix__c = '{key_prefix}' "
+                        "LIMIT 5"
+                    )
+                else:
+                    # Fallback: fetch all Default Layout rows and filter client-side
+                    soql_settings = (
+                        "SELECT Id, ascendix_search__ResultColumns__c, "
+                        "ascendix_search__ObjectKeyPrefix__c "
+                        "FROM ascendix_search__SearchSetting__c "
+                        "WHERE ascendix_search__LayoutName__c = 'Default Layout' "
+                        "LIMIT 50"
+                    )
+
+                setting_result = _as_dict(self.sf.query(soql_settings))
+                for setting_rec in _as_list(setting_result.get("records")):
+                    result_cols_json = setting_rec.get("ascendix_search__ResultColumns__c")
+                    if not result_cols_json:
+                        continue
+                    try:
+                        cols = _json.loads(result_cols_json)
+                        if isinstance(cols, list):
+                            for col_entry in cols:
+                                col_name = (
+                                    col_entry
+                                    if isinstance(col_entry, str)
+                                    else col_entry.get("fieldName", "")
+                                )
+                                if col_name and col_name in meta.fields:
+                                    fs = meta.ensure_field_score(col_name)
+                                    fs.ascendix_result_appearances += 1
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"  Warning: SearchSetting query failed: {e}")
 
         # Apply DEFAULT_PRIMARY_RELATIONSHIPS — ensures key relationships
         # are included even when no saved-search signals mention them.
@@ -769,7 +823,7 @@ class SalesforceHarvester:
         if meta.ascendix_parent_refs:
             print(f"  T5: {len(meta.ascendix_parent_refs)} cross-object joins from saved searches")
 
-    def discover_objects(self) -> List[str]:
+    def discover_objects(self, require_records: bool = True) -> List[str]:
         """Read object list from Ascendix Search SearchSetting__c.
 
         Returns a list of object API names configured in Ascendix Search
@@ -779,65 +833,70 @@ class SalesforceHarvester:
         SearchSetting rows (each row covers one or more objects), so we
         query all Default Layout rows and merge their SelectedObjects.
         """
-        import json as _json
-        try:
-            soql = (
-                "SELECT ascendix_search__SelectedObjects__c "
-                "FROM ascendix_search__SearchSetting__c "
-                "WHERE ascendix_search__LayoutName__c = 'Default Layout' "
-                "LIMIT 100"
-            )
-            result = _as_dict(self.sf.query(soql))
-            records = _as_list(result.get("records"))
-            if not records:
-                print("Warning: No Default Layout SearchSetting found")
+        selected_objects = _as_list(
+            _as_dict(self._normalized_ascendix_source).get("selected_objects")
+        )
+        all_selected = sorted(
+            {
+                obj.get("api_name", "")
+                for obj in selected_objects
+                if obj.get("is_searchable") and obj.get("api_name")
+            }
+        )
+        if not all_selected:
+            import json as _json
+            try:
+                soql = (
+                    "SELECT ascendix_search__SelectedObjects__c "
+                    "FROM ascendix_search__SearchSetting__c "
+                    "WHERE ascendix_search__LayoutName__c = 'Default Layout' "
+                    "LIMIT 100"
+                )
+                result = _as_dict(self.sf.query(soql))
+                records = _as_list(result.get("records"))
+                for rec in records:
+                    selected_json = rec.get("ascendix_search__SelectedObjects__c", "")
+                    if not selected_json:
+                        continue
+                    try:
+                        selected = _json.loads(selected_json)
+                        if isinstance(selected, list):
+                            all_selected.extend(
+                                obj for obj in selected if isinstance(obj, str)
+                            )
+                    except (ValueError, TypeError):
+                        pass
+                all_selected = sorted(set(all_selected))
+            except Exception as e:
+                if "INVALID_TYPE" in str(e) or "doesn't exist" in str(e):
+                    print("Info: Ascendix Search package not installed — cannot discover objects")
+                else:
+                    print(f"Warning: object discovery failed: {e}")
                 return []
-
-            # Merge SelectedObjects from all rows (handles chunking)
-            all_selected: Set[str] = set()
-            for rec in records:
-                selected_json = rec.get("ascendix_search__SelectedObjects__c", "")
-                if not selected_json:
-                    continue
-                try:
-                    selected = _json.loads(selected_json)
-                    if isinstance(selected, list):
-                        for obj in selected:
-                            if isinstance(obj, str):
-                                all_selected.add(obj)
-                except (ValueError, TypeError):
-                    pass
-
-            if not all_selected:
-                print("Warning: No objects found in SelectedObjects across SearchSetting rows")
-                return []
-
-            print(f"  Found {len(all_selected)} distinct objects in SearchSetting config")
-
-            # Filter to objects with records
-            objects_with_data: List[str] = []
-            for obj_name in sorted(all_selected):
-                try:
-                    count_result = _as_dict(
-                        self.sf.query(f"SELECT COUNT() FROM {obj_name}")
-                    )
-                    count = count_result.get("totalSize", 0)
-                    if count > 0:
-                        objects_with_data.append(obj_name)
-                        print(f"  {obj_name}: {count} records")
-                    else:
-                        print(f"  {obj_name}: 0 records (deferred)")
-                except Exception as e:
-                    print(f"  {obj_name}: query failed ({e})")
-
-            return objects_with_data
-
-        except Exception as e:
-            if "INVALID_TYPE" in str(e) or "doesn't exist" in str(e):
-                print("Info: Ascendix Search package not installed — cannot discover objects")
-            else:
-                print(f"Warning: object discovery failed: {e}")
+        if not all_selected:
+            print("Warning: No objects found in Selected Objects config")
             return []
+
+        print(f"  Found {len(all_selected)} distinct objects in SearchSetting config")
+        if not require_records:
+            return all_selected
+
+        objects_with_data: List[str] = []
+        for obj_name in all_selected:
+            try:
+                count_result = _as_dict(
+                    self.sf.query(f"SELECT COUNT() FROM {obj_name}")
+                )
+                count = count_result.get("totalSize", 0)
+                if count > 0:
+                    objects_with_data.append(obj_name)
+                    print(f"  {obj_name}: {count} records")
+                else:
+                    print(f"  {obj_name}: 0 records (deferred)")
+            except Exception as e:
+                print(f"  {obj_name}: query failed ({e})")
+
+        return objects_with_data
 
 
 # ===================================================================
@@ -864,11 +923,14 @@ def build_config_for_object(
     # --- Field classification ---
     embed_fields: List[Tuple[str, int, str]] = []   # (name, score, provenance)
     metadata_fields: List[Tuple[str, int, str]] = []
+    allowlist = set(getattr(meta, "ascendix_field_allowlist", set()))
 
     for fname, fs in sorted(
         meta.field_scores.items(), key=lambda kv: kv[1].score, reverse=True
     ):
         if _is_excluded_direct_field(meta, fname):
+            continue
+        if allowlist and fname not in allowlist:
             continue
         sc = fs.score
         if sc >= THRESHOLD_EMBED:
@@ -879,6 +941,8 @@ def build_config_for_object(
     emitted_direct_fields = {name for name, _, _ in embed_fields + metadata_fields}
     for fname, finfo in sorted(meta.fields.items()):
         if fname in emitted_direct_fields or _is_excluded_direct_field(meta, fname):
+            continue
+        if allowlist and fname not in allowlist:
             continue
         if _is_geocoordinate_field(finfo):
             metadata_fields.append((fname, THRESHOLD_METADATA, "geocoordinate"))
@@ -1374,6 +1438,12 @@ def connect_salesforce(args) -> Any:
 
 
 def main() -> None:
+    from lib.config_refresh import (
+        compile_config_artifact,
+        fetch_ascendix_source,
+        normalize_ascendix_source,
+    )
+
     parser = argparse.ArgumentParser(
         description="Generate denormalization config from Salesforce org metadata."
     )
@@ -1415,69 +1485,54 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    target_set = set(args.objects)
-    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
     if args.mock:
         print("Running in MOCK mode — using hardcoded Ascendix CRE metadata.")
-        all_meta = build_mock_metadata()
-        # Filter to requested objects
-        meta_to_process = {
-            k: v for k, v in all_meta.items() if k in target_set
-        }
-        if not meta_to_process:
-            print(f"Warning: None of {args.objects} found in mock data. "
-                  f"Available: {list(all_meta.keys())}")
-            meta_to_process = all_meta
-
-        fetcher = MockParentFetcher()
-        configs: Dict[str, Dict[str, Any]] = {}
-        for obj_name, meta in meta_to_process.items():
-            print(f"\nProcessing {obj_name} ({meta.label})...")
-            cfg = build_config_for_object(meta, fetcher, target_set, args.namespace_prefix)
-            configs[obj_name] = cfg
-            n_embed = len(cfg["embed_fields"])
-            n_meta = len(cfg["metadata_fields"])
-            n_parents = sum(len(v) for v in cfg["parents"].values())
-            print(f"  {n_embed} embed fields, {n_meta} metadata fields, "
-                  f"{n_parents} parent denorm fields, {len(cfg['children'])} child aggs")
+        compile_result = compile_config_artifact(
+            org_id="mock-org",
+            raw_source={"search_settings": [], "saved_searches": []},
+            target_objects=args.objects,
+            namespace_prefix=args.namespace_prefix,
+            mock=True,
+        )
     else:
         sf = connect_salesforce(args)
-        ascendix_search = not args.no_ascendix_search
-        harvester = SalesforceHarvester(sf, ascendix_search=ascendix_search)
-
-        # Discover objects from Ascendix Search if requested
+        raw_source = fetch_ascendix_source(sf) if not args.no_ascendix_search else {
+            "search_settings": [],
+            "saved_searches": [],
+        }
+        target_objects = list(args.objects)
         if args.discover_objects:
             print("\nDiscovering objects from Ascendix Search settings...")
-            discovered = harvester.discover_objects()
+            normalized_source = normalize_ascendix_source(raw_source)
+            discovered = [
+                obj["api_name"]
+                for obj in _as_list(normalized_source.get("selected_objects"))
+                if obj.get("is_searchable")
+            ]
             if discovered:
-                args.objects = discovered
-                target_set = set(discovered)
-                print(f"\nDiscovered {len(discovered)} objects with data")
+                target_objects = discovered
+                print(f"\nDiscovered {len(discovered)} searchable objects")
             else:
                 print("Warning: discovery returned no objects, falling back to --objects")
+        compile_result = compile_config_artifact(
+            sf=sf,
+            org_id="cli-org",
+            raw_source=raw_source,
+            target_objects=target_objects,
+            namespace_prefix=args.namespace_prefix,
+        )
 
-        configs = {}
-        for obj_name in args.objects:
-            print(f"\nHarvesting metadata for {obj_name}...")
-            meta = harvester.harvest_object(obj_name)
-            print(f"  Scored {len(meta.field_scores)} fields")
-            cfg = build_config_for_object(
-                meta, harvester, target_set, args.namespace_prefix
-            )
-            configs[obj_name] = cfg
-            n_embed = len(cfg["embed_fields"])
-            n_meta = len(cfg["metadata_fields"])
-            n_parents = sum(len(v) for v in cfg["parents"].values())
-            print(f"  {n_embed} embed fields, {n_meta} metadata fields, "
-                  f"{n_parents} parent denorm fields, {len(cfg['children'])} child aggs")
-
-    # Render and write
-    yaml_output = render_yaml(configs, generated_at)
+    for obj_name, cfg in compile_result.annotated_configs.items():
+        print(f"\nCompiled {obj_name}...")
+        n_embed = len(cfg["embed_fields"])
+        n_meta = len(cfg["metadata_fields"])
+        n_parents = sum(len(v) for v in cfg["parents"].values())
+        print(f"  {n_embed} embed fields, {n_meta} metadata fields, "
+              f"{n_parents} parent denorm fields, {len(cfg['children'])} child aggs")
 
     output_path = args.output
     with open(output_path, "w") as f:
-        f.write(yaml_output)
+        f.write(compile_result.rendered_denorm_yaml)
 
     print(f"\nConfig written to {output_path}")
     print("Review the generated config and commit when ready.")

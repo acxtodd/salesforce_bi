@@ -7,6 +7,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import * as path from "path";
 
@@ -34,6 +35,7 @@ interface ApiStackProps extends cdk.StackProps {
   ingestLambda: lambda.Function;
   // Zero-Config Schema Discovery table
   schemaCacheTable?: dynamodb.Table;
+  configArtifactBucket: s3.Bucket;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -54,6 +56,7 @@ export class ApiStack extends cdk.Stack {
       actionMetadataTable,
       ingestLambda,
       schemaCacheTable,
+      configArtifactBucket,
     } = props;
 
     // -------------------------------------------------------------------------
@@ -134,6 +137,7 @@ export class ApiStack extends cdk.Stack {
           actions: ["ssm:GetParameter"],
           resources: [
             `arn:aws:ssm:${this.region}:${this.account}:parameter/salesforce/*`,
+            `arn:aws:ssm:${this.region}:${this.account}:parameter/salesforce-ai-search/config/*`,
           ],
         }),
       );
@@ -228,6 +232,8 @@ export class ApiStack extends cdk.Stack {
       environment: {
         AWS_LWA_INVOKE_MODE: "RESPONSE_STREAM",
         DENORM_CONFIG_PATH: "denorm_config.yaml",
+        CONFIG_ARTIFACT_BUCKET: configArtifactBucket.bucketName,
+        CONFIG_ARTIFACT_PREFIX: "config",
         BEDROCK_MODEL_ID:
           "us.anthropic.claude-haiku-4-5-20251001-v1:0",
         TURBOPUFFER_API_KEY: turbopufferApiKeySecret.secretValue.unsafeUnwrap(),
@@ -240,6 +246,7 @@ export class ApiStack extends cdk.Stack {
     // Grant Query Lambda permission to read the Turbopuffer + streaming API key secrets
     turbopufferApiKeySecret.grantRead(queryRole);
     streamingApiKeySecret.grantRead(this.queryLambda);
+    configArtifactBucket.grantRead(queryRole);
 
     const queryFunctionUrl = this.queryLambda.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,

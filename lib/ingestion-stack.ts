@@ -343,6 +343,9 @@ export class IngestionStack extends cdk.Stack {
     const pollSyncSchedule = this.node.tryGetContext("pollSyncSchedule") as
       | string
       | undefined;
+    const configRefreshSchedule = this.node.tryGetContext("configRefreshSchedule") as
+      | string
+      | undefined;
 
     // Dedicated role for Poll Sync Lambda
     const pollSyncRole = new iam.Role(this, "PollSyncLambdaRole", {
@@ -449,6 +452,73 @@ export class IngestionStack extends cdk.Stack {
 
       pollSyncRule.addTarget(
         new targets.LambdaFunction(pollSyncLambda, {
+          retryAttempts: 2,
+        }),
+      );
+    }
+
+    // =========================================================================
+    // Config Refresh Lambda — compile and store active Ascendix Search config
+    // =========================================================================
+
+    const configRefreshRole = new iam.Role(this, "ConfigRefreshLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          "service-role/AWSLambdaVPCAccessExecutionRole",
+        ),
+      ],
+    });
+
+    configRefreshRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:PutParameter",
+        ],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/salesforce/*`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/salesforce-ai-search/config/*`,
+        ],
+      }),
+    );
+
+    kmsKey.grantEncryptDecrypt(configRefreshRole);
+    dataBucket.grantReadWrite(configRefreshRole);
+
+    const configRefreshLambda = new lambda.Function(this, "ConfigRefreshLambda", {
+      functionName: "salesforce-ai-search-config-refresh",
+      runtime: lambda.Runtime.PYTHON_3_11,
+      handler: "index.lambda_handler",
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, "../lambda/config_refresh/.bundle"),
+        { exclude: LAMBDA_ASSET_EXCLUDES },
+      ),
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 1024,
+      role: configRefreshRole,
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [lambdaSecurityGroup],
+      environment: {
+        SALESFORCE_ORG_ID: "00Ddl000003yx57EAA",
+        CONFIG_ARTIFACT_BUCKET: dataBucket.bucketName,
+        CONFIG_ARTIFACT_PREFIX: "config",
+        LOG_LEVEL: "INFO",
+      },
+    });
+
+    if (configRefreshSchedule) {
+      const configRefreshRule = new events.Rule(this, "ConfigRefreshScheduleRule", {
+        ruleName: "salesforce-ai-search-config-refresh-schedule",
+        description: "Scheduled refresh of Ascendix Search runtime config artifacts",
+        schedule: events.Schedule.expression(configRefreshSchedule),
+      });
+
+      configRefreshRule.addTarget(
+        new targets.LambdaFunction(configRefreshLambda, {
           retryAttempts: 2,
         }),
       );
@@ -914,6 +984,12 @@ export class IngestionStack extends cdk.Stack {
       value: pollSyncLambda.functionArn,
       description: "Poll Sync Lambda Function ARN (incremental sync for non-CDC objects)",
       exportName: `${this.stackName}-PollSyncLambdaArn`,
+    });
+
+    new cdk.CfnOutput(this, "ConfigRefreshLambdaArn", {
+      value: configRefreshLambda.functionArn,
+      description: "Config Refresh Lambda Function ARN",
+      exportName: `${this.stackName}-ConfigRefreshLambdaArn`,
     });
 
     // Zero-Config Schema Discovery Lambda output

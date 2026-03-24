@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""Local CLI for Ascendix Search config refresh."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import boto3
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "lambda"))
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from common.salesforce_client import SalesforceClient
+from lib.config_refresh import ConfigArtifactStore, execute_config_refresh
+
+LOG = logging.getLogger("config_refresh_cli")
+
+
+def sf_client_from_cli(target_org: str) -> SalesforceClient:
+    result = subprocess.run(
+        ["sf", "org", "display", "--target-org", target_org, "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"sf org display failed: {result.stderr}")
+    payload = json.loads(result.stdout)
+    org_result = payload.get("result", {})
+    instance_url = org_result.get("instanceUrl")
+    access_token = org_result.get("accessToken")
+    if not instance_url or not access_token:
+        raise RuntimeError("Could not extract Salesforce credentials from sf CLI output")
+    return SalesforceClient(instance_url, access_token)
+
+
+def get_sf_client(args: argparse.Namespace) -> SalesforceClient:
+    if args.instance_url and args.access_token:
+        return SalesforceClient(args.instance_url, args.access_token)
+
+    instance_url = os.environ.get("SALESFORCE_INSTANCE_URL")
+    access_token = os.environ.get("SALESFORCE_ACCESS_TOKEN")
+    if instance_url and access_token:
+        return SalesforceClient(instance_url, access_token)
+
+    try:
+        return SalesforceClient.from_ssm()
+    except Exception:
+        LOG.info("Falling back to sf CLI auth for %s", args.target_org)
+        return sf_client_from_cli(args.target_org)
+
+
+def get_org_id(sf_client: SalesforceClient) -> str:
+    result = sf_client.query("SELECT Id FROM Organization LIMIT 1")
+    return result["records"][0]["Id"]
+
+
+def main() -> None:
+    logging.basicConfig(
+        level=os.getenv("LOG_LEVEL", "INFO"),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    parser = argparse.ArgumentParser(
+        description="Compile and persist the active Ascendix Search runtime config.",
+    )
+    parser.add_argument("--target-org", default="ascendix-beta-sandbox")
+    parser.add_argument("--instance-url", default="")
+    parser.add_argument("--access-token", default="")
+    parser.add_argument("--org-id", default="")
+    parser.add_argument("--bucket", default=os.environ.get("CONFIG_ARTIFACT_BUCKET", ""))
+    parser.add_argument("--prefix", default=os.environ.get("CONFIG_ARTIFACT_PREFIX", "config"))
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help=(
+            "Request activation for the candidate version. Non-safe changes are "
+            "still blocked in this slice until targeted rebuild/apply "
+            "orchestration lands."
+        ),
+    )
+    parser.add_argument("--objects", nargs="+", default=None, help="Optional object subset to compile.")
+    args = parser.parse_args()
+
+    if not args.bucket:
+        raise SystemExit("--bucket or CONFIG_ARTIFACT_BUCKET is required")
+
+    sf_client = get_sf_client(args)
+    org_id = args.org_id or get_org_id(sf_client)
+    store = ConfigArtifactStore(
+        s3_client=boto3.client("s3"),
+        ssm_client=boto3.client("ssm"),
+        bucket=args.bucket,
+        s3_prefix=args.prefix,
+    )
+    result = execute_config_refresh(
+        sf=sf_client,
+        org_id=org_id,
+        store=store,
+        apply=args.apply,
+        applied_by="scripts/run_config_refresh.py",
+        target_objects=args.objects,
+    )
+
+    compile_result = result["compile_result"]
+    print(json.dumps(
+        {
+            "org_id": org_id,
+            "version_id": compile_result.version_id,
+            "impact_classification": compile_result.impact_classification,
+            "auto_apply_eligible": compile_result.auto_apply_eligible,
+            "requires_apply": compile_result.requires_apply,
+            "activated": result["activated"],
+            "activation_blocked_reason": result["activation_blocked_reason"],
+            "stored_keys": result["stored_keys"],
+            "diff": compile_result.diff,
+        },
+        indent=2,
+        sort_keys=True,
+    ))
+    if result["activation_blocked_reason"]:
+        raise SystemExit(2)
+
+
+if __name__ == "__main__":
+    main()

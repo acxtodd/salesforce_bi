@@ -24,6 +24,8 @@ cp "$PROJECT_ROOT/lib/turbopuffer_backend.py" "$QUERY_DIR/lib/"
 cp "$PROJECT_ROOT/lib/system_prompt.py" "$QUERY_DIR/lib/"
 cp "$PROJECT_ROOT/lib/write_proposal.py" "$QUERY_DIR/lib/"
 cp "$PROJECT_ROOT/lib/denormalize.py" "$QUERY_DIR/lib/"
+cp "$PROJECT_ROOT/lib/config_refresh.py" "$QUERY_DIR/lib/"
+cp "$PROJECT_ROOT/lib/runtime_config.py" "$QUERY_DIR/lib/"
 
 # Copy denorm config
 cp "$PROJECT_ROOT/denorm_config.yaml" "$QUERY_DIR/"

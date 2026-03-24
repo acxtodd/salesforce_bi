@@ -893,7 +893,69 @@ def _collect_field_names(config: dict) -> dict[str, list[str]]:
     return result
 
 
-def build_system_prompt(config: dict) -> str:
+def _build_query_scope_reference(query_scope: dict | None) -> str:
+    """Render admin-authored query fixtures from compiled query_scope."""
+    if not isinstance(query_scope, dict):
+        return ""
+
+    objects = query_scope.get("objects")
+    if not isinstance(objects, dict) or not objects:
+        return ""
+
+    lines = ["## Admin Query Fixtures"]
+    for object_name in sorted(objects.keys()):
+        fixture = objects.get(object_name)
+        if not isinstance(fixture, dict):
+            continue
+        label = fixture.get("label") or object_name
+        result_columns = fixture.get("result_columns") or []
+        saved_search_names = fixture.get("saved_search_names") or []
+        relationship_paths = fixture.get("relationship_paths") or []
+        fixture_bits: list[str] = []
+        if result_columns:
+            fixture_bits.append(f"preferred result columns: {', '.join(result_columns)}")
+        if saved_search_names:
+            fixture_bits.append(f"saved-search fixtures: {', '.join(saved_search_names)}")
+        if relationship_paths:
+            fixture_bits.append(f"relationship paths: {', '.join(relationship_paths)}")
+        if fixture_bits:
+            lines.append(f"- {label}: {'; '.join(fixture_bits)}")
+
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
+def _build_query_scope_tool_hints(query_scope: dict | None) -> str:
+    """Render concise query-scope hints for tool descriptions."""
+    if not isinstance(query_scope, dict):
+        return ""
+
+    objects = query_scope.get("objects")
+    if not isinstance(objects, dict) or not objects:
+        return ""
+
+    lines: list[str] = []
+    for object_name in sorted(objects.keys()):
+        fixture = objects.get(object_name)
+        if not isinstance(fixture, dict):
+            continue
+        label = fixture.get("label") or object_name
+        result_columns = fixture.get("result_columns") or []
+        saved_search_names = fixture.get("saved_search_names") or []
+        relationship_paths = fixture.get("relationship_paths") or []
+        hint_bits: list[str] = []
+        if result_columns:
+            hint_bits.append(f"result columns {', '.join(result_columns)}")
+        if saved_search_names:
+            hint_bits.append(f"saved searches {', '.join(saved_search_names)}")
+        if relationship_paths:
+            hint_bits.append(f"relationships {', '.join(relationship_paths)}")
+        if hint_bits:
+            lines.append(f"  {label}: {'; '.join(hint_bits)}")
+
+    return "\n".join(lines)
+
+
+def build_system_prompt(config: dict, query_scope: dict | None = None) -> str:
     """Build a system prompt with actual field names from *config*.
 
     *config* is the dict returned by ``yaml.safe_load(open("denorm_config.yaml"))``.
@@ -924,6 +986,9 @@ def build_system_prompt(config: dict) -> str:
             field_sections.append(f"### {title} fields\n  {field_list}")
 
     field_reference = "\n\n".join(field_sections)
+    query_scope_reference = _build_query_scope_reference(query_scope)
+    if query_scope_reference:
+        field_reference = f"{field_reference}\n\n{query_scope_reference}"
 
     # Build dynamic guidelines with actual object list
     guidelines = _build_guidelines(object_names)
@@ -937,7 +1002,7 @@ def build_system_prompt(config: dict) -> str:
     )
 
 
-def build_tool_definitions(config: dict) -> list[dict]:
+def build_tool_definitions(config: dict, query_scope: dict | None = None) -> list[dict]:
     """Build TOOL_DEFINITIONS dynamically from *config*.
 
     *config* is the dict returned by ``yaml.safe_load(open("denorm_config.yaml"))``.
@@ -961,6 +1026,7 @@ def build_tool_definitions(config: dict) -> list[dict]:
         fields = field_map[obj_type]
         filter_lines.append(f"  {title}: {', '.join(fields)}")
     filter_desc = "\n".join(filter_lines)
+    query_scope_hints = _build_query_scope_tool_hints(query_scope)
 
     object_list_str = ", ".join(object_enum)
 
@@ -975,7 +1041,13 @@ def build_tool_definitions(config: dict) -> list[dict]:
                     f"Object types: {object_list_str}.\n\n"
                     "Filter field names (use semantic aliases):\n"
                     f"{filter_desc}\n\n"
-                    "Filter operators: append _gte, _lte, _gt, _lt, _in, _ne to field names."
+                    + (
+                        "Admin query fixtures:\n"
+                        f"{query_scope_hints}\n\n"
+                        if query_scope_hints
+                        else ""
+                    )
+                    + "Filter operators: append _gte, _lte, _gt, _lt, _in, _ne to field names."
                 ),
                 "inputSchema": {
                     "json": {

@@ -47,6 +47,7 @@ Primary runtime components:
 - `lambda/query` — natural-language `/query` API, SSE streaming, citations, clarification options
 - `lambda/cdc_sync` — live CDC processor for the 5 CDC-managed objects
 - `lambda/poll_sync` — incremental sync path for non-CDC expansion objects after bulk seed
+- `lambda/config_refresh` — compiles versioned Ascendix Search runtime artifacts and advances the active pointer for safe changes
 - `lambda/ingest` — preserved because Salesforce batch export still points at `/ingest`
 - `lambda/schema_api` — `/schema/{object}` endpoint used by Salesforce schema cache client
 - `lambda/schema_discovery` and `lambda/schema_drift_checker` — metadata discovery and drift monitoring
@@ -160,6 +161,7 @@ Current guardrails:
 │   └── remoteSiteSettings/
 ├── scripts/
 │   ├── generate_denorm_config.py      # Metadata-driven config generation
+│   ├── run_config_refresh.py          # Local config refresh / artifact publish CLI
 │   ├── task_manager.py                # Task workflow CLI
 │   ├── run_poll_sync.py               # Poll sync runner
 │   ├── replay_from_audit.py           # Replay docs from audit bucket
@@ -221,6 +223,20 @@ Mock mode is available when Salesforce credentials are not configured:
 ```bash
 python3 scripts/generate_denorm_config.py --mock --output denorm_config.yaml
 ```
+
+### Refresh Runtime Config
+
+```bash
+python3 scripts/run_config_refresh.py \
+  --bucket salesforce-ai-search-data-<account>-<region> \
+  --target-org ascendix-beta-sandbox
+```
+
+`/query` resolves runtime config in this order:
+
+1. active compiled artifact from S3 via the SSM active-version pointer
+2. last-known-good cache in `/tmp`
+3. bundled `denorm_config.yaml`
 
 ### Run Tests
 

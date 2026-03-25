@@ -14,16 +14,23 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from lib.config_refresh import (
+    APPROVAL_APPLIED,
+    APPROVAL_PENDING,
+    APPROVAL_ROLLED_BACK,
     ConfigArtifactStore,
     IMPACT_FIELD_SCOPE,
+    IMPACT_NONE,
     IMPACT_OBJECT_SCOPE,
     IMPACT_PROMPT_ONLY,
     IMPACT_RELATIONSHIP,
-    UNSAFE_APPLY_BLOCK_REASON,
+    ApplyResult,
+    _build_apply_plan,
     compile_config_artifact,
     diff_runtime_artifacts,
     execute_config_refresh,
+    execute_targeted_apply,
     normalize_ascendix_source,
+    rollback_to_version,
 )
 from lib.system_prompt import build_system_prompt, build_tool_definitions
 
@@ -386,7 +393,8 @@ def test_prompt_only_changes_modify_prompt_and_tool_outputs():
     )
 
 
-def test_execute_config_refresh_blocks_manual_activation_for_non_safe_changes():
+def test_execute_config_refresh_pending_approval_for_non_safe_without_apply_flag():
+    """Non-safe change without --apply writes pending approval state."""
     base_result = compile_config_artifact(
         sf=_FakeRefreshSalesforce(),
         org_id="00DTEST",
@@ -431,10 +439,284 @@ def test_execute_config_refresh_blocks_manual_activation_for_non_safe_changes():
         store=store,
         raw_source=field_change_source,
         target_objects=["ascendix__Property__c"],
-        apply=True,
+        apply=False,
     )
 
     assert refresh["compile_result"].impact_classification == IMPACT_FIELD_SCOPE
     assert refresh["activated"] is False
-    assert refresh["activation_blocked_reason"] == UNSAFE_APPLY_BLOCK_REASON
+    assert "requires operator approval" in refresh["activation_blocked_reason"]
     assert store.resolve_active_version("00DTEST") == base_result.version_id
+
+    approval = store.load_approval_state("00DTEST", refresh["compile_result"].version_id)
+    assert approval is not None
+    assert approval["state"] == APPROVAL_PENDING
+
+
+def test_execute_config_refresh_targeted_apply_with_callback():
+    """Non-safe change with --apply and reindex callback activates after reindex."""
+    base_result = compile_config_artifact(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        raw_source=_make_raw_source(),
+        target_objects=["ascendix__Property__c"],
+    )
+    fake_s3 = _FakeS3()
+    fake_ssm = _FakeSSM()
+    store = ConfigArtifactStore(
+        s3_client=fake_s3,
+        ssm_client=fake_ssm,
+        bucket="config-bucket",
+    )
+    store.write_candidate(base_result)
+    store.set_active_version(
+        "00DTEST",
+        base_result.version_id,
+        applied_by="seed",
+        reason="manual_apply",
+    )
+
+    field_change_source = _make_raw_source()
+    _set_selected_objects(
+        field_change_source,
+        [
+            {
+                "name": "ascendix__Property__c",
+                "label": "Property",
+                "isSearchable": True,
+                "isSearchOrResultFieldsFiltered": True,
+                "fields": [
+                    {"name": "Name"},
+                    {"name": "ascendix__City__c"},
+                    {"name": "ascendix__Status__c"},
+                ],
+            }
+        ],
+    )
+
+    reindex_calls = []
+
+    def fake_reindex(object_name, action_type, full_sync=False):
+        reindex_calls.append({"object": object_name, "action": action_type, "full_sync": full_sync})
+        return {"records_synced": 10}
+
+    refresh = execute_config_refresh(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        store=store,
+        raw_source=field_change_source,
+        target_objects=["ascendix__Property__c"],
+        apply=True,
+        reindex_callback=fake_reindex,
+    )
+
+    assert refresh["compile_result"].impact_classification == IMPACT_FIELD_SCOPE
+    assert refresh["activated"] is True
+    assert len(reindex_calls) > 0
+    assert refresh["apply_result"] is not None
+    assert refresh["apply_result"].activated is True
+
+
+def test_execute_config_refresh_targeted_apply_deferred_without_callback():
+    """Non-safe change with --apply but no callback defers activation."""
+    base_result = compile_config_artifact(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        raw_source=_make_raw_source(),
+        target_objects=["ascendix__Property__c"],
+    )
+    fake_s3 = _FakeS3()
+    fake_ssm = _FakeSSM()
+    store = ConfigArtifactStore(
+        s3_client=fake_s3,
+        ssm_client=fake_ssm,
+        bucket="config-bucket",
+    )
+    store.write_candidate(base_result)
+    store.set_active_version(
+        "00DTEST",
+        base_result.version_id,
+        applied_by="seed",
+        reason="manual_apply",
+    )
+
+    field_change_source = _make_raw_source()
+    _set_selected_objects(
+        field_change_source,
+        [
+            {
+                "name": "ascendix__Property__c",
+                "label": "Property",
+                "isSearchable": True,
+                "isSearchOrResultFieldsFiltered": True,
+                "fields": [
+                    {"name": "Name"},
+                    {"name": "ascendix__City__c"},
+                    {"name": "ascendix__Status__c"},
+                ],
+            }
+        ],
+    )
+
+    refresh = execute_config_refresh(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        store=store,
+        raw_source=field_change_source,
+        target_objects=["ascendix__Property__c"],
+        apply=True,
+        reindex_callback=None,
+    )
+
+    assert refresh["compile_result"].impact_classification == IMPACT_FIELD_SCOPE
+    assert refresh["activated"] is False
+    assert "reindex deferred" in refresh["activation_blocked_reason"]
+
+
+def test_build_apply_plan_object_add():
+    diff = {
+        "classification": IMPACT_OBJECT_SCOPE,
+        "added_objects": ["ascendix__NewObj__c"],
+        "removed_objects": [],
+        "field_changes": {},
+        "relationship_changes": {},
+    }
+    plan = _build_apply_plan(diff)
+    assert plan["requires_reindex"] is True
+    assert any(a["action"] == "seed_new_object" for a in plan["actions"])
+
+
+def test_build_apply_plan_object_remove():
+    diff = {
+        "classification": IMPACT_OBJECT_SCOPE,
+        "added_objects": [],
+        "removed_objects": ["ascendix__OldObj__c"],
+        "field_changes": {},
+        "relationship_changes": {},
+    }
+    plan = _build_apply_plan(diff)
+    assert any(a["action"] == "retire_object" for a in plan["actions"])
+    retire_action = [a for a in plan["actions"] if a["action"] == "retire_object"][0]
+    assert retire_action["requires_reindex"] is False
+
+
+def test_build_apply_plan_field_scope():
+    diff = {
+        "classification": IMPACT_FIELD_SCOPE,
+        "added_objects": [],
+        "removed_objects": [],
+        "field_changes": {
+            "ascendix__Property__c": {
+                "added_fields": ["ascendix__State__c"],
+                "removed_fields": [],
+            }
+        },
+        "relationship_changes": {},
+    }
+    plan = _build_apply_plan(diff)
+    assert plan["requires_reindex"] is True
+    assert any(a["action"] == "reindex_field_add" for a in plan["actions"])
+
+
+def test_build_apply_plan_relationship():
+    diff = {
+        "classification": IMPACT_RELATIONSHIP,
+        "added_objects": [],
+        "removed_objects": [],
+        "field_changes": {},
+        "relationship_changes": {
+            "ascendix__Property__c": {
+                "previous": {},
+                "candidate": {"ascendix__Market__c": ["Name"]},
+            }
+        },
+    }
+    plan = _build_apply_plan(diff)
+    assert plan["requires_reindex"] is True
+    assert any(a["action"] == "reindex_relationship" for a in plan["actions"])
+
+
+def test_rollback_to_version():
+    result_v1 = compile_config_artifact(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        raw_source=_make_raw_source(),
+        target_objects=["ascendix__Property__c"],
+    )
+    result_v2 = compile_config_artifact(
+        sf=_FakeRefreshSalesforce(),
+        org_id="00DTEST",
+        raw_source=_make_raw_source(),
+        target_objects=["ascendix__Property__c"],
+    )
+    fake_s3 = _FakeS3()
+    fake_ssm = _FakeSSM()
+    store = ConfigArtifactStore(
+        s3_client=fake_s3,
+        ssm_client=fake_ssm,
+        bucket="config-bucket",
+    )
+    store.write_candidate(result_v1)
+    store.set_active_version("00DTEST", result_v1.version_id, applied_by="seed", reason="initial")
+    store.write_candidate(result_v2)
+    store.set_active_version("00DTEST", result_v2.version_id, applied_by="test", reason="upgrade")
+
+    assert store.resolve_active_version("00DTEST") == result_v2.version_id
+
+    rollback = rollback_to_version(
+        store=store,
+        org_id="00DTEST",
+        target_version_id=result_v1.version_id,
+        rolled_back_by="operator",
+        reason="test rollback",
+    )
+
+    assert rollback["rolled_back_to"] == result_v1.version_id
+    assert store.resolve_active_version("00DTEST") == result_v1.version_id
+
+
+def test_cli_reindex_callback_invokes_poll_sync_lambda():
+    """Verify _make_reindex_callback invokes the poll_sync Lambda correctly."""
+    import io
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+
+    from run_config_refresh import _make_reindex_callback
+
+    invocations = []
+
+    class FakeLambdaClient:
+        def invoke(self, **kwargs):
+            invocations.append(kwargs)
+            return {
+                "StatusCode": 200,
+                "Payload": io.BytesIO(json.dumps({
+                    "statusCode": 200,
+                    "summary": {"ascendix__Property__c": {"records_synced": 15}},
+                }).encode("utf-8")),
+            }
+
+    callback = _make_reindex_callback(
+        lambda_client=FakeLambdaClient(),
+        poll_sync_function_name="test-poll-sync",
+    )
+
+    result = callback(
+        object_name="ascendix__Property__c",
+        action_type="reindex_field_add",
+        full_sync=False,
+    )
+
+    assert len(invocations) == 1
+    assert invocations[0]["FunctionName"] == "test-poll-sync"
+    payload = json.loads(invocations[0]["Payload"])
+    assert payload["objects"] == ["ascendix__Property__c"]
+    assert payload["full_sync"] is False
+    assert result["statusCode"] == 200
+
+    # seed_new_object should force full_sync=True
+    result2 = callback(
+        object_name="ascendix__NewObj__c",
+        action_type="seed_new_object",
+        full_sync=False,
+    )
+    payload2 = json.loads(invocations[1]["Payload"])
+    assert payload2["full_sync"] is True

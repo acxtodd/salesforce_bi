@@ -1,0 +1,306 @@
+{
+  "saved_searches": [
+    {
+      "Id": "a08dl00000cff1RAAQ",
+      "LastModifiedDate": "2025-12-09T12:09:33.000+0000",
+      "Name": "Office Availabilities",
+      "ascendix_search__Template__c": "{\n  \"version\" : {\n    \"patch\" : 0,\n    \"minorRelease\" : 23,\n    \"majorRelease\" : 1\n  },\n  \"sectionsList\" : [ {\n    \"objectName\" : \"ascendix__Availability__c\",\n    \"label\" : \"Availability DETAILS\",\n    \"isListView\" : false,\n    \"fieldsList\" : [ {\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"Name\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"reference\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"ascendix__Property__c\",\n      \"logicalName\" : \"ascendix__Property__c\",\n      \"isPolymorphicField\" : false,\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"RecordType\",\n      \"logicalName\" : \"RecordTypeId\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"double\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__AvailableArea__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false,\n      \"format\" : \"#,###\"\n    }, {\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__UseType__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    } ]\n  }, {\n    \"relationship\" : \"ascendix__Property__r\",\n    \"objectName\" : \"ascendix__Property__c\",\n    \"label\" : \"Property\",\n    \"isListView\" : false,\n    \"fieldsList\" : [ {\n      \"value2\" : \"\",\n      \"value\" : \"A\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__PropertyClass__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value2\" : \"\",\n      \"value\" : \"Plano\",\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__City__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value2\" : \"\",\n      \"value\" : \"012fk0000002NdiAAE\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"RecordType\",\n      \"logicalName\" : \"RecordTypeId\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    } ]\n  } ],\n  \"resultColumns\" : [ {\n    \"type\" : \"string\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"Name\",\n    \"label\" : \"Unit Name/Number\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"Name\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"ascendix__Property__c\",\n    \"label\" : \"Property\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__Property__c\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"RecordTypeId\",\n    \"label\" : \"Record Type\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"RecordTypeId\"\n  }, {\n    \"type\" : \"double\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"ascendix__AvailableArea__c\",\n    \"label\" : \"Available Area (SF)\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__AvailableArea__c\"\n  }, {\n    \"type\" : \"picklist\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"ascendix__UseType__c\",\n    \"label\" : \"Use Type\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__UseType__c\"\n  } ],\n  \"matchAnySection\" : false,\n  \"mapData\" : {\n    \"zoom\" : 4.0,\n    \"center\" : {\n      \"lng\" : -98.579597,\n      \"lat\" : 39.828194\n    }\n  }\n}",
+      "attributes": {
+        "type": "ascendix_search__Search__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__Search__c/a08dl00000cff1RAAQ"
+      }
+    },
+    {
+      "Id": "a08dl00000dAVP3AAO",
+      "LastModifiedDate": "2025-12-09T06:54:20.000+0000",
+      "Name": "Class A office in Plano",
+      "ascendix_search__Template__c": "{\n  \"version\" : {\n    \"patch\" : 0,\n    \"minorRelease\" : 23,\n    \"majorRelease\" : 1\n  },\n  \"sectionsList\" : [ {\n    \"objectName\" : \"ascendix__Property__c\",\n    \"label\" : \"Property DETAILS\",\n    \"isListView\" : false,\n    \"fieldsList\" : [ {\n      \"value2\" : \"\",\n      \"value\" : \"A+;A\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"in\",\n      \"logicalName\" : \"ascendix__PropertyClass__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"Name\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value\" : \"012fk0000002NdiAAE\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"RecordType\",\n      \"logicalName\" : \"RecordTypeId\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"textarea\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__Street__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value\" : \"Plano\",\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__City__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__State__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"double\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__TotalAvailableArea__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false,\n      \"format\" : \"#,###\"\n    } ]\n  } ],\n  \"resultColumns\" : [ {\n    \"type\" : \"string\",\n    \"targetObject\" : \"ascendix__Property__c\",\n    \"logicalName\" : \"Name\",\n    \"label\" : \"Property Name\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"Name\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Property__c\",\n    \"logicalName\" : \"RecordTypeId\",\n    \"label\" : \"Record Type\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"RecordTypeId\"\n  }, {\n    \"type\" : \"textarea\",\n    \"targetObject\" : \"ascendix__Property__c\",\n    \"logicalName\" : \"ascendix__Street__c\",\n    \"label\" : \"Street\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__Street__c\"\n  }, {\n    \"type\" : \"string\",\n    \"targetObject\" : \"ascendix__Property__c\",\n    \"logicalName\" : \"ascendix__City__c\",\n    \"label\" : \"City\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__City__c\"\n  }, {\n    \"type\" : \"string\",\n    \"targetObject\" : \"ascendix__Property__c\",\n    \"logicalName\" : \"ascendix__State__c\",\n    \"label\" : \"State/Province\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__State__c\"\n  }, {\n    \"type\" : \"double\",\n    \"targetObject\" : \"ascendix__Property__c\",\n    \"logicalName\" : \"ascendix__TotalAvailableArea__c\",\n    \"label\" : \"Total Available Area (SF)\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__TotalAvailableArea__c\"\n  } ],\n  \"matchAnySection\" : false,\n  \"mapData\" : {\n    \"zoom\" : 4.0,\n    \"center\" : {\n      \"lng\" : -98.579597,\n      \"lat\" : 39.828194\n    }\n  }\n}",
+      "attributes": {
+        "type": "ascendix_search__Search__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__Search__c/a08dl00000dAVP3AAO"
+      }
+    },
+    {
+      "Id": "a08dl00000dBHijAAG",
+      "LastModifiedDate": "2025-12-09T16:18:38.000+0000",
+      "Name": "Deals for Class A office in Plano",
+      "ascendix_search__Template__c": "{\n  \"version\" : {\n    \"patch\" : 0,\n    \"minorRelease\" : 23,\n    \"majorRelease\" : 1\n  },\n  \"sectionsList\" : [ {\n    \"objectName\" : \"ascendix__Deal__c\",\n    \"label\" : \"Deal DETAILS\",\n    \"isListView\" : false,\n    \"fieldsList\" : [ {\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Deal__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"Name\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Deal__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"RecordType\",\n      \"logicalName\" : \"RecordTypeId\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"reference\",\n      \"targetObject\" : \"ascendix__Deal__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"Account\",\n      \"logicalName\" : \"ascendix__Client__c\",\n      \"isPolymorphicField\" : false,\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Deal__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__SalesStage__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"currency\",\n      \"targetObject\" : \"ascendix__Deal__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__GrossFeeAmount__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false,\n      \"format\" : \"#,###.00\"\n    }, {\n      \"type\" : \"date\",\n      \"targetObject\" : \"ascendix__Deal__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__CloseDateEstimated__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"reference\",\n      \"targetObject\" : \"ascendix__Deal__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"ascendix__Property__c\",\n      \"logicalName\" : \"ascendix__Property__c\",\n      \"isPolymorphicField\" : false,\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    } ]\n  }, {\n    \"relationship\" : \"ascendix__Property__r\",\n    \"objectName\" : \"ascendix__Property__c\",\n    \"label\" : \"Property\",\n    \"isListView\" : false,\n    \"fieldsList\" : [ {\n      \"value2\" : \"\",\n      \"value\" : \"A\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__PropertyClass__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value2\" : \"\",\n      \"value\" : \"Plano\",\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__City__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value2\" : \"\",\n      \"value\" : \"012fk0000002NdiAAE\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"RecordType\",\n      \"logicalName\" : \"RecordTypeId\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    } ]\n  } ],\n  \"resultColumns\" : [ {\n    \"type\" : \"string\",\n    \"targetObject\" : \"ascendix__Deal__c\",\n    \"logicalName\" : \"Name\",\n    \"label\" : \"Deal Name\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"Name\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Deal__c\",\n    \"logicalName\" : \"RecordTypeId\",\n    \"label\" : \"Record Type\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"RecordTypeId\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Deal__c\",\n    \"logicalName\" : \"ascendix__Client__c\",\n    \"label\" : \"Client\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__Client__c\"\n  }, {\n    \"type\" : \"picklist\",\n    \"targetObject\" : \"ascendix__Deal__c\",\n    \"logicalName\" : \"ascendix__SalesStage__c\",\n    \"label\" : \"Deal Stage\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__SalesStage__c\"\n  }, {\n    \"type\" : \"currency\",\n    \"targetObject\" : \"ascendix__Deal__c\",\n    \"logicalName\" : \"ascendix__GrossFeeAmount__c\",\n    \"label\" : \"Gross Fee Amount\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__GrossFeeAmount__c\"\n  }, {\n    \"type\" : \"date\",\n    \"targetObject\" : \"ascendix__Deal__c\",\n    \"logicalName\" : \"ascendix__CloseDateEstimated__c\",\n    \"label\" : \"Est. Close Date\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__CloseDateEstimated__c\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Deal__c\",\n    \"logicalName\" : \"ascendix__Property__c\",\n    \"label\" : \"Property\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__Property__c\"\n  } ],\n  \"matchAnySection\" : false,\n  \"mapData\" : {\n    \"zoom\" : 4.0,\n    \"center\" : {\n      \"lng\" : -98.579597,\n      \"lat\" : 39.828194\n    }\n  }\n}",
+      "attributes": {
+        "type": "ascendix_search__Search__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__Search__c/a08dl00000dBHijAAG"
+      }
+    },
+    {
+      "Id": "a08dl00000dMqmHAAS",
+      "LastModifiedDate": "2025-12-15T14:00:10.000+0000",
+      "Name": "Leases in Class A office in Plano",
+      "ascendix_search__Template__c": "{\n  \"version\" : {\n    \"patch\" : 0,\n    \"minorRelease\" : 23,\n    \"majorRelease\" : 1\n  },\n  \"sectionsList\" : [ {\n    \"objectName\" : \"ascendix__Lease__c\",\n    \"label\" : \"Lease DETAILS\",\n    \"isListView\" : false,\n    \"fieldsList\" : [ {\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Lease__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"Name\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"reference\",\n      \"targetObject\" : \"ascendix__Lease__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"ascendix__Floor__c\",\n      \"logicalName\" : \"ascendix__Floor__c\",\n      \"isPolymorphicField\" : false,\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"reference\",\n      \"targetObject\" : \"ascendix__Lease__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"ascendix__Property__c\",\n      \"logicalName\" : \"ascendix__Property__c\",\n      \"isPolymorphicField\" : false,\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"double\",\n      \"targetObject\" : \"ascendix__Lease__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__Size__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false,\n      \"format\" : \"#,###\"\n    }, {\n      \"type\" : \"reference\",\n      \"targetObject\" : \"ascendix__Lease__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"Account\",\n      \"logicalName\" : \"ascendix__Tenant__c\",\n      \"isPolymorphicField\" : false,\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"currency\",\n      \"targetObject\" : \"ascendix__Lease__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__LeaseRatePerUOM__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false,\n      \"format\" : \"#,###.00\"\n    }, {\n      \"type\" : \"date\",\n      \"targetObject\" : \"ascendix__Lease__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__TermCommencementDate__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"date\",\n      \"targetObject\" : \"ascendix__Lease__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__TermExpirationDate__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    } ]\n  }, {\n    \"relationship\" : \"ascendix__Property__r\",\n    \"objectName\" : \"ascendix__Property__c\",\n    \"label\" : \"Property\",\n    \"isListView\" : false,\n    \"fieldsList\" : [ {\n      \"value2\" : \"\",\n      \"value\" : \"A\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__PropertyClass__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value2\" : \"\",\n      \"value\" : \"Plano\",\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__City__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value2\" : \"\",\n      \"value\" : \"012fk0000002NdiAAE\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"RecordType\",\n      \"logicalName\" : \"RecordTypeId\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    } ]\n  } ],\n  \"resultColumns\" : [ {\n    \"type\" : \"string\",\n    \"targetObject\" : \"ascendix__Lease__c\",\n    \"logicalName\" : \"Name\",\n    \"label\" : \"Unit Name/Number\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"Name\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Lease__c\",\n    \"logicalName\" : \"ascendix__Floor__c\",\n    \"label\" : \"Floor\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__Floor__c\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Lease__c\",\n    \"logicalName\" : \"ascendix__Property__c\",\n    \"label\" : \"Property\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__Property__c\"\n  }, {\n    \"type\" : \"double\",\n    \"targetObject\" : \"ascendix__Lease__c\",\n    \"logicalName\" : \"ascendix__Size__c\",\n    \"label\" : \"Size (SF)\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__Size__c\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Lease__c\",\n    \"logicalName\" : \"ascendix__Tenant__c\",\n    \"label\" : \"Tenant\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__Tenant__c\"\n  }, {\n    \"type\" : \"currency\",\n    \"targetObject\" : \"ascendix__Lease__c\",\n    \"logicalName\" : \"ascendix__LeaseRatePerUOM__c\",\n    \"label\" : \"Lease Rate /SF\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__LeaseRatePerUOM__c\"\n  }, {\n    \"type\" : \"date\",\n    \"targetObject\" : \"ascendix__Lease__c\",\n    \"logicalName\" : \"ascendix__TermCommencementDate__c\",\n    \"label\" : \"Commencement Date\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__TermCommencementDate__c\"\n  }, {\n    \"type\" : \"date\",\n    \"targetObject\" : \"ascendix__Lease__c\",\n    \"logicalName\" : \"ascendix__TermExpirationDate__c\",\n    \"label\" : \"Expiration Date\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__TermExpirationDate__c\"\n  } ],\n  \"matchAnySection\" : false,\n  \"mapData\" : {\n    \"zoom\" : 4.0,\n    \"center\" : {\n      \"lng\" : -98.579597,\n      \"lat\" : 39.828194\n    }\n  }\n}",
+      "attributes": {
+        "type": "ascendix_search__Search__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__Search__c/a08dl00000dMqmHAAS"
+      }
+    },
+    {
+      "Id": "a08dl00000hChFDAA0",
+      "LastModifiedDate": "2026-03-22T18:38:46.000+0000",
+      "Name": "Class A Office Availabilities Dallas Downtown",
+      "ascendix_search__Template__c": "{\n  \"version\" : {\n    \"patch\" : 0,\n    \"minorRelease\" : 23,\n    \"majorRelease\" : 1\n  },\n  \"sortColumn\" : {\n    \"logicalName\" : \"Name\",\n    \"isAscSortOrder\" : true\n  },\n  \"sectionsList\" : [ {\n    \"objectName\" : \"ascendix__Availability__c\",\n    \"label\" : \"Availability DETAILS\",\n    \"isListView\" : false,\n    \"fieldsList\" : [ {\n      \"value2\" : \"\",\n      \"value\" : \"a0Rdl00000EJKHVEA5\",\n      \"type\" : \"reference\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"ascendix__Geography__c\",\n      \"logicalName\" : \"ascendix__SubMarket__c\",\n      \"isPolymorphicField\" : false,\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"Name\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"reference\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"ascendix__Property__c\",\n      \"logicalName\" : \"ascendix__Property__c\",\n      \"isPolymorphicField\" : false,\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"RecordType\",\n      \"logicalName\" : \"RecordTypeId\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"type\" : \"double\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__AvailableArea__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false,\n      \"format\" : \"#,###\"\n    }, {\n      \"value\" : \"\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Availability__c\",\n      \"showRadiusDistance\" : false,\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__UseType__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    } ]\n  }, {\n    \"relationship\" : \"ascendix__Property__r\",\n    \"objectName\" : \"ascendix__Property__c\",\n    \"label\" : \"Property\",\n    \"isListView\" : false,\n    \"fieldsList\" : [ {\n      \"value2\" : \"\",\n      \"value\" : \"A\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__PropertyClass__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value2\" : \"\",\n      \"value\" : \"\",\n      \"type\" : \"string\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"logicalName\" : \"ascendix__City__c\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    }, {\n      \"value2\" : \"\",\n      \"value\" : \"012fk0000002NdiAAE\",\n      \"type\" : \"picklist\",\n      \"targetObject\" : \"ascendix__Property__c\",\n      \"showRadiusDistance\" : false,\n      \"relationship\" : \"ascendix__Property__r\",\n      \"operator\" : \"=\",\n      \"lookupObject\" : \"RecordType\",\n      \"logicalName\" : \"RecordTypeId\",\n      \"isListView\" : false,\n      \"isLabelEdited\" : false\n    } ]\n  } ],\n  \"resultColumns\" : [ {\n    \"type\" : \"string\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"Name\",\n    \"label\" : \"Unit Name/Number\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"Name\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"ascendix__Property__c\",\n    \"label\" : \"Property\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__Property__c\"\n  }, {\n    \"type\" : \"reference\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"RecordTypeId\",\n    \"label\" : \"Record Type\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"RecordTypeId\"\n  }, {\n    \"type\" : \"double\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"ascendix__AvailableArea__c\",\n    \"label\" : \"Available Area (SF)\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__AvailableArea__c\"\n  }, {\n    \"type\" : \"picklist\",\n    \"targetObject\" : \"ascendix__Availability__c\",\n    \"logicalName\" : \"ascendix__UseType__c\",\n    \"label\" : \"Use Type\",\n    \"isSortable\" : true,\n    \"isRadiusDistance\" : false,\n    \"attribute\" : \"ascendix__UseType__c\"\n  } ],\n  \"matchAnySection\" : false,\n  \"mapData\" : {\n    \"zoom\" : 4.0,\n    \"center\" : {\n      \"lng\" : -98.579597,\n      \"lat\" : 39.828194\n    }\n  }\n}",
+      "attributes": {
+        "type": "ascendix_search__Search__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__Search__c/a08dl00000hChFDAA0"
+      }
+    }
+  ],
+  "search_settings": [
+    {
+      "Id": "a07dl0000bOVbVfAAL",
+      "LastModifiedDate": "2026-03-20T06:25:05.000+0000",
+      "Name": "Default Layout Accou-001-08bd40c",
+      "ascendix_search__Value__c": "[\"Phone\",\"OwnerId\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000bOVbVfAAL"
+      }
+    },
+    {
+      "Id": "a07dl0000Zhhh8iAQA",
+      "LastModifiedDate": "2025-12-03T17:27:19.000+0000",
+      "Name": "Default Layout Avail-a0D-fafa884",
+      "ascendix_search__Value__c": "[\"ascendix__Property__r.Name\",\"toLabel(RecordType.Name)\",\"ascendix__AvailableArea__c\",\"toLabel(ascendix__UseType__c)\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000Zhhh8iAQA"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpBdTAAV",
+      "LastModifiedDate": "2025-12-11T18:28:43.000+0000",
+      "Name": "Default Layout Case-500-0819eb3",
+      "ascendix_search__Value__c": "[\"CaseNumber\",\"Subject\",\"toLabel(Status)\",\"CreatedDate\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpBdTAAV"
+      }
+    },
+    {
+      "Id": "a07dl0000aDYG4IAAX",
+      "LastModifiedDate": "2025-12-09T16:15:15.000+0000",
+      "Name": "Default Layout Deal-a0P-3067c5b",
+      "ascendix_search__Value__c": "[\"toLabel(RecordType.Name)\",\"ascendix__Client__r.Name\",\"toLabel(ascendix__SalesStage__c)\",\"ascendix__GrossFeeAmount__c\",\"ascendix__CloseDateEstimated__c\",\"ascendix__Property__r.Name\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDYG4IAAX"
+      }
+    },
+    {
+      "Id": "a07dl0000aDfCOPAA3",
+      "LastModifiedDate": "2025-12-10T13:57:43.000+0000",
+      "Name": "Default Layout Inqui-a0T-38f26eb",
+      "ascendix_search__Value__c": "[\"ascendix__FirstName__c\",\"ascendix__LastName__c\",\"ascendix__Company__c\",\"toLabel(RecordType.Name)\",\"ascendix__Active__c\",\"ascendix__Converted__c\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDfCOPAA3"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpV1fAAF",
+      "LastModifiedDate": "2025-12-11T18:38:42.000+0000",
+      "Name": "Default Layout Lease-a0V-816a1ed",
+      "ascendix_search__Value__c": "[\"ascendix__Floor__r.Name\",\"ascendix__Property__r.Name\",\"ascendix__Size__c\",\"ascendix__Tenant__r.Name\",\"ascendix__LeaseRatePerUOM__c\",\"ascendix__TermCommencementDate__c\",\"ascendix__TermExpirationDate__c\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpV1fAAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDer00AAB",
+      "LastModifiedDate": "2025-12-10T13:57:33.000+0000",
+      "Name": "Default Layout Listi-a0W-3aace5c",
+      "ascendix_search__Value__c": "[\"ascendix__AskingPrice__c\",\"toLabel(ascendix__Status__c)\",\"ascendix__Property__r.Name\",\"toLabel(RecordType.Name)\",\"ascendix__Exclusive__c\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDer00AAB"
+      }
+    },
+    {
+      "Id": "a07dl0000aDfF9FAAV",
+      "LastModifiedDate": "2025-12-10T14:00:59.000+0000",
+      "Name": "Default Layout Note-002-3b0649c",
+      "ascendix_search__Value__c": "[\"Title\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDfF9FAAV"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpJ9OAAV",
+      "LastModifiedDate": "2025-12-11T18:26:26.000+0000",
+      "Name": "Default Layout Prefe-a0Z-a3ecb6a",
+      "ascendix_search__Value__c": "[\"ascendix__Account__r.Name\",\"ascendix__Contact__r.Name\",\"toLabel(ascendix__PropertyType__c)\",\"toLabel(ascendix__SaleOrLease__c)\",\"ascendix__RequiredMoveInDate__c\",\"ascendix__PriceMaximum__c\",\"ascendix__RentMaximum__c\",\"ascendix__AreaMaximum__c\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpJ9OAAV"
+      }
+    },
+    {
+      "Id": "a07dl0000aDVTlmAAH",
+      "LastModifiedDate": "2025-12-09T06:51:49.000+0000",
+      "Name": "Default Layout Prope-a0a-c0d2c8b",
+      "ascendix_search__Value__c": "[\"toLabel(RecordType.Name)\",\"ascendix__Street__c\",\"ascendix__City__c\",\"ascendix__State__c\",\"ascendix__TotalAvailableArea__c\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDVTlmAAH"
+      }
+    },
+    {
+      "Id": "a07dl0000aDeVfjAAF",
+      "LastModifiedDate": "2025-12-10T12:36:51.000+0000",
+      "Name": "Default Layout Sale-a0j-689ff7a",
+      "ascendix_search__Value__c": "[\"ascendix__Property__r.Name\",\"ascendix__ListingDate__c\",\"ascendix__ListingPrice__c\",\"ascendix__SaleDate__c\",\"ascendix__SalePrice__c\"]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDeVfjAAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP90AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects",
+      "ascendix_search__Value__c": "[{\"name\":\"Account\",\"mapData\":{\"objectName\":\"Account\",\"longitude\":\"BillingLongitude\",\"latitude\":\"BillingLatitude\",\"geolocation\":\"BillingAddress\"},\"isSearchOrResultFieldsFiltered\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":true,",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP90AAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP91AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects1",
+      "ascendix_search__Value__c": "\"isGeoEnabled\":false,\"isAdHocListEnabled\":true,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"ascendix__Availability__c\",\"isSearchOrResultFieldsFiltered\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeo",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP91AAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP9AAAV",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects10",
+      "ascendix_search__Value__c": "esultFieldsFiltered\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"ascendix__Property__c\",\"isSearchOrResultFiel",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP9AAAV"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP9BAAV",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects11",
+      "ascendix_search__Value__c": "dsFiltered\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"ascendix__Sale__c\",\"isSearchOrResultFieldsFiltered\":f",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP9BAAV"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP9CAAV",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects12",
+      "ascendix_search__Value__c": "alse,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"Task\",\"isSearchOrResultFieldsFiltered\":false,\"isSearchable\":true,\"",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP9CAAV"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP9DAAV",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects13",
+      "ascendix_search__Value__c": "isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false}]",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP9DAAV"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP92AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects2",
+      "ascendix_search__Value__c": "Enabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"Contact\",\"mapData\":{\"objectName\":\"Contact\",\"longitude\":\"MailingLongitude\",\"latitude\":\"MailingLatitude\",\"geolocation\":\"MailingAddress\"},\"isSearchOrRes",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP92AAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP93AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects3",
+      "ascendix_search__Value__c": "ultFieldsFiltered\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":true,\"isGeoEnabled\":false,\"isAdHocListEnabled\":true,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"ascendix__Deal__c\",\"isSearchOrResultFieldsFilter",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP93AAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP94AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects4",
+      "ascendix_search__Value__c": "ed\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"ascendix__Inquiry__c\",\"isSearchOrResultFieldsFiltered\":false,",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP94AAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP95AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects5",
+      "ascendix_search__Value__c": "\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"Lead\",\"mapData\":{\"objectName\":\"Lead\",\"longitude\":\"Longitude\",\"latitude\"",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP95AAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP96AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects6",
+      "ascendix_search__Value__c": ":\"Latitude\",\"geolocation\":\"Address\"},\"isSearchOrResultFieldsFiltered\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":true,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"nam",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP96AAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP97AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects7",
+      "ascendix_search__Value__c": "e\":\"ascendix__Lease__c\",\"isSearchOrResultFieldsFiltered\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"ascendix",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP97AAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP98AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects8",
+      "ascendix_search__Value__c": "__Listing__c\",\"isSearchOrResultFieldsFiltered\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"ContentNote\",\"isSe",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP98AAF"
+      }
+    },
+    {
+      "Id": "a07dl0000aDpP99AAF",
+      "LastModifiedDate": "2025-12-11T18:31:08.000+0000",
+      "Name": "Selected Objects9",
+      "ascendix_search__Value__c": "archOrResultFieldsFiltered\":false,\"isSearchable\":true,\"isRelatedListsFiltered\":false,\"isMapEnabled\":false,\"isGeoEnabled\":false,\"isAdHocListEnabled\":false,\"fields\":[],\"disableEdit\":false,\"disableCreate\":false},{\"name\":\"ascendix__Preference__c\",\"isSearchOrR",
+      "attributes": {
+        "type": "ascendix_search__SearchSetting__c",
+        "url": "/services/data/v59.0/sobjects/ascendix_search__SearchSetting__c/a07dl0000aDpP99AAF"
+      }
+    }
+  ]
+}

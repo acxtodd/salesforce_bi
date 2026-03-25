@@ -355,6 +355,16 @@ class SalesforceClient:
             raise last_exception
         raise SalesforceAPIError("Request failed after all retries")
 
+    def restful(self, path: str, method: str = "GET", **kwargs: Any) -> Any:
+        """Execute a REST API call using an arbitrary path.
+
+        Compatible with the ``simple_salesforce`` restful() interface so that
+        callers like ``SalesforceHarvester`` can use either client
+        interchangeably.
+        """
+        url = f"{self._base_url}/{path.lstrip('/')}"
+        return self._make_request(method, url)
+
     def query(self, soql: str) -> Dict[str, Any]:
         """
         Execute SOQL query against Salesforce REST API.

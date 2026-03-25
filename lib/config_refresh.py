@@ -29,10 +29,13 @@ IMPACT_RELATIONSHIP = "relationship_change"
 IMPACT_OBJECT_SCOPE = "object_scope_change"
 
 AUTO_APPLY_IMPACTS = {IMPACT_NONE, IMPACT_PROMPT_ONLY}
-UNSAFE_APPLY_BLOCK_REASON = (
-    "Activation for field-scope, relationship, and object-scope changes is "
-    "blocked until targeted rebuild/apply orchestration lands in 4.9.6+."
-)
+
+# Approval states for the operator review flow
+APPROVAL_PENDING = "pending_approval"
+APPROVAL_APPROVED = "approved"
+APPROVAL_REJECTED = "rejected"
+APPROVAL_APPLIED = "applied"
+APPROVAL_ROLLED_BACK = "rolled_back"
 
 _SELECTED_OBJECTS_RE = re.compile(r"^Selected Objects(?P<index>\d+)?$")
 _DEFAULT_LAYOUT_RE = re.compile(r"^Default Layout(?P<suffix>.*)$")
@@ -571,6 +574,40 @@ def diff_runtime_artifacts(
     }
 
 
+def _extract_relationship_dot_columns(
+    normalized_source: dict[str, Any],
+) -> dict[str, list[str]]:
+    """Extract dot-notation columns from saved search relationship sections.
+
+    Returns a dict mapping primary_object → list of "Relationship__r.Field"
+    strings, suitable for injection into meta.dot_notation_columns.
+    """
+    dot_columns_by_object: dict[str, set[str]] = {}
+    for saved_search in _as_list(normalized_source.get("saved_searches")):
+        primary_object = str(saved_search.get("primary_object", "")).strip()
+        if not primary_object:
+            continue
+        template = _as_dict(saved_search.get("template"))
+        sections = _as_list(template.get("sectionsList"))
+        for section in sections:
+            section = _as_dict(section)
+            relationship = str(section.get("relationship", "")).strip()
+            if not relationship:
+                continue
+            fields = [
+                _normalize_field_name(f)
+                for f in _as_list(section.get("fieldsList"))
+                if _normalize_field_name(f)
+            ]
+            if not fields:
+                fields = ["Name"]
+            for field in fields:
+                dot_columns_by_object.setdefault(primary_object, set()).add(
+                    f"{relationship}.{field}"
+                )
+    return {obj: sorted(cols) for obj, cols in sorted(dot_columns_by_object.items())}
+
+
 def compile_config_artifact(
     *,
     sf: Any | None = None,
@@ -601,6 +638,10 @@ def compile_config_artifact(
     ]
     object_names = list(target_objects or selected_searchable_objects)
 
+    # Extract relationship dot columns from saved searches so they
+    # feed into build_config_for_object's parent-field logic.
+    rel_dot_columns = _extract_relationship_dot_columns(normalized_source)
+
     annotated_configs: dict[str, dict[str, Any]] = {}
     if mock:
         mock_metadata = build_mock_metadata()
@@ -619,6 +660,10 @@ def compile_config_artifact(
                 if meta.name_field:
                     allowlist.add(meta.name_field)
                 meta.ascendix_field_allowlist = allowlist
+            # Inject relationship dot-notation columns from saved searches
+            for dot_col in rel_dot_columns.get(object_name, []):
+                if dot_col not in meta.dot_notation_columns:
+                    meta.dot_notation_columns.append(dot_col)
             annotated_configs[object_name] = build_config_for_object(
                 meta,
                 fetcher,
@@ -646,6 +691,10 @@ def compile_config_artifact(
             object_names = harvester.discover_objects(require_records=False)
         for object_name in object_names:
             meta = harvester.harvest_object(object_name)
+            # Inject relationship dot-notation columns from saved searches
+            for dot_col in rel_dot_columns.get(object_name, []):
+                if dot_col not in meta.dot_notation_columns:
+                    meta.dot_notation_columns.append(dot_col)
             annotated_configs[object_name] = build_config_for_object(
                 meta,
                 harvester,
@@ -828,10 +877,328 @@ class ConfigArtifactStore:
             Overwrite=True,
         )
 
+    def write_approval_state(
+        self,
+        org_id: str,
+        version_id: str,
+        *,
+        state: str,
+        operator: str,
+        reason: str,
+        previous_version: str = "",
+    ) -> str:
+        """Write or update the approval record for a candidate version."""
+        approval_key = f"{self.s3_prefix}/{org_id}/approval/{version_id}.json"
+        self.s3_client.put_object(
+            Bucket=self.bucket,
+            Key=approval_key,
+            Body=json.dumps(
+                {
+                    "version_id": version_id,
+                    "state": state,
+                    "operator": operator,
+                    "reason": reason,
+                    "previous_version": previous_version,
+                    "updated_at": _now_utc(),
+                },
+                indent=2,
+                sort_keys=True,
+            ).encode("utf-8"),
+            ContentType="application/json",
+        )
+        return approval_key
+
+    def load_approval_state(self, org_id: str, version_id: str) -> dict[str, Any] | None:
+        """Load approval state for a candidate version."""
+        approval_key = f"{self.s3_prefix}/{org_id}/approval/{version_id}.json"
+        try:
+            response = self.s3_client.get_object(Bucket=self.bucket, Key=approval_key)
+            return _as_dict(json.loads(response["Body"].read()))
+        except Exception:
+            return None
+
+
+def _build_apply_plan(diff: dict[str, Any]) -> dict[str, Any]:
+    """Build an apply plan describing required work before activation.
+
+    Returns a plan dict with per-object actions keyed by impact type.
+    """
+    classification = diff.get("classification", IMPACT_NONE)
+    actions: list[dict[str, Any]] = []
+
+    if classification == IMPACT_OBJECT_SCOPE:
+        for obj in diff.get("added_objects", []):
+            actions.append({
+                "object": obj,
+                "action": "seed_new_object",
+                "description": (
+                    f"Initial data seed required for newly added object {obj}. "
+                    "Run poll_sync with full_sync=true for this object, then "
+                    "initialize the poll watermark."
+                ),
+                "requires_reindex": True,
+            })
+        for obj in diff.get("removed_objects", []):
+            actions.append({
+                "object": obj,
+                "action": "retire_object",
+                "description": (
+                    f"Object {obj} removed from scope. It will be excluded "
+                    "from query_scope immediately on activation. Index data "
+                    "can be retired asynchronously."
+                ),
+                "requires_reindex": False,
+            })
+
+    if classification in (IMPACT_FIELD_SCOPE, IMPACT_OBJECT_SCOPE):
+        for obj, changes in diff.get("field_changes", {}).items():
+            if changes.get("added_fields"):
+                actions.append({
+                    "object": obj,
+                    "action": "reindex_field_add",
+                    "description": (
+                        f"Fields added to {obj}: {changes['added_fields']}. "
+                        "Targeted reindex required to embed/index new field data."
+                    ),
+                    "added_fields": changes["added_fields"],
+                    "requires_reindex": True,
+                })
+            if changes.get("removed_fields"):
+                actions.append({
+                    "object": obj,
+                    "action": "reindex_field_remove",
+                    "description": (
+                        f"Fields removed from {obj}: {changes['removed_fields']}. "
+                        "Targeted reindex to remove stale field data from embeddings."
+                    ),
+                    "removed_fields": changes["removed_fields"],
+                    "requires_reindex": True,
+                })
+
+    if classification in (IMPACT_RELATIONSHIP, IMPACT_OBJECT_SCOPE):
+        for obj, changes in diff.get("relationship_changes", {}).items():
+            actions.append({
+                "object": obj,
+                "action": "reindex_relationship",
+                "description": (
+                    f"Relationship config changed for {obj}. "
+                    "Targeted reindex required to update parent-field embeddings."
+                ),
+                "previous_parents": changes.get("previous", {}),
+                "candidate_parents": changes.get("candidate", {}),
+                "requires_reindex": True,
+            })
+
+    requires_reindex = any(a.get("requires_reindex") for a in actions)
+    return {
+        "classification": classification,
+        "requires_reindex": requires_reindex,
+        "action_count": len(actions),
+        "actions": actions,
+    }
+
+
+@dataclass
+class ApplyResult:
+    """Result of executing a targeted apply workflow."""
+
+    version_id: str
+    activated: bool
+    apply_plan: dict[str, Any]
+    reindex_results: list[dict[str, Any]]
+    evidence: dict[str, Any]
+    approval_key: str = ""
+    apply_record_key: str = ""
+
+
+def execute_targeted_apply(
+    *,
+    store: ConfigArtifactStore,
+    org_id: str,
+    version_id: str,
+    diff: dict[str, Any],
+    applied_by: str = "operator",
+    reason: str = "manual_apply",
+    reindex_callback: Any | None = None,
+) -> ApplyResult:
+    """Execute targeted seed/reindex work and promote candidate to active.
+
+    For each action in the apply plan:
+    - object add: calls reindex_callback with full_sync=True for the object
+    - field/relationship change: calls reindex_callback for affected objects
+    - object remove: no reindex needed, just scope removal on activation
+
+    If no reindex_callback is provided, the apply plan is recorded but
+    reindex work is marked as deferred (for operator to execute manually).
+    """
+    plan = _build_apply_plan(diff)
+    reindex_results: list[dict[str, Any]] = []
+
+    for action in plan["actions"]:
+        if not action.get("requires_reindex"):
+            reindex_results.append({
+                "object": action["object"],
+                "action": action["action"],
+                "status": "not_required",
+            })
+            continue
+
+        if reindex_callback is not None:
+            try:
+                callback_result = reindex_callback(
+                    object_name=action["object"],
+                    action_type=action["action"],
+                    full_sync=action["action"] == "seed_new_object",
+                )
+                reindex_results.append({
+                    "object": action["object"],
+                    "action": action["action"],
+                    "status": "completed",
+                    "result": callback_result,
+                })
+            except Exception as exc:
+                LOG.error(
+                    "Reindex failed for %s (%s): %s",
+                    action["object"],
+                    action["action"],
+                    exc,
+                )
+                reindex_results.append({
+                    "object": action["object"],
+                    "action": action["action"],
+                    "status": "failed",
+                    "error": str(exc),
+                })
+        else:
+            reindex_results.append({
+                "object": action["object"],
+                "action": action["action"],
+                "status": "deferred",
+                "description": (
+                    "No reindex_callback provided. Operator must run "
+                    "targeted reindex manually before activation."
+                ),
+            })
+
+    # Check if all required reindex work succeeded or was deferred
+    all_reindex_ok = all(
+        r["status"] in ("completed", "not_required")
+        for r in reindex_results
+    )
+    any_deferred = any(r["status"] == "deferred" for r in reindex_results)
+
+    activated = False
+    apply_record_key = ""
+    approval_key = ""
+
+    if all_reindex_ok and not any_deferred:
+        # All reindex work completed — safe to activate
+        apply_record_key = store.set_active_version(
+            org_id,
+            version_id,
+            applied_by=applied_by,
+            reason=reason,
+        )
+        approval_key = store.write_approval_state(
+            org_id,
+            version_id,
+            state=APPROVAL_APPLIED,
+            operator=applied_by,
+            reason=reason,
+        )
+        activated = True
+        LOG.info("Activated version %s for %s after targeted apply", version_id, org_id)
+    elif any_deferred:
+        approval_key = store.write_approval_state(
+            org_id,
+            version_id,
+            state=APPROVAL_APPROVED,
+            operator=applied_by,
+            reason="Approved but reindex deferred — manual reindex required before activation",
+        )
+        LOG.info("Version %s approved but activation deferred pending manual reindex", version_id)
+    else:
+        approval_key = store.write_approval_state(
+            org_id,
+            version_id,
+            state=APPROVAL_REJECTED,
+            operator=applied_by,
+            reason="Reindex failed — activation blocked",
+        )
+        LOG.warning("Version %s apply failed — reindex errors occurred", version_id)
+
+    evidence = {
+        "version_id": version_id,
+        "org_id": org_id,
+        "apply_plan": plan,
+        "reindex_results": reindex_results,
+        "activated": activated,
+        "applied_by": applied_by,
+        "applied_at": _now_utc(),
+    }
+
+    return ApplyResult(
+        version_id=version_id,
+        activated=activated,
+        apply_plan=plan,
+        reindex_results=reindex_results,
+        evidence=evidence,
+        approval_key=approval_key,
+        apply_record_key=apply_record_key,
+    )
+
+
+def rollback_to_version(
+    *,
+    store: ConfigArtifactStore,
+    org_id: str,
+    target_version_id: str,
+    rolled_back_by: str = "operator",
+    reason: str = "manual_rollback",
+) -> dict[str, Any]:
+    """Roll back active config to a specified previous version.
+
+    Verifies the target version exists before activating it.
+    """
+    artifact = store.load_compiled_artifact(org_id, target_version_id)
+    if not artifact:
+        raise ValueError(f"Target rollback version {target_version_id} not found")
+
+    current_version = store.resolve_active_version(org_id) or ""
+    apply_record_key = store.set_active_version(
+        org_id,
+        target_version_id,
+        applied_by=rolled_back_by,
+        reason=reason,
+    )
+    approval_key = store.write_approval_state(
+        org_id,
+        target_version_id,
+        state=APPROVAL_ROLLED_BACK,
+        operator=rolled_back_by,
+        reason=reason,
+        previous_version=current_version,
+    )
+    LOG.info(
+        "Rolled back %s from %s to %s",
+        org_id,
+        current_version,
+        target_version_id,
+    )
+    return {
+        "org_id": org_id,
+        "previous_version": current_version,
+        "rolled_back_to": target_version_id,
+        "apply_record_key": apply_record_key,
+        "approval_key": approval_key,
+        "rolled_back_by": rolled_back_by,
+        "rolled_back_at": _now_utc(),
+    }
+
 
 def execute_config_refresh(
     *,
-    sf: Any,
+    sf: Any = None,
     org_id: str,
     store: ConfigArtifactStore | None,
     apply: bool = False,
@@ -839,8 +1206,15 @@ def execute_config_refresh(
     raw_source: dict[str, Any] | None = None,
     target_objects: list[str] | None = None,
     namespace_prefix: str = "ascendix__",
+    reindex_callback: Any | None = None,
+    mock: bool = False,
 ) -> dict[str, Any]:
-    """Run the full config refresh flow and optionally activate the result."""
+    """Run the full config refresh flow and optionally activate the result.
+
+    For safe changes (none, prompt_only), auto-applies immediately.
+    For non-safe changes with apply=True, runs the targeted apply workflow
+    which performs required seed/reindex before activation.
+    """
     previous_artifact = store.load_active_artifact(org_id) if store is not None else None
     source_snapshot = raw_source or fetch_ascendix_source(sf)
     compile_result = compile_config_artifact(
@@ -850,6 +1224,7 @@ def execute_config_refresh(
         previous_artifact=previous_artifact,
         target_objects=target_objects,
         namespace_prefix=namespace_prefix,
+        mock=mock,
     )
 
     stored_keys: dict[str, str] = {}
@@ -859,6 +1234,8 @@ def execute_config_refresh(
     activated = False
     apply_record_key = ""
     activation_blocked_reason = ""
+    apply_result: ApplyResult | None = None
+
     if store is not None and compile_result.auto_apply_eligible:
         reason = "auto_apply"
         apply_record_key = store.set_active_version(
@@ -868,18 +1245,52 @@ def execute_config_refresh(
             reason=reason,
         )
         activated = True
-    elif apply:
-        activation_blocked_reason = UNSAFE_APPLY_BLOCK_REASON
-        LOG.warning(
-            "Blocking manual activation for %s (%s): %s",
+    elif apply and store is not None and compile_result.requires_apply:
+        # Targeted apply workflow for non-safe changes
+        apply_result = execute_targeted_apply(
+            store=store,
+            org_id=org_id,
+            version_id=compile_result.version_id,
+            diff=compile_result.diff,
+            applied_by=applied_by,
+            reason="targeted_apply",
+            reindex_callback=reindex_callback,
+        )
+        activated = apply_result.activated
+        apply_record_key = apply_result.apply_record_key
+        if not activated:
+            activation_blocked_reason = (
+                "Targeted apply did not activate: "
+                + ("reindex deferred" if any(
+                    r["status"] == "deferred" for r in apply_result.reindex_results
+                ) else "reindex failed")
+            )
+    elif store is not None and compile_result.requires_apply and not apply:
+        # Write pending approval state
+        store.write_approval_state(
+            org_id,
+            compile_result.version_id,
+            state=APPROVAL_PENDING,
+            operator=applied_by,
+            reason=f"Non-safe change ({compile_result.impact_classification}) requires approval",
+        )
+        activation_blocked_reason = (
+            f"Change classified as {compile_result.impact_classification} — "
+            "requires operator approval. Run with --apply to execute targeted "
+            "apply workflow, or use approve/rollback commands."
+        )
+        LOG.info(
+            "Version %s for %s requires approval (%s)",
+            compile_result.version_id,
             org_id,
             compile_result.impact_classification,
-            activation_blocked_reason,
         )
+
     return {
         "compile_result": compile_result,
         "stored_keys": stored_keys,
         "activated": activated,
         "apply_record_key": apply_record_key,
         "activation_blocked_reason": activation_blocked_reason,
+        "apply_result": apply_result,
     }

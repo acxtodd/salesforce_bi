@@ -290,9 +290,9 @@
     ],
     "scenario": "baseline_object_scope",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T191216-75e7d0ebea94.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T191216-75e7d0ebea94.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T191216-75e7d0ebea94.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260325T102734-75e7d0ebea94.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260325T102734-75e7d0ebea94.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260325T102734-75e7d0ebea94.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -323,8 +323,8 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T19:15:03.789732+00:00",
-    "version_id": "20260324T191216-75e7d0ebea94"
+    "timestamp": "2026-03-25T10:31:03.551915+00:00",
+    "version_id": "20260325T102734-75e7d0ebea94"
   },
   {
     "activated": true,
@@ -373,9 +373,9 @@
     },
     "scenario": "no_change",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T191504-75e7d0ebea94.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T191504-75e7d0ebea94.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T191504-75e7d0ebea94.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260325T103104-75e7d0ebea94.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260325T103104-75e7d0ebea94.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260325T103104-75e7d0ebea94.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -406,8 +406,8 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T19:17:51.581917+00:00",
-    "version_id": "20260324T191504-75e7d0ebea94"
+    "timestamp": "2026-03-25T10:33:51.968008+00:00",
+    "version_id": "20260325T103104-75e7d0ebea94"
   },
   {
     "activated": true,
@@ -456,9 +456,9 @@
     },
     "scenario": "field_add",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T191752-7cce709a4f6a.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T191752-7cce709a4f6a.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T191752-7cce709a4f6a.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260325T103353-7cce709a4f6a.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260325T103353-7cce709a4f6a.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260325T103353-7cce709a4f6a.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -489,8 +489,8 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T19:20:38.685587+00:00",
-    "version_id": "20260324T191752-7cce709a4f6a"
+    "timestamp": "2026-03-25T10:36:38.728331+00:00",
+    "version_id": "20260325T103353-7cce709a4f6a"
   },
   {
     "activated": true,
@@ -501,8 +501,8 @@
       "actions": [
         {
           "action": "seed_new_object",
-          "description": "Initial data seed required for newly added object ascendix__ValidationTestObj__c. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
-          "object": "ascendix__ValidationTestObj__c",
+          "description": "Initial data seed required for newly added object Opportunity. Run poll_sync with full_sync=true for this object, then initialize the poll watermark.",
+          "object": "Opportunity",
           "requires_reindex": true
         }
       ],
@@ -512,7 +512,7 @@
     "classification_match": true,
     "diff": {
       "added_objects": [
-        "ascendix__ValidationTestObj__c"
+        "Opportunity"
       ],
       "auto_apply_eligible": false,
       "classification": "object_scope_change",
@@ -530,6 +530,7 @@
         "Contact",
         "ContentNote",
         "Lead",
+        "Opportunity",
         "Task",
         "ascendix__Availability__c",
         "ascendix__Deal__c",
@@ -538,8 +539,7 @@
         "ascendix__Listing__c",
         "ascendix__Preference__c",
         "ascendix__Property__c",
-        "ascendix__Sale__c",
-        "ascendix__ValidationTestObj__c"
+        "ascendix__Sale__c"
       ],
       "relationship_paths": {
         "ascendix__Availability__c": [
@@ -556,11 +556,11 @@
     "reindex_results": [
       {
         "action": "seed_new_object",
-        "object": "ascendix__ValidationTestObj__c",
+        "object": "Opportunity",
         "result": {
           "action": "seed_new_object",
           "noop": true,
-          "object": "ascendix__ValidationTestObj__c",
+          "object": "Opportunity",
           "statusCode": 200
         },
         "status": "completed"
@@ -568,9 +568,9 @@
     ],
     "scenario": "object_add",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T192039-0a8659fcb276.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T192039-0a8659fcb276.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T192039-0a8659fcb276.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260325T103639-536a08723544.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260325T103639-536a08723544.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260325T103639-536a08723544.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -601,8 +601,8 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T19:23:29.574126+00:00",
-    "version_id": "20260324T192039-0a8659fcb276"
+    "timestamp": "2026-03-25T10:39:38.607260+00:00",
+    "version_id": "20260325T103639-536a08723544"
   },
   {
     "activated": true,
@@ -1088,9 +1088,9 @@
     ],
     "scenario": "relationship_path_change",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T192330-ba9c13d28d3c.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T192330-ba9c13d28d3c.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T192330-ba9c13d28d3c.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260325T103939-ba9c13d28d3c.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260325T103939-ba9c13d28d3c.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260325T103939-ba9c13d28d3c.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -1121,8 +1121,8 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T19:26:17.462332+00:00",
-    "version_id": "20260324T192330-ba9c13d28d3c"
+    "timestamp": "2026-03-25T10:42:25.203228+00:00",
+    "version_id": "20260325T103939-ba9c13d28d3c"
   },
   {
     "activated": true,
@@ -1171,9 +1171,9 @@
     },
     "scenario": "prompt_only_label_change",
     "stored_keys": {
-      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260324T192618-75e7d0ebea94.yaml",
-      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260324T192618-75e7d0ebea94.json",
-      "source": "config-validation/00Ddl000003yx57EAA/source/20260324T192618-75e7d0ebea94.json"
+      "compiled": "config-validation/00Ddl000003yx57EAA/compiled/20260325T104226-75e7d0ebea94.yaml",
+      "plan": "config-validation/00Ddl000003yx57EAA/plan/20260325T104226-75e7d0ebea94.json",
+      "source": "config-validation/00Ddl000003yx57EAA/source/20260325T104226-75e7d0ebea94.json"
     },
     "structural_parity_evidence": {
       "failed_count": 0,
@@ -1204,7 +1204,7 @@
       "summary": "PASS: 4/4 checks passed",
       "total": 4
     },
-    "timestamp": "2026-03-24T19:29:03.163914+00:00",
-    "version_id": "20260324T192618-75e7d0ebea94"
+    "timestamp": "2026-03-25T10:45:12.660243+00:00",
+    "version_id": "20260325T104226-75e7d0ebea94"
   }
 ]

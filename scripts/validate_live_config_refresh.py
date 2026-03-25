@@ -242,16 +242,21 @@ def mutate_field_add(source: dict) -> dict:
 
 
 def mutate_object_add(source: dict) -> dict:
-    """Add a new searchable object to Selected Objects."""
+    """Add a real Salesforce object (Opportunity) to Selected Objects.
+
+    Opportunity is a standard object present in every Salesforce org but not
+    in the current Ascendix Search Selected Objects config, so this exercises
+    the real describe/harvest path against live org metadata.
+    """
     objects = _read_selected_objects_json(source)
     objects.append({
-        "name": "ascendix__ValidationTestObj__c",
-        "label": "Validation Test Object",
+        "name": "Opportunity",
+        "label": "Opportunity",
         "isSearchable": True,
         "isMapEnabled": False,
-        "fields": ["Name", "ascendix__Status__c"],
+        "fields": ["Name", "StageName", "Amount", "CloseDate"],
     })
-    LOG.info("object_add: added ascendix__ValidationTestObj__c")
+    LOG.info("object_add: added Opportunity (real standard object)")
     return _write_selected_objects_json(source, objects)
 
 

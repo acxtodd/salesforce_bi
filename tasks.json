@@ -2541,7 +2541,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:13:40.870049+00:00",
-          "updatedAt": "2026-03-24T19:29:53.899509+00:00",
+          "updatedAt": "2026-03-25T10:45:41.084526+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2585,6 +2585,14 @@
             {
               "timestamp": "2026-03-24T19:29:53.899683+00:00",
               "note": "All subtasks 4.9.1-4.9.10 complete. Live validation covers all 4 required scenario types (field add, object add, relationship-path change, prompt-only change)."
+            },
+            {
+              "timestamp": "2026-03-25T10:27:25.374953+00:00",
+              "note": "Reopened: 4.9.9 object_add fixture correction."
+            },
+            {
+              "timestamp": "2026-03-25T10:45:41.084697+00:00",
+              "note": "All subtasks complete. Live validation uses real SF objects from ascendix-beta-sandbox for all 4 required scenario types."
             }
           ],
           "description": "Build a config control plane around the actual Ascendix Search payload model so admin changes in Selected Objects, field filters, Default Layout rows, saved searches, relationship paths, and result columns can be detected, compiled into runtime artifacts, classified by impact, and applied without relying on ad hoc manual regeneration. Ascendix Search should be used as an admin-intent signal and structural validation reference, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
@@ -2603,8 +2611,8 @@
             "Validation uses Ascendix Search as a structural reference for object scope, field allowlists, default columns, and relationship paths while preserving freedom for the NL search system to exceed Ascendix's query-builder patterns."
           ],
           "technical_context": "The demo org stores Ascendix Search config in ascendix_search__SearchSetting__c.Name plus ascendix_search__Value__c, not in dedicated SelectedObjects/ResultColumns fields. Selected Objects is chunked across multiple rows and must be concatenated before JSON parsing. Default layouts are stored as Default Layout * rows whose Value__c is a JSON array of result-column expressions. Saved searches remain in ascendix_search__Search__c.Template__c and are useful as relationship and filter fixtures for structural validation. This control plane should inform indexing and denorm, not constrain NL query behavior to Ascendix Search parity.",
-          "startedAt": "2026-03-24T19:29:27.695377+00:00",
-          "completedAt": "2026-03-24T19:29:53.899680+00:00"
+          "startedAt": "2026-03-25T10:27:25.374951+00:00",
+          "completedAt": "2026-03-25T10:45:41.084694+00:00"
         },
         {
           "id": "4.9.1",
@@ -2918,7 +2926,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-20T07:15:03.232121+00:00",
-          "updatedAt": "2026-03-24T19:29:49.292593+00:00",
+          "updatedAt": "2026-03-25T10:45:36.609182+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -2950,6 +2958,14 @@
             {
               "timestamp": "2026-03-24T19:29:49.292760+00:00",
               "note": "Live validation complete with all 4 required scenario types. 6 scenarios validated against real ascendix-beta-sandbox: baseline_object_scope (object_scope_change), no_change (none), field_add (prompt_only), object_add (object_scope_change — adds ascendix__ValidationTestObj__c to Selected Objects, diff detects added object, seed_new_object apply plan executed), relationship_path_change (relationship_change), prompt_only_label_change (none). All activated, all structural parity PASS. Evidence at docs/evidence/live_config_refresh_evidence.json."
+            },
+            {
+              "timestamp": "2026-03-25T10:27:21.495155+00:00",
+              "note": "Reopened: object_add used synthetic ascendix__ValidationTestObj__c. Switching to real Opportunity object."
+            },
+            {
+              "timestamp": "2026-03-25T10:45:36.609350+00:00",
+              "note": "Live validation now uses real Opportunity object (standard SF object verified via sf sobject describe). object_add diff shows added_objects=[Opportunity], 14 objects in parity check. All 6 scenarios PASS against real ascendix-beta-sandbox."
             }
           ],
           "description": "Prove the full control-plane loop against real Ascendix Search admin changes: field add, object add, relationship-path change, and prompt-only change. Record the resulting active config versions and search validation evidence using Ascendix Search as a structural reference for admin intent, not as the capability ceiling of the natural language search product. See docs/architecture/ascendix_search_config_refresh_plan.md and docs/architecture/ascendix_search_signal_priority_and_validation.md.",
@@ -2968,8 +2984,8 @@
             "Validation records the detected diff, impact classification, applied action, resulting active version, and structural parity evidence for each scenario without treating Ascendix Search ranking or exact query behavior as the acceptance target."
           ],
           "technical_context": "Use the new structural validation harness rather than manual eyeballing. Evidence should map each test scenario back to normalized Ascendix fixtures: object set from Selected Objects*, filtered fields from object descriptors, default columns from Default Layout rows, and relationships from Search__c Template__c.",
-          "completedAt": "2026-03-24T19:29:49.292758+00:00",
-          "startedAt": "2026-03-24T19:29:23.663348+00:00"
+          "completedAt": "2026-03-25T10:45:36.609348+00:00",
+          "startedAt": "2026-03-25T10:27:21.495152+00:00"
         },
         {
           "id": "4.9.10",

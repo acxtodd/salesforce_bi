@@ -596,6 +596,72 @@ class TestAnswerChunking:
 
 
 # ---------------------------------------------------------------------------
+# 10b. Record-page context injection
+# ---------------------------------------------------------------------------
+
+
+class TestRecordPageContext:
+    """Record-page context should include the Salesforce Id when available."""
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_record_id_included_when_all_three_fields_present(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "update phone",
+            "org_id": "00Ddl000003yx57EAA",
+            "record_id": "001fk000002qD1tAAE",
+            "record_type": "Account",
+            "record_name": "Todco Investments",
+        })
+
+        call_args = mock_qh_instance.query.call_args
+        effective_question = call_args[0][0]
+        assert "001fk000002qD1tAAE" in effective_question
+        assert "Todco Investments" in effective_question
+        assert "Account" in effective_question
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_record_context_without_id_omits_id(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "update phone",
+            "org_id": "00Ddl000003yx57EAA",
+            "record_type": "Account",
+            "record_name": "Todco Investments",
+        })
+
+        call_args = mock_qh_instance.query.call_args
+        effective_question = call_args[0][0]
+        assert "Todco Investments" in effective_question
+        assert "Id:" not in effective_question
+
+    @patch(f"{_PATCH_PREFIX}.boto3")
+    @patch(f"{_PATCH_PREFIX}.TurbopufferBackend")
+    @patch(f"{_PATCH_PREFIX}.QueryHandler")
+    def test_record_id_only_fallback(self, MockQH, MockBackend, mock_boto3):
+        mock_qh_instance = MockQH.return_value
+        mock_qh_instance.query.return_value = _make_query_result()
+
+        _invoke({
+            "question": "update phone",
+            "org_id": "00Ddl000003yx57EAA",
+            "record_id": "001fk000002qD1tAAE",
+        })
+
+        call_args = mock_qh_instance.query.call_args
+        effective_question = call_args[0][0]
+        assert "001fk000002qD1tAAE" in effective_question
+
+
+# ---------------------------------------------------------------------------
 # 11. Conversation history extraction and forwarding
 # ---------------------------------------------------------------------------
 

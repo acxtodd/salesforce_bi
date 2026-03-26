@@ -130,16 +130,20 @@ _WRITE_PROPOSAL_EXAMPLE = """\
 
 **14. Edit proposal — confirm the target record and use exact writable fields**
 User: "Update John Smith's phone number to 214-555-0100"
-Tool call:
+Step 1: search_records to find the Contact and obtain the real Salesforce Id.
+Step 2: propose_edit using the exact id from the search result (or from the
+record-page context bracket if the user is viewing the record):
   propose_edit(
     object_type="Contact",
-    record_id="003000000000001AAA",
+    record_id="003dl00000VeThOAAV",
     record_name="John Smith",
     summary="Update John Smith's phone number",
     fields=[{"apiName": "Phone", "proposedValue": "214-555-0100"}]
   )
-Note: Confirm the target record first, then propose the smallest explicit field
-change. Never include denormalized search fields or read-only/system fields."""
+Note: record_id must be the real 18-character Salesforce Id from search results
+or the [Id: ...] in the record-page context — never fabricate or guess an Id.
+Propose the smallest explicit field change. Never include denormalized search
+fields or read-only/system fields."""
 
 # ---------------------------------------------------------------------------
 # Field reference tables for new objects (curated, task 4.10)

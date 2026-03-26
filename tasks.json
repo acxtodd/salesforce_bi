@@ -3811,7 +3811,7 @@
           "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T18:57:31.730667+00:00",
-          "updatedAt": "2026-03-24T05:57:32.737793+00:00",
+          "updatedAt": "2026-03-26T17:49:48.576193+00:00",
           "files_modified": [],
           "commits": [
             "441fed1"
@@ -3837,6 +3837,10 @@
             {
               "timestamp": "2026-03-24T05:57:32.737796+00:00",
               "note": "Task completed, commit: 441fed1"
+            },
+            {
+              "timestamp": "2026-03-26T17:49:48.576020+00:00",
+              "note": "2026-03-26 live CDC incident + targeted recovery: two fresh Salesforce changes reached AppFlow/S3 but failed in cdc_sync due to expired Salesforce session in Lambda. Evidence before fix: Contact 003dl000013JyYaAAK (Carl Simpson, CREATE at 2026-03-26T17:22:04Z) and Account 001dl000011j8q0AAA (Cousins Properties, Website=cousins.com, UPDATE at 2026-03-26T17:29:03Z) both produced successful AppFlow executions and S3 CDC objects, but CloudWatch showed SalesforceAuthenticationError / INVALID_SESSION_ID and 'CDC sync: 0 succeeded, 1 failed'. Recovery performed without full reindex: refreshed /salesforce/access_token in SSM from sf org display, forced Lambda cold start by updating TOKEN_REFRESH_TS on salesforce-ai-search-cdc-sync, then replayed only the two existing CDC S3 objects via direct lambda invoke with bucket+key payloads. Result after replay: both invokes returned {succeeded:1, failed:0}; CloudWatch logged 'Upserted Account 001dl000011j8q0AAA' and 'Upserted Contact 003dl000013JyYaAAK'; Turbopuffer verified Account website=cousins.com last_modified=2026-03-26T17:29:03+0000 and Contact Carl Simpson present with last_modified=2026-03-26T17:22:04+0000. This was a targeted CDC replay only, not a bulk load or full namespace reindex."
             }
           ],
           "description": "The CDC sync Lambda, EventBridge rule, and S3 bucket are deployed, but the AppFlow flows that listen to Salesforce CDC events are missing. The ingestion stack CDK conditionally creates AppFlow resources only when three context values are passed at deploy time: salesforceInstanceUrl (SSM: /salesforce/instance_url), salesforceSecretArn (Secrets Manager: salesforce-ai-search/appflow-creds), and salesforceJwtToken (minted via scripts/mint_jwt.py). Both SSM and Secrets Manager prerequisites exist. The fix is to redeploy SalesforceAISearch-Ingestion-dev with the three -c context flags. After deployment, validate by editing a Contact in SF and confirming the CDC event flows through AppFlow to S3 to EventBridge to cdc_sync Lambda to Turbopuffer upsert within about 60 seconds.",
@@ -4111,6 +4115,43 @@
           ],
           "description": "When the user selects a clarification button after an ambiguous query (e.g. 'who are our top brokers by deal value?'), the follow-up query does not faithfully execute the selected interpretation. Observed: selected 'Any broker role by deal value' but follow-up narrowed to listing brokers only. The clarification UX renders correctly — the bug is in how the selected intent is passed back to the query handler. Found during 4.7 LWC smoke test (2026-03-24).",
           "completedAt": "2026-03-24T09:42:39.702133+00:00"
+        },
+        {
+          "id": "4.22",
+          "title": "Fix record-page propose_edit failures: record_id missing from model context",
+          "status": "review",
+          "owner": "Todd Terry",
+          "createdAt": "2026-03-26T17:49:15.801178+00:00",
+          "updatedAt": "2026-03-26T17:56:24.748750+00:00",
+          "files_modified": [
+            "lambda/query/index.py",
+            "lib/write_proposal.py",
+            "lib/system_prompt.py",
+            "tests/test_tool_dispatch.py",
+            "tests/test_query_lambda.py",
+            "tests/test_system_prompt.py"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-03-26T17:49:27.848718+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-03-26T17:56:15.855179+00:00",
+              "note": "All three fixes deployed and verified live. (A) index.py:319-329 - record_id now included in effective question bracket. (B) write_proposal.py - Salesforce ID format regex rejects non-ID strings with clear error. (C) system_prompt.py - guidance and example tell model to use exact IDs. Live replay: 8/8 record-page propose_edit attempts (4 Account, 4 Contact) returned correct recordId. Previously failed 3/4. Model now uses 1 tool call instead of 2 since ID is in context."
+            }
+          ],
+          "description": "When the user is on a Salesforce record page and asks the agent to edit the record, the propose_edit tool fails ~75% of the time with 'Write proposal rejected — invalid Salesforce Id'. Root cause: index.py:319-323 builds the effective question with record_name and record_type but omits record_id. The model has no reliable way to get the Salesforce ID of the viewed record, so it either passes the record name as the ID ('Todco Investments'), hallucinates an ID, or asks the user for the ID. Without record page context the model always searches first and succeeds 100%. Fix: (A) Include record_id in the effective question bracket so the model has the real ID. (B) Add Salesforce ID format validation in normalize_propose_edit_input so invalid IDs produce a clear tool error the model can self-correct from, rather than failing opaquely in Apex. (C) Add prompt guidance telling the model to use the exact id from search results or record context — never fabricate.",
+          "acceptance_criteria": [
+            "When record_id, record_name, and record_type are all present in the request, the effective question bracket includes the Salesforce Id so the model can use it directly in propose_edit",
+            "normalize_propose_edit_input rejects record_id values that do not match Salesforce 15- or 18-char ID format with a clear error message the model can act on",
+            "System prompt guidance explicitly instructs the model to use the exact id from search results or record-page context — never fabricate a Salesforce Id",
+            "Existing unit tests pass and new tests cover the ID validation and record-context paths",
+            "Live replay: 4/4 record-page propose_edit attempts return a valid recordId matching the request record_id"
+          ],
+          "startedAt": "2026-03-26T17:49:27.848327+00:00"
         }
       ]
     },
@@ -4185,7 +4226,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 22,
+      "4.": 23,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

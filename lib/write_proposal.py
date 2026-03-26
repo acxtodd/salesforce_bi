@@ -7,8 +7,12 @@ before a proposal reaches the UI layer.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
+
+# Salesforce IDs are 15-char (case-sensitive) or 18-char (case-insensitive).
+_SFDC_ID_RE = re.compile(r"^[a-zA-Z0-9]{15}(?:[a-zA-Z0-9]{3})?$")
 
 
 class WriteProposalValidationError(ValueError):
@@ -398,6 +402,9 @@ def build_writable_proposal_guidance() -> str:
     """Return concise prompt guidance for proposal generation."""
     return (
         "Use propose_edit only when the target record is already identified. "
+        "The record_id MUST be the exact Salesforce Id from a prior "
+        "search_records result or the record-page context bracket — never "
+        "fabricate, guess, or use a record name as the Id. "
         "Confirm the target record in the response, prefer minimal explicit "
         "field changes, and do not propose any field outside the writable "
         "contract."
@@ -421,6 +428,13 @@ def normalize_propose_edit_input(params: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(record_id, str) or not record_id.strip():
         raise WriteProposalValidationError("'record_id' is required for propose_edit")
     record_id = record_id.strip()
+    if not _SFDC_ID_RE.match(record_id):
+        raise WriteProposalValidationError(
+            f"'record_id' value '{record_id}' is not a valid Salesforce Id. "
+            "It must be the exact 15- or 18-character Id from a prior "
+            "search_records result or the record-page context — never a name "
+            "or fabricated value."
+        )
 
     record_name = params.get("record_name")
     if isinstance(record_name, str):

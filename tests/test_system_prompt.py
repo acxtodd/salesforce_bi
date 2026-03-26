@@ -577,7 +577,7 @@ class TestBuildSystemPrompt:
         assert "propose_edit" in result
         assert "Supported writable objects" in result
         assert "Account, Contact, Task" in result
-        assert "Never include denormalized search fields" in result
+        assert "never fabricate" in result
 
     def test_includes_prompt_quality_sections(self):
         result = build_system_prompt(SAMPLE_CONFIG_11)

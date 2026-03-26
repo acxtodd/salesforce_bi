@@ -316,7 +316,14 @@ def handler(event: dict, context: Any) -> dict:
         )
         # Prepend record context so the LLM knows which record the user is viewing.
         effective_question = question
-        if record_name and record_type:
+        if record_name and record_type and record_id:
+            effective_question = (
+                f"[The user is currently viewing a {record_type} record: "
+                f'"{record_name}" (Id: {record_id}). '
+                f"Use this as context for their question.] "
+                f"{question}"
+            )
+        elif record_name and record_type:
             effective_question = (
                 f"[The user is currently viewing a {record_type} record named "
                 f'"{record_name}". Use this as context for their question.] '

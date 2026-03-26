@@ -442,6 +442,71 @@ class TestDispatchProposeEdit:
         assert "error" in result
         assert "unsupported object_type" in result["error"]
 
+    def test_rejects_record_name_as_id(self):
+        """Model sometimes passes the record name instead of the Salesforce Id."""
+        d, _ = _make_dispatcher()
+        result = d.dispatch({
+            "name": "propose_edit",
+            "parameters": {
+                "object_type": "Account",
+                "record_id": "Todco Investments",
+                "fields": [
+                    {"apiName": "Phone", "proposedValue": "555-000-1234"},
+                ],
+            },
+        })
+
+        assert "error" in result
+        assert "not a valid Salesforce Id" in result["error"]
+
+    def test_rejects_short_id(self):
+        d, _ = _make_dispatcher()
+        result = d.dispatch({
+            "name": "propose_edit",
+            "parameters": {
+                "object_type": "Contact",
+                "record_id": "003abc",
+                "fields": [
+                    {"apiName": "Phone", "proposedValue": "555-000-1234"},
+                ],
+            },
+        })
+
+        assert "error" in result
+        assert "not a valid Salesforce Id" in result["error"]
+
+    def test_accepts_valid_15_char_id(self):
+        d, _ = _make_dispatcher()
+        result = d.dispatch({
+            "name": "propose_edit",
+            "parameters": {
+                "object_type": "Account",
+                "record_id": "001000000000001",
+                "fields": [
+                    {"apiName": "Phone", "proposedValue": "555-000-1234"},
+                ],
+            },
+        })
+
+        assert "write_proposal" in result
+        assert result["write_proposal"]["recordId"] == "001000000000001"
+
+    def test_accepts_valid_18_char_id(self):
+        d, _ = _make_dispatcher()
+        result = d.dispatch({
+            "name": "propose_edit",
+            "parameters": {
+                "object_type": "Account",
+                "record_id": "001dl00000VTVY3AAP",
+                "fields": [
+                    {"apiName": "Phone", "proposedValue": "555-000-1234"},
+                ],
+            },
+        })
+
+        assert "write_proposal" in result
+        assert result["write_proposal"]["recordId"] == "001dl00000VTVY3AAP"
+
 
 # =========================================================================
 # dispatch — unknown tools

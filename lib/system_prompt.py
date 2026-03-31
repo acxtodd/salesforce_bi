@@ -45,7 +45,8 @@ _PROPERTY_FIELDS = """\
   - name: record name / building name
   - city, state: location
   - property_class: building class (A, B, C)
-  - property_type: property subtype (General, Business Park, Mixed Use, etc.) — NOT the primary type. Use text_query for "office"/"industrial"/"retail" searches.
+  - record_type: primary building type (Office, Retail, Industrial, Multi-Family, etc.) — use this for "office buildings", "industrial properties", etc.
+  - property_type: property subtype (General, Business Park, Mixed Use, etc.) — NOT the primary type
   - total_sf: total building area in square feet
   - year_built: year the building was constructed
   - floors: number of floors
@@ -77,7 +78,8 @@ _LEASE_FIELDS = """\
   - property_city: parent property city (denormalized)
   - property_state: parent property state (denormalized)
   - property_class: parent property class (denormalized)
-  - property_type: parent property subtype (denormalized) — subtypes, not primary type
+  - property_type: parent property subtype (denormalized) — subtypes like General, Business Park, not primary type
+  - property_record_type: parent property primary type (Office, Retail, Industrial, etc.) — denormalized from Property RecordType
   - property_total_sf: parent property total building area (denormalized)"""
 
 _AVAILABILITY_FIELDS = """\
@@ -101,7 +103,8 @@ _AVAILABILITY_FIELDS = """\
   - property_city: parent property city (denormalized)
   - property_state: parent property state (denormalized)
   - property_class: parent property class (denormalized)
-  - property_type: parent property subtype (denormalized) — subtypes, not primary type
+  - property_type: parent property subtype (denormalized) — subtypes like General, Business Park, not primary type
+  - property_record_type: parent property primary type (Office, Retail, Industrial, etc.) — denormalized from Property RecordType
   - property_total_sf: parent property total building area (denormalized)"""
 
 _ACCOUNT_FIELDS = """\
@@ -274,26 +277,23 @@ _FEW_SHOT_EXAMPLES = """\
 Note: Dates in examples below are illustrative. Always compute relative dates
 (e.g. "last 12 months") from today's date stated above.
 
-**1. Property search — filters + text_query**
+**1. Property search — filters + structured record_type**
 User: "Show me Class A office buildings in Dallas over 100,000 SF"
 Tool call:
   search_records(
     object_type="Property",
-    filters={"city": "Dallas", "property_class": "A", "total_sf_gte": 100000},
-    text_query="office"
+    filters={"city": "Dallas", "property_class": "A", "total_sf_gte": 100000, "record_type": "Office"}
   )
-Note: "office" is qualitative → text_query. "Dallas", "A", and 100000 are structured → filters.
+Note: "office" is a primary building type → use record_type filter. "Dallas", "A", and 100000 are structured → filters.
 
 **2. Property search — explicit market filter when user says market**
 User: "Show me office properties in the Dallas-Fort Worth market"
 Tool call:
   search_records(
     object_type="Property",
-    filters={"market": "Dallas-Fort Worth"},
-    text_query="office"
+    filters={"market": "Dallas-Fort Worth", "record_type": "Office"}
   )
-Note: Preserve the user's geography grain. If they explicitly ask for a market or
-submarket, use market/submarket filters instead of silently narrowing to city.
+Note: Preserve the user's geography grain. "office" is a primary building type → record_type filter, not text_query.
 
 **3. Lease comp search — cross-object denormalized fields**
 User: "What lease comps exist in Dallas CBD for office space in the last 12 months over 10,000 SF?"
@@ -322,7 +322,7 @@ Tool call:
       "status": "Active"
     }
   )
-Note: Asking rates use rent_low/rent_high range fields. There is no single asking-rate field.
+Note: use_type is the space use type within the building. For filtering by the parent building's primary type, use property_record_type instead. Asking rates use rent_low/rent_high range fields.
 
 **5. Deal pipeline search — broker and party filters**
 User: "Show me Transwestern's closed deals this year over $50,000 in fees"
@@ -347,12 +347,10 @@ User: "List all companies that own office property in Texas, Oklahoma and Louisi
 Tool call:
   search_records(
     object_type="Property",
-    filters={"state_in": ["TX", "OK", "LA"]},
-    text_query="office",
+    filters={"state_in": ["TX", "OK", "LA"], "record_type": "Office"},
     limit=50
   )
-Note: Use _in for multi-value filters (states, cities, classes). Extract owner_account_name
-from results to answer "which companies" questions — no separate Account search needed.
+Note: Use _in for multi-value filters (states, cities, classes). "office" is a primary building type → record_type filter. Extract owner_account_name from results to answer "which companies" questions.
 
 **8. Multi-object: inquiries matching a market**
 User: "Find active inquiries for office space in the Houston market"
@@ -367,8 +365,7 @@ User: "What listings match preferences for Class A office over 5,000 SF?"
 Tool calls (parallel):
   search_records(
     object_type="Preference",
-    filters={"property_class": "A", "min_size_lte": 5000, "sale_or_lease": "Lease"},
-    text_query="office"
+    filters={"property_class": "A", "property_type": "Office", "min_size_lte": 5000, "sale_or_lease": "Lease"}
   )
   search_records(
     object_type="Listing",
@@ -450,6 +447,13 @@ User: "Who are our top brokers by deal value?"
 Why wrong: Raw search hits are not a complete dataset. Use aggregate_records
 with group_by for rankings, or clarify if the grouping dimension is ambiguous.
 
+**WRONG - using text_query for primary building type when structured field exists**
+User: "Show me office properties in Dallas"
+  search_records(object_type="Property", filters={"city": "Dallas"}, text_query="office")
+Why wrong: "office" is a primary building type. Use record_type="Office" filter instead of text_query.
+Correct:
+  search_records(object_type="Property", filters={"city": "Dallas", "record_type": "Office"})
+
 **WRONG - using text_query as a match-everything hack**
 User: "How many properties do we have?"
   search_records(object_type="Property", text_query="a the is of and")
@@ -499,9 +503,9 @@ follow-up suggestions or disambiguation options.
 
 3. **Use text_query for qualitative concepts, filters for structured values.**
    Put subjective or descriptive terms in text_query (BM25 semantic match):
-   "office", "medical", "CBD", "Class A", broker/company names.
+   "medical", "CBD", broker/company names.
    Put exact values in filters: city names, numeric ranges, dates, picklist
-   values. Combine both when the question has both types.
+   values, building primary type (record_type). Combine both when the question has both types.
    Preserve the user's geography grain: if they explicitly say "market" or
    "submarket", use market/submarket filters rather than silently replacing
    them with city/state filters.

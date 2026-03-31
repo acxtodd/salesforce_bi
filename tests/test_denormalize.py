@@ -559,6 +559,116 @@ class TestSchema:
 # ===================================================================
 
 
+# ===================================================================
+# Nested / dotted parent field tests (Task 4.16.2)
+# ===================================================================
+
+
+class TestDottedParentFields:
+    """Tests for dotted parent fields like RecordType.Name."""
+
+    def test_flatten_resolves_nested_parent_field(self):
+        """Dotted parent field like RecordType.Name is resolved via nested traversal."""
+        record = {
+            "Id": "a0P001",
+            "LastModifiedDate": "2026-01-01",
+            "ascendix__Property__c": "prop001",
+            "ascendix__Property__r": {
+                "Name": "Main Tower",
+                "RecordType": {"Name": "Office"},
+            },
+        }
+        parent_config = {
+            "ascendix__Property__c": ["Name", "RecordType.Name"],
+        }
+        rel_map = {
+            "ascendix__Property__c": {"relationship_name": "ascendix__Property__r"},
+        }
+        direct, parents = flatten(record, [], [], parent_config, rel_map)
+        assert parents["ascendix__Property__c"]["RecordType.Name"] == "Office"
+        assert parents["ascendix__Property__c"]["Name"] == "Main Tower"
+
+    def test_flatten_nested_field_missing_gracefully(self):
+        """When nested parent data is absent, dotted field is simply omitted."""
+        record = {
+            "Id": "a0P002",
+            "LastModifiedDate": "2026-01-01",
+            "ascendix__Property__c": "prop002",
+            "ascendix__Property__r": {
+                "Name": "Other Tower",
+                # RecordType key is missing entirely
+            },
+        }
+        parent_config = {
+            "ascendix__Property__c": ["Name", "RecordType.Name"],
+        }
+        rel_map = {
+            "ascendix__Property__c": {"relationship_name": "ascendix__Property__r"},
+        }
+        direct, parents = flatten(record, [], [], parent_config, rel_map)
+        assert "RecordType.Name" not in parents["ascendix__Property__c"]
+        assert parents["ascendix__Property__c"]["Name"] == "Other Tower"
+
+    def test_build_document_flattens_dotted_parent_field_key(self):
+        """Dotted parent field RecordType.Name becomes property_recordtype_name, not property_recordtype.name."""
+        parent_fields = {
+            "ascendix__Property__c": {
+                "Name": "Main Tower",
+                "RecordType.Name": "Office",
+            }
+        }
+        doc = build_document(
+            direct_fields={"Id": "a0A001", "LastModifiedDate": "2026-01-01"},
+            parent_fields=parent_fields,
+            text="test",
+            vector=[0.1] * 1024,
+            record_id="a0A001",
+            object_type="ascendix__Availability__c",
+            salesforce_org_id="00D001",
+            embed_field_names=[],
+            metadata_field_names=[],
+            parent_config={"ascendix__Property__c": ["Name", "RecordType.Name"]},
+        )
+        assert "property_recordtype_name" in doc
+        assert doc["property_recordtype_name"] == "Office"
+        assert doc["property_name"] == "Main Tower"
+        # Must not have dotted key
+        for key in doc:
+            assert "." not in key, f"Dotted key found: {key}"
+
+    def test_build_text_handles_dotted_parent_field(self):
+        """Dotted parent field uses clean labels for each segment."""
+        direct = {"Name": "Avail-001"}
+        parent = {
+            "ascendix__Property__c": {
+                "Name": "Main Tower",
+                "RecordType.Name": "Office",
+            }
+        }
+        parent_config = {
+            "ascendix__Property__c": ["Name", "RecordType.Name"],
+        }
+        text = build_text(
+            direct, parent, ["Name"], parent_config, "ascendix__Availability__c"
+        )
+        assert "RecordType Name: Office" in text
+
+    def test_build_soql_handles_dotted_parent_field(self):
+        """Dotted parent fields produce correct multi-level SOQL traversal."""
+        rel_map = {
+            "ascendix__Property__c": {"relationship_name": "ascendix__Property__r"},
+        }
+        soql = build_soql(
+            "ascendix__Availability__c",
+            ["Name"],
+            [],
+            {"ascendix__Property__c": ["Name", "RecordType.Name"]},
+            rel_map,
+        )
+        assert "ascendix__Property__r.RecordType.Name" in soql
+        assert "ascendix__Property__r.Name" in soql
+
+
 class TestConstants:
     def test_embedding_model_id(self):
         assert EMBEDDING_MODEL_ID == "amazon.titan-embed-text-v2:0"

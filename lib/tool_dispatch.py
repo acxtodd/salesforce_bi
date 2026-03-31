@@ -95,6 +95,7 @@ def _extract_suffix(key: str) -> str:
 
 SEMANTIC_ALIASES: dict[str, dict[str, str]] = {
     "property": {
+        "record_type": "recordtype_name",
         "property_type": "propertysubtype",
         "property_subtype": "propertysubtype",
         "total_sf": "totalbuildingarea",
@@ -110,6 +111,7 @@ SEMANTIC_ALIASES: dict[str, dict[str, str]] = {
         "market": "market_name",
     },
     "lease": {
+        "property_record_type": "property_recordtype_name",
         "leased_sf": "size",
         "rate_psf": "leaserateperuom",
         "lease_rate": "leaserateperuom",
@@ -132,6 +134,7 @@ SEMANTIC_ALIASES: dict[str, dict[str, str]] = {
         "state": "property_state",
     },
     "availability": {
+        "property_record_type": "property_recordtype_name",
         "available_sf": "availablearea",
         # asking_rate_psf intentionally NOT aliased — spec has a single field
         # but the index stores a low/high range (rentlow / renthigh).  Aliasing
@@ -318,11 +321,19 @@ def build_field_registry(
             for pf in parent_fields:
                 if isinstance(pf, (list, tuple)):
                     pf = pf[0]
-                pf_clean = _clean_label(pf).lower()
+                if "." in pf:
+                    # Dotted parent field: flatten all parts
+                    parts = pf.split(".")
+                    pf_clean = "_".join(_clean_label(p).lower() for p in parts)
+                else:
+                    pf_clean = _clean_label(pf).lower()
                 indexed = f"{prefix}_{pf_clean}"
                 fs.filterable.add(indexed)
                 # Auto snake_case alias for the parent field portion
-                pf_snake = _to_snake_case(_clean_label(pf))
+                if "." in pf:
+                    pf_snake = "_".join(_to_snake_case(_clean_label(p)) for p in pf.split("."))
+                else:
+                    pf_snake = _to_snake_case(_clean_label(pf))
                 alias_key = f"{prefix}_{pf_snake}"
                 if alias_key != indexed:
                     aliases[alias_key] = indexed

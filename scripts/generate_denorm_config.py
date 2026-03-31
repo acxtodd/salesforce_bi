@@ -170,6 +170,11 @@ def _is_geocoordinate_field(field_info: Dict[str, Any]) -> bool:
     return compound_name.endswith("__c")
 
 
+# RecordTypeId is allowed as a parent reference only for these objects.
+# For all other objects, RecordType remains excluded to avoid scope creep.
+RECORDTYPE_PARENT_ALLOWED_OBJECTS = {"ascendix__Property__c"}
+
+
 def _should_include_parent_ref(
     object_name: str,
     ref_field: str,
@@ -177,8 +182,19 @@ def _should_include_parent_ref(
 ) -> bool:
     """Return True when a direct parent reference should be denormalized."""
     if ref_field in EXCLUDED_PARENT_REF_FIELDS:
+        # Bounded exception: RecordTypeId is allowed for specific objects
+        if ref_field == "RecordTypeId" and object_name in RECORDTYPE_PARENT_ALLOWED_OBJECTS:
+            return True
         return False
     if parent_obj in EXCLUDED_PARENT_OBJECTS:
+        # Bounded exception: RecordType parent is allowed when ref field is RecordTypeId
+        # and the object is in the allowlist
+        if (
+            parent_obj == "RecordType"
+            and ref_field == "RecordTypeId"
+            and object_name in RECORDTYPE_PARENT_ALLOWED_OBJECTS
+        ):
+            return True
         return False
     if parent_obj == object_name:
         return False

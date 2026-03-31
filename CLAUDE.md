@@ -2,6 +2,8 @@
 
 Repo-specific agent rules only. Keep this file narrow.
 Use `python3 scripts/task_manager.py` for all task reads and writes.
+For environments, CDC pipeline, and operational notes see
+[`environments.md`](environments.md).
 Before changing searchable object scope or freshness behavior, read
 `docs/architecture/object_scope_and_sync.md`.
 For Ascendix-driven scope/config work, also read

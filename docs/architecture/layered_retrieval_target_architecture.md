@@ -681,3 +681,195 @@ Useful references:
 - HeteRAG: https://arxiv.org/abs/2504.10529
 - GraphRAG: https://arxiv.org/abs/2404.16130
 - BenchmarkQED: https://www.microsoft.com/en-us/research/blog/benchmarkqed-automated-benchmarking-of-rag-systems/
+
+---
+
+## Addendum: BA Review And Commentary
+
+_Added 2026-03-31 after independent analysis of HyPE, RAPTOR, and index-time
+LLM summaries against the current production baseline._
+
+### Overall Assessment
+
+This document is architecturally sound. The core insight — stop forcing one
+document representation to serve every retrieval job — directly addresses
+real weaknesses in the current system. The QA adapted academic techniques to
+our specific constraints (CDC freshness, structured CRM data, existing
+tool-use loop, aggregate integrity) rather than proposing generic adoption.
+
+The remainder of this addendum captures areas where the BA analysis diverged,
+risks that deserve explicit tracking, and sequencing recommendations.
+
+### What This Document Gets Right
+
+**Async sidecar generation solves the CDC latency problem.** Independent
+analysis identified CDC latency as the primary blocker for any index-time LLM
+work. The current CDC path processes a record in ~1 second; adding a
+synchronous LLM summary call would push that to 3-6 seconds. This document
+solves it cleanly: canonical entity writes stay on the fast path, sidecar
+documents (questions, facts, summaries) regenerate asynchronously via
+`lambda/index_enrichment`. The freshness contract is preserved.
+
+**Deterministic neighborhoods avoid RAPTOR's clustering instability.**
+Independent analysis rejected RAPTOR because unsupervised clustering produces
+non-deterministic tree structures that don't align with CRE business
+hierarchies. This document sidesteps the problem entirely by using Salesforce
+FK-based groupings (Property rollups, Account rollups, Market/Submarket
+rollups) instead of algorithmic clusters. The hierarchy is real and stable.
+
+**Aggregate isolation is explicitly protected.** The separate-namespace
+strategy (`org_{id}__q`, `org_{id}__fact`, `org_{id}__summary`) with
+`doc_kind` fencing ensures that `aggregate_records` only touches canonical
+entity documents. This preserves the current exact-aggregation semantics that
+users depend on.
+
+**The IndexGraph refresh model closes a real gap.** The parent-change cascade
+is a known weakness today. When a Property's city changes, we re-fetch child
+records via SOQL and re-embed, but the trigger depends on the child record
+itself appearing in a CDC event or poll-sync window. The DynamoDB reverse-edge
+design enables deterministic fan-out from parent changes to affected children
+and summary groups.
+
+### Areas Of Concern
+
+#### 1. Layer 2 (Relation-Fact Documents) may not carry its weight
+
+The proposal generates micro-propositions like `"Lease Tower West Suite 200 is
+in Dallas."` The claimed benefit is capturing small, high-signal facts buried
+inside large row documents.
+
+However, our entity documents are not large unstructured chunks. They are
+structured field concatenations where every fact is already atomic and
+filterable. `property_city = "Dallas"` is already a first-class attribute on
+every Lease document, and the embedding text already contains
+`"Property City: Dallas"`. Proposition-level retrieval research (Dense X
+Retrieval) shows the strongest gains when applied to long-form documents like
+PDFs or knowledge articles where key facts are buried in paragraphs — not to
+structured CRM records where facts are already disaggregated.
+
+**Recommendation:** Defer Layer 2 until query-log evidence shows specific
+relationship-retrieval failures that Layers 0, 1, and 3 cannot address. If
+Layer 2 is pursued, start with a narrow pilot (e.g., only cross-object
+relationship facts, not direct-field facts that are already filterable) and
+measure incremental recall lift against the baseline with Layers 0+1 already
+active.
+
+#### 2. Query routing adds a classification step that could conflict with tool use
+
+The proposed 4-way intent classifier (`aggregate`, `entity_lookup`,
+`relationship_lookup`, `global_summary`) runs before the Claude tool-use loop.
+But Claude already performs implicit routing — it decides whether to call
+`search_records` or `aggregate_records` based on the question.
+
+Two routing decisions in series create a disagreement surface. A pre-router
+that classifies *"Show me top 5 markets by available SF with declining
+occupancy"* as `aggregate` might prevent the tool-use loop from also pulling
+summary context that would help with the "declining" qualifier.
+
+The document itself acknowledges this tension: *"The initial implementation
+does not need a new public tool. `search_records` can federate internally and
+still return canonical entity records."* Internal federation within
+`search_records` avoids the pre-classification problem entirely and is more
+consistent with the existing architecture.
+
+**Recommendation:** Implement multi-namespace federation inside
+`search_records` and `tool_dispatch.py` rather than adding a pre-router. If
+query-log analysis later reveals systematic misrouting by the tool-use loop,
+revisit the pre-classification approach with evidence.
+
+#### 3. The evaluation baseline does not exist yet
+
+The evaluation plan proposes Recall@10, MRR@10, nDCG@10 across four query
+buckets — this is textbook-correct. But we do not currently measure any of
+these metrics. Every phase's exit criteria depend on showing "measurable recall
+lift" or "no regression," which requires a labeled baseline.
+
+Building the evaluation harness — a set of 50-100 queries with labeled
+relevant records across the four query categories — is a prerequisite for
+every phase of this plan. Without it, the exit criteria are unmeasurable and we
+risk shipping complexity without proven value.
+
+**Recommendation:** Scope the evaluation harness as a standalone task that
+precedes or runs in parallel with Phase 1. Sources: Ascendix saved searches
+(structural fixtures), historical `/query` audit logs, and synthetic
+gap-focused queries authored from real denormalized records. This investment
+pays off regardless of whether the full layered architecture is pursued.
+
+#### 4. The cost model is absent
+
+The document does not estimate:
+
+- LLM cost per record for question generation (3-10 questions × ~500 input
+  tokens + ~200 output tokens each)
+- LLM cost per summary neighborhood (structured rollup + narrative generation)
+- DynamoDB read/write cost for IndexGraph at scale
+- Additional Turbopuffer storage for 3 new namespaces
+- Lambda compute cost for `lambda/index_enrichment`
+
+Back-of-envelope at current scale (14,861 records):
+
+- Question proxies: 14,861 records × 5 questions × ~700 tokens ≈ 52M tokens.
+  At Haiku pricing (~$0.25/MTok input, ~$1.25/MTok output) ≈ $15-25 for full
+  generation. Regeneration on CDC (~100 events/day) ≈ $0.10/day.
+- Neighborhood summaries: ~2,500 Property + ~4,700 Account + ~50 Market
+  summaries ≈ 7,250 summaries × ~1,500 tokens each ≈ 11M tokens ≈ $5-10 for
+  full generation.
+- Turbopuffer: index grows from ~15K to ~90-100K vectors. Storage cost
+  increase is modest.
+- DynamoDB: ~15K items + ~30K reverse edges. Well within on-demand free tier
+  at this scale.
+
+Total estimated monthly cost at current volumes: under $50/month. The cost
+concern is not the dollar amount — it is the operational complexity of
+managing regeneration queues, handling generation failures, and debugging
+stale sidecars.
+
+**Recommendation:** Add cost estimates per phase to the rollout plan. Track
+operational complexity (queue depth, regeneration failure rate, staleness
+p95) alongside retrieval metrics.
+
+#### 5. Implementation scope is large relative to Phase 4 remaining work
+
+The component list is substantial: 6 new modules, 6 new test files, 1 new
+Lambda, 1 new DynamoDB table, and extensions to 6 existing files. Phase 4
+still has 19 pending tasks including user-facing features (write-back 4.17,
+RecordType indexing 4.16, Apollo enrichment 4.19).
+
+**Recommendation:** Position this as a Phase 5 initiative, not a Phase 4
+task. Phase 1 of this plan (instrument + IndexGraph) is low-risk and delivers
+independent value (parent-change cascade fix), so it could be pulled into
+late Phase 4 if capacity allows. Phases 2-5 should follow after Phase 4
+user-facing work is delivered.
+
+### Revised Layer Priority
+
+After synthesizing both the QA analysis and independent BA review:
+
+| Layer | Priority | Rationale |
+|-------|----------|-----------|
+| Phase 1: Instrument + IndexGraph | **High — do first** | Low risk, solves real parent-cascade gap, prerequisite for everything else |
+| Evaluation harness | **High — do in parallel with Phase 1** | Prerequisite for measuring value of all subsequent phases |
+| Phase 2: Reranking | **Medium** | Improves result quality within existing retrieval, no new index infrastructure |
+| Phase 3: Question proxies (Layer 1) | **Medium** | Strongest recall-lift case for natural-language queries, but value depends on baseline measurement |
+| Phase 5: Neighborhood summaries (Layer 3) | **Medium-Low** | Real value for portfolio/market queries, but `aggregate_records` already handles most cases today |
+| Phase 4: Relation facts (Layer 2) | **Low — defer** | Weakest case for structured CRM data; pursue only if query-log evidence shows specific failures |
+
+### Open Questions For Stakeholder Review
+
+1. Do we have query-log evidence of semantic recall failures today? If the
+   tool-use loop already compensates for embedding-gap queries via structured
+   filters, the ROI of Layers 1-3 may be lower than expected.
+
+2. What is the acceptable freshness lag for sidecar documents? The canonical
+   entity stays fresh within seconds (CDC). If a question-proxy or summary
+   takes 30 seconds to regenerate, is that acceptable? 5 minutes? The SLA
+   drives the `index_enrichment` Lambda's concurrency and cost profile.
+
+3. Should the evaluation harness be scoped as a standalone task now,
+   independent of the layered retrieval decision? Its value extends to prompt
+   tuning, model upgrades, and regression testing regardless of this
+   architecture.
+
+4. Is there a user-facing pain point today that would serve as a compelling
+   pilot for one specific layer? A concrete before/after demo is more
+   persuasive than retrieval metrics for stakeholder buy-in.

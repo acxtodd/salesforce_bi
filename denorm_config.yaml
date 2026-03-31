@@ -88,6 +88,8 @@ ascendix__Property__c:
       - Name                         # parent nameField
     ascendix__SubMarket__c:          # -> ascendix__Geography__c
       - Name                         # parent nameField
+    RecordTypeId:                    # -> RecordType
+      - Name                         # record type name (e.g. Office, Industrial)
 
 ascendix__Lease__c:
   embed_fields:
@@ -112,6 +114,7 @@ ascendix__Lease__c:
       - ascendix__PropertyClass__c   # property class
       - ascendix__PropertySubType__c # property subtype
       - ascendix__TotalBuildingArea__c  # property total SF
+      - RecordType.Name              # property record type (e.g. Office)
     ascendix__ListingBrokerCompany__c: # -> Account
       - Name                         # parent nameField
       - Type                         # parent compact
@@ -189,6 +192,7 @@ ascendix__Availability__c:
       - ascendix__PropertyClass__c   # property class
       - ascendix__PropertySubType__c # property subtype
       - ascendix__TotalBuildingArea__c  # property total SF
+      - RecordType.Name              # property record type (e.g. Office)
     ascendix__Listing__c:            # -> ascendix__Listing__c
       - Name                         # parent nameField
     ascendix__Market__c:             # -> ascendix__Geography__c

@@ -1135,3 +1135,51 @@ class TestNewObjectTypesInRegistry:
         fs = registry["listing"]
         assert "listing_broker" in fs.aliases
         assert fs.aliases["listing_broker"] == "listingbrokercompany_name"
+
+
+# =========================================================================
+# Dotted parent field support (Task 4.16.2)
+# =========================================================================
+
+
+class TestDottedParentFieldRegistry:
+    """Verify build_field_registry handles dotted parent fields like RecordType.Name."""
+
+    def test_field_registry_dotted_parent_field_produces_flat_key(self):
+        """Dotted parent field RecordType.Name under Property parent produces flat indexed key."""
+        config = {
+            "ascendix__Availability__c": {
+                "embed_fields": ["ascendix__UseType__c"],
+                "metadata_fields": [],
+                "parents": {
+                    "ascendix__Property__c": [
+                        "Name",
+                        "RecordType.Name",
+                    ],
+                },
+            },
+        }
+        registry = build_field_registry(config, {})
+        avail = registry["availability"]
+        assert "property_recordtype_name" in avail.filterable
+        assert "property_recordtype.name" not in avail.filterable
+        # No dotted keys anywhere
+        for key in avail.filterable:
+            assert "." not in key, f"Dotted key in filterable: {key}"
+        for key in avail.aliases:
+            assert "." not in key, f"Dotted key in aliases: {key}"
+
+    def test_field_registry_property_recordtype_direct_parent(self):
+        """RecordTypeId as direct parent on Property produces recordtype_name."""
+        config = {
+            "ascendix__Property__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": [],
+                "parents": {
+                    "RecordTypeId": ["Name"],
+                },
+            },
+        }
+        registry = build_field_registry(config, {})
+        prop = registry["property"]
+        assert "recordtype_name" in prop.filterable

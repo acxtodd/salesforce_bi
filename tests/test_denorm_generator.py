@@ -29,6 +29,7 @@ from generate_denorm_config import (
     WEIGHT_LIST_VIEW_FILTER,
     WEIGHT_SEARCH_LAYOUT,
     WEIGHT_IS_FILTERABLE,
+    RECORDTYPE_PARENT_ALLOWED_OBJECTS,
     FieldScore,
     MockParentFetcher,
     ObjectMetadata,
@@ -861,3 +862,42 @@ class TestSalesforceHarvesterNullSafety:
             {"conditions": None, "subConditions": None}, meta
         )
         assert meta.field_scores == {}
+
+
+# ===================================================================
+# RecordType parent allowlist tests (Task 4.16.1)
+# ===================================================================
+
+
+class TestRecordTypeParentAllowlist:
+    """Test that RecordTypeId is allowed as a parent only for specific objects."""
+
+    def test_property_recordtype_parent_allowed(self):
+        """Property allows RecordTypeId as a parent with Name field."""
+        meta = ObjectMetadata("ascendix__Property__c")
+        _add_mock_field(meta, "Name", name_field=True)
+        _add_mock_field(
+            meta, "RecordTypeId", sf_type="reference", reference_to="RecordType"
+        )
+        meta.reference_fields["RecordTypeId"] = "RecordType"
+
+        cfg = build_config_for_object(meta, None, set(), "ascendix__")
+        assert "RecordTypeId" in cfg["parents"]
+        parent_field_names = [f[0] for f in cfg["parents"]["RecordTypeId"]]
+        assert "Name" in parent_field_names
+
+    def test_non_property_recordtype_parent_excluded(self):
+        """RecordTypeId is still excluded as parent for non-Property objects."""
+        meta = ObjectMetadata("ascendix__Lease__c")
+        _add_mock_field(meta, "Name", name_field=True)
+        _add_mock_field(
+            meta, "RecordTypeId", sf_type="reference", reference_to="RecordType"
+        )
+        meta.reference_fields["RecordTypeId"] = "RecordType"
+
+        cfg = build_config_for_object(meta, None, set(), "ascendix__")
+        assert "RecordTypeId" not in cfg["parents"]
+
+    def test_allowlist_contains_property(self):
+        """The allowlist constant includes Property."""
+        assert "ascendix__Property__c" in RECORDTYPE_PARENT_ALLOWED_OBJECTS

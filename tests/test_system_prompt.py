@@ -339,7 +339,7 @@ class TestSystemPrompt:
     def test_has_property_market_few_shot_example(self):
         """Static prompt includes an explicit Property market-filter example."""
         assert "Dallas-Fort Worth market" in SYSTEM_PROMPT
-        assert 'filters={"market": "Dallas-Fort Worth"}' in SYSTEM_PROMPT
+        assert 'filters={"market": "Dallas-Fort Worth", "record_type": "Office"}' in SYSTEM_PROMPT
 
     def test_preserves_market_geography_grain(self):
         """Prompt tells the model not to silently replace market with city."""
@@ -554,7 +554,7 @@ class TestBuildSystemPrompt:
     def test_includes_market_grain_guidance(self):
         result = build_system_prompt(SAMPLE_CONFIG)
         assert "Preserve the user's geography grain" in result
-        assert 'filters={"market": "Dallas-Fort Worth"}' in result
+        assert 'filters={"market": "Dallas-Fort Worth", "record_type": "Office"}' in result
 
     def test_includes_grouped_ranking_guard(self):
         result = build_system_prompt(SAMPLE_CONFIG_11)
@@ -856,3 +856,68 @@ class TestPromptExport:
         assert stats.guideline_count == 20
         assert "Tool definitions: 3 tools (search_records, aggregate_records, propose_edit)" in document
         assert "Guidelines: 20" in document
+
+
+# =========================================================================
+# 8. Record type / building type field references (Task 4.16.3)
+# =========================================================================
+
+
+class TestRecordTypeFieldReferences:
+    """Verify record_type and property_record_type field references in prompts."""
+
+    def test_property_record_type_in_static_prompt(self):
+        """Static prompt contains record_type field reference for Property."""
+        assert "record_type: primary building type" in SYSTEM_PROMPT
+
+    def test_no_text_query_office_in_correct_examples(self):
+        """Static prompt must not use text_query="office" in correct examples.
+
+        The anti-pattern section intentionally shows it as WRONG, so we count
+        occurrences: exactly 1 (the anti-pattern) is acceptable.
+        """
+        count = SYSTEM_PROMPT.count('text_query="office"')
+        assert count == 1, (
+            f"Expected exactly 1 occurrence (anti-pattern), found {count}"
+        )
+
+    def test_property_record_type_in_availability_static(self):
+        """Static prompt contains property_record_type for Availability."""
+        assert "property_record_type: parent property primary type" in SYSTEM_PROMPT
+
+    def test_property_record_type_in_lease_static(self):
+        """Static prompt contains property_record_type for Lease."""
+        # property_record_type appears in both Lease and Availability sections
+        assert SYSTEM_PROMPT.count("property_record_type: parent property primary type") >= 2
+
+    def test_record_type_distinct_from_property_type(self):
+        """Prompt distinguishes record_type (primary type) from property_type (subtype)."""
+        assert "record_type: primary building type" in SYSTEM_PROMPT
+        assert "property_type: property subtype" in SYSTEM_PROMPT
+
+    def test_use_type_unchanged(self):
+        """use_type must still reference space use type in Availability."""
+        assert "use_type: space use type" in SYSTEM_PROMPT
+
+    def test_record_type_in_dynamic_prompt(self):
+        """Dynamic prompt also contains record_type references."""
+        result = build_system_prompt(SAMPLE_CONFIG)
+        assert "record_type: primary building type" in result
+        # Only the anti-pattern section should contain text_query="office"
+        count = result.count('text_query="office"')
+        assert count == 1, (
+            f"Expected exactly 1 occurrence (anti-pattern), found {count}"
+        )
+
+    def test_property_record_type_in_dynamic_prompt(self):
+        """Dynamic prompt contains property_record_type for child objects."""
+        result = build_system_prompt(SAMPLE_CONFIG)
+        assert "property_record_type: parent property primary type" in result
+
+    def test_anti_pattern_text_query_office(self):
+        """Anti-pattern warning about text_query for building type exists."""
+        assert "WRONG - using text_query for primary building type" in SYSTEM_PROMPT
+
+    def test_record_type_in_example_filters(self):
+        """Examples use record_type in filters, not text_query for office."""
+        assert '"record_type": "Office"' in SYSTEM_PROMPT

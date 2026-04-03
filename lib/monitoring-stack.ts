@@ -357,7 +357,7 @@ export class MonitoringStack extends cdk.Stack {
       namespace: "AWS/Bedrock",
       metricName: "Invocations",
       dimensionsMap: {
-        ModelId: "amazon.titan-embed-text-v2:0",
+        ModelId: "cohere.embed-v4",
       },
       statistic: "Sum",
       period: cdk.Duration.hours(1),

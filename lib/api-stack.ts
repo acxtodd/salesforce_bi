@@ -90,8 +90,8 @@ export class ApiStack extends cdk.Stack {
             "bedrock:InvokeModelWithResponseStream",
           ],
           resources: [
-            // Titan embedding model
-            `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+            // Cohere Embed v4 (embedding model)
+            `arn:aws:bedrock:${this.region}::foundation-model/cohere.embed-v4:0`,
             // Inference profiles (cross-region)
             `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/*`,
             // Foundation models — all providers for model selector A/B testing

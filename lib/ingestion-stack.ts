@@ -249,13 +249,14 @@ export class IngestionStack extends cdk.Stack {
       ],
     });
 
-    // Bedrock Titan Embed v2 for generating embeddings
+    // Bedrock Cohere Embed v4 for generating embeddings
     cdcSyncRole.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ["bedrock:InvokeModel"],
         resources: [
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/us.cohere.embed-v4:0`,
+          `arn:aws:bedrock:*::foundation-model/cohere.embed-v4:0`,
         ],
       }),
     );
@@ -357,13 +358,14 @@ export class IngestionStack extends cdk.Stack {
       ],
     });
 
-    // Bedrock Titan Embed v2
+    // Bedrock Cohere Embed v4
     pollSyncRole.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
         actions: ["bedrock:InvokeModel"],
         resources: [
-          `arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`,
+          `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/us.cohere.embed-v4:0`,
+          `arn:aws:bedrock:*::foundation-model/cohere.embed-v4:0`,
         ],
       }),
     );

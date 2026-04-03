@@ -4366,6 +4366,37 @@
             "Live replay: 4/4 record-page propose_edit attempts return a valid recordId matching the request record_id"
           ],
           "startedAt": "2026-03-26T17:49:27.848327+00:00"
+        },
+        {
+          "id": "4.23",
+          "title": "Switch embedding model from Bedrock Titan v2 to Cohere Embed v4",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-03T19:16:40.943751+00:00",
+          "updatedAt": "2026-04-03T19:24:29.807828+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Switch Salesforce namespace embeddings from Bedrock Titan v2 to Bedrock Cohere Embed v4 so the indexed vectors are compatible with xiq-kw query-time embedding.\n\n## Current implementation\n- lib/denormalize.py uses EMBEDDING_MODEL_ID = \"amazon.titan-embed-text-v2:0\" and EMBEDDING_DIMENSIONS = 1024.\n- scripts/bulk_load.py sends Titan requests via _generate_embedding_request().\n- lambda/cdc_sync/index.py sends Titan requests via _embed_single().\n- lambda/poll_sync/index.py sends Titan requests via _embed_single() / _embed_batch().\n- scripts/validate_data.py has its own local copies of EMBEDDING_MODEL_ID and EMBEDDING_DIMENSIONS plus an inline Titan embed call.\n\n## Required embedding contract\n- Model: us.cohere.embed-v4:0 (Bedrock inference profile)\n- Dimensions: 1024\n- Index-time mode: search_document\n- Bedrock request body:\n  {\"texts\": [\"...\"], \"input_type\": \"search_document\", \"embedding_types\": [\"int8\"], \"truncate\": \"END\", \"output_dimension\": 1024}\n- Persistence boundary: cast returned int8 embedding values to list[float] before document build/upsert. This preserves float-typed vectors across build_document(), SearchBackend, and Turbopuffer while matching xiq-kw query-time int8 representation.\n- xiq-kw will use the paired search_query mode at query time. This task is index-time only.\n\n## Code paths that must be updated\n- lib/denormalize.py — canonical constants (model ID changes to us.cohere.embed-v4:0)\n- scripts/bulk_load.py — _generate_embedding_request() Titan request/response shape -> Cohere request/response + int8-to-float cast\n- lambda/cdc_sync/index.py — _embed_single() Titan request/response shape -> Cohere request/response + int8-to-float cast\n- lambda/poll_sync/index.py — _embed_single() / _embed_batch() Titan request/response shape -> Cohere request/response + int8-to-float cast\n- scripts/validate_data.py — local constant copies and inline Titan embed call\n- tests/test_denormalize.py — hardcoded assertion for Titan model ID\n- tests/test_bulk_load.py — asserts Titan request fields (inputText, dimensions)\n- tests/test_cdc_sync.py — Titan embedding mocks and assertions\n- tests/test_poll_sync.py — Titan embedding mocks and assertions\n\n## Must remain unchanged\n- Namespace format: org_{salesforce_org_id} in lambda/cdc_sync/index.py\n- Turbopuffer document shape from build_document() in lib/denormalize.py\n- text BM25 field/schema in FULL_TEXT_SEARCH_SCHEMA\n- Cleaned direct-field keys and prefixed parent-field keys\n- Query Lambda / tool-dispatch behavior\n- Float-typed vector interface across build_document(), SearchBackend, and Turbopuffer upsert\n\n## Non-goals\n- No /query redesign\n- No field alias or schema-contract changes beyond embedding model swap\n- No mixed-model compatibility layer\n- No public type churn (vectors stay list[float] at persistence boundary)\n\n## Critical note\nReindex is mandatory. Changing query-time embeddings without rebuilding the SF namespace is incompatible. No mixed Titan/Cohere vectors may remain.",
+          "acceptance_criteria": [
+            "Bulk load writes Cohere Embed v4 1024-dim vectors using Bedrock search_document",
+            "CDC sync writes the same Cohere Embed v4 1024-dim vectors",
+            "Poll sync writes the same Cohere Embed v4 1024-dim vectors",
+            "Existing namespace is fully rebuilt after the switch; no mixed Titan/Cohere vectors remain",
+            "Live ANN query against the rebuilt namespace using a Cohere search_query vector returns relevant Salesforce records, and existing BM25/filter queries still work unchanged"
+          ],
+          "references": [
+            "lib/denormalize.py",
+            "scripts/bulk_load.py",
+            "lambda/cdc_sync/index.py",
+            "lambda/poll_sync/index.py",
+            "scripts/validate_data.py",
+            "tests/test_denormalize.py",
+            "tests/test_bulk_load.py",
+            "tests/test_cdc_sync.py",
+            "tests/test_poll_sync.py"
+          ]
         }
       ]
     },
@@ -4440,7 +4471,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 23,
+      "4.": 24,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

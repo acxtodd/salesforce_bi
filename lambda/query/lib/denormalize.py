@@ -13,7 +13,7 @@ from typing import Any
 # Embedding constants
 # ===================================================================
 
-EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
+EMBEDDING_MODEL_ID = "us.cohere.embed-v4:0"
 EMBEDDING_DIMENSIONS = 1024
 
 # ===================================================================
@@ -304,9 +304,22 @@ def flatten(
         parent_record = record.get(rel_name) or {}
         pvals: dict[str, Any] = {}
         for pf in pfield_names:
-            val = parent_record.get(pf)
-            if val is not None:
-                pvals[pf] = val
+            if "." in pf:
+                # Nested parent field (e.g. RecordType.Name)
+                parts = pf.split(".")
+                nested = parent_record
+                for part in parts:
+                    if isinstance(nested, dict):
+                        nested = nested.get(part)
+                    else:
+                        nested = None
+                        break
+                if nested is not None:
+                    pvals[pf] = nested
+            else:
+                val = parent_record.get(pf)
+                if val is not None:
+                    pvals[pf] = val
         parent_fields[ref_field] = pvals
 
     return direct_fields, parent_fields
@@ -349,7 +362,11 @@ def build_text(
         for pf in pfield_names:
             val = parent_vals.get(pf)
             if val is not None:
-                parts.append(f"{rel_label} {clean_label(pf)}: {val}")
+                if "." in pf:
+                    pf_label = " ".join(clean_label(p) for p in pf.split("."))
+                else:
+                    pf_label = clean_label(pf)
+                parts.append(f"{rel_label} {pf_label}: {val}")
 
     return " | ".join(parts)
 
@@ -399,6 +416,11 @@ def build_document(
         for pf in pfield_names:
             val = parent_vals.get(pf)
             if val is not None:
-                doc[f"{prefix}_{clean_label(pf).lower()}"] = val
+                if "." in pf:
+                    # Dotted parent field: flatten all parts
+                    pf_key = "_".join(clean_label(p).lower() for p in pf.split("."))
+                else:
+                    pf_key = clean_label(pf).lower()
+                doc[f"{prefix}_{pf_key}"] = val
 
     return doc

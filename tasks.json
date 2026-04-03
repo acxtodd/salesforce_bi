@@ -4370,11 +4370,15 @@
         {
           "id": "4.23",
           "title": "Switch embedding model from Bedrock Titan v2 to Cohere Embed v4",
-          "status": "in_progress",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-04-03T19:16:40.943751+00:00",
-          "updatedAt": "2026-04-03T21:29:37.330878+00:00",
-          "files_modified": [],
+          "updatedAt": "2026-04-03T21:57:59.849157+00:00",
+          "files_modified": [
+            "lib/ingestion-stack.ts",
+            "lib/api-stack.ts",
+            "lib/monitoring-stack.ts"
+          ],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [
@@ -4389,6 +4393,14 @@
             {
               "timestamp": "2026-04-03T21:29:37.330692+00:00",
               "note": "Ingestion stack deployed: CDCSyncLambda, PollSyncLambda, ConfigRefreshLambda all updated with Cohere Embed v4 code. All 5 AC items verified."
+            },
+            {
+              "timestamp": "2026-04-03T21:57:53.776385+00:00",
+              "note": "Live Lambda validation complete: poll sync embedded 1 Property record via Cohere Embed v4 and upserted to Turbopuffer. IAM policies updated with wildcard region for cross-region inference profile routing."
+            },
+            {
+              "timestamp": "2026-04-03T21:57:59.849161+00:00",
+              "note": "Task completed"
             }
           ],
           "description": "Switch Salesforce namespace embeddings from Bedrock Titan v2 to Bedrock Cohere Embed v4 so the indexed vectors are compatible with xiq-kw query-time embedding.\n\n## Current implementation\n- lib/denormalize.py uses EMBEDDING_MODEL_ID = \"amazon.titan-embed-text-v2:0\" and EMBEDDING_DIMENSIONS = 1024.\n- scripts/bulk_load.py sends Titan requests via _generate_embedding_request().\n- lambda/cdc_sync/index.py sends Titan requests via _embed_single().\n- lambda/poll_sync/index.py sends Titan requests via _embed_single() / _embed_batch().\n- scripts/validate_data.py has its own local copies of EMBEDDING_MODEL_ID and EMBEDDING_DIMENSIONS plus an inline Titan embed call.\n\n## Required embedding contract\n- Model: us.cohere.embed-v4:0 (Bedrock inference profile)\n- Dimensions: 1024\n- Index-time mode: search_document\n- Bedrock request body:\n  {\"texts\": [\"...\"], \"input_type\": \"search_document\", \"embedding_types\": [\"int8\"], \"truncate\": \"END\", \"output_dimension\": 1024}\n- Persistence boundary: cast returned int8 embedding values to list[float] before document build/upsert. This preserves float-typed vectors across build_document(), SearchBackend, and Turbopuffer while matching xiq-kw query-time int8 representation.\n- xiq-kw will use the paired search_query mode at query time. This task is index-time only.\n\n## Code paths that must be updated\n- lib/denormalize.py — canonical constants (model ID changes to us.cohere.embed-v4:0)\n- scripts/bulk_load.py — _generate_embedding_request() Titan request/response shape -> Cohere request/response + int8-to-float cast\n- lambda/cdc_sync/index.py — _embed_single() Titan request/response shape -> Cohere request/response + int8-to-float cast\n- lambda/poll_sync/index.py — _embed_single() / _embed_batch() Titan request/response shape -> Cohere request/response + int8-to-float cast\n- scripts/validate_data.py — local constant copies and inline Titan embed call\n- tests/test_denormalize.py — hardcoded assertion for Titan model ID\n- tests/test_bulk_load.py — asserts Titan request fields (inputText, dimensions)\n- tests/test_cdc_sync.py — Titan embedding mocks and assertions\n- tests/test_poll_sync.py — Titan embedding mocks and assertions\n\n## Must remain unchanged\n- Namespace format: org_{salesforce_org_id} in lambda/cdc_sync/index.py\n- Turbopuffer document shape from build_document() in lib/denormalize.py\n- text BM25 field/schema in FULL_TEXT_SEARCH_SCHEMA\n- Cleaned direct-field keys and prefixed parent-field keys\n- Query Lambda / tool-dispatch behavior\n- Float-typed vector interface across build_document(), SearchBackend, and Turbopuffer upsert\n\n## Non-goals\n- No /query redesign\n- No field alias or schema-contract changes beyond embedding model swap\n- No mixed-model compatibility layer\n- No public type churn (vectors stay list[float] at persistence boundary)\n\n## Critical note\nReindex is mandatory. Changing query-time embeddings without rebuilding the SF namespace is incompatible. No mixed Titan/Cohere vectors may remain.",
@@ -4410,7 +4422,8 @@
             "tests/test_cdc_sync.py",
             "tests/test_poll_sync.py"
           ],
-          "startedAt": "2026-04-03T19:25:56.889471+00:00"
+          "startedAt": "2026-04-03T19:25:56.889471+00:00",
+          "completedAt": "2026-04-03T21:57:59.848965+00:00"
         }
       ]
     },

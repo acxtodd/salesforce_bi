@@ -301,11 +301,13 @@ def _get_relationship_map(
 
 
 def _embed_single(bedrock_client: Any, text: str) -> list[float]:
-    """Generate embedding for a single text via Bedrock Titan v2."""
+    """Generate embedding for a single text via Bedrock Cohere Embed v4."""
     request_body = {
-        "inputText": text,
-        "dimensions": EMBEDDING_DIMENSIONS,
-        "normalize": True,
+        "texts": [text],
+        "input_type": "search_document",
+        "embedding_types": ["int8"],
+        "truncate": "END",
+        "output_dimension": EMBEDDING_DIMENSIONS,
     }
     response = bedrock_client.invoke_model(
         modelId=EMBEDDING_MODEL_ID,
@@ -314,7 +316,7 @@ def _embed_single(bedrock_client: Any, text: str) -> list[float]:
         body=json.dumps(request_body),
     )
     response_body = json.loads(response["body"].read())
-    return response_body["embedding"]
+    return [float(v) for v in response_body["embeddings"]["int8"][0]]
 
 
 # ---------------------------------------------------------------------------

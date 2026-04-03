@@ -55,16 +55,16 @@ def _make_sf_client_mock(query_results: list[dict] | None = None) -> MagicMock:
 
 
 def _make_bedrock_mock(dimension: int = 1024) -> MagicMock:
-    """Create a mock Bedrock client returning deterministic embeddings."""
+    """Create a mock Bedrock client returning deterministic Cohere embeddings."""
     mock = MagicMock()
 
     def invoke_model(**kwargs):
         body = json.loads(kwargs["body"])
-        text = body["inputText"]
+        text = body["texts"][0]
         # Use hash of text for deterministic but unique embeddings
         seed = hash(text) % 1000
-        embedding = [float(seed + i) / 10000.0 for i in range(dimension)]
-        response_body = json.dumps({"embedding": embedding})
+        int8_embedding = [int((seed + i) % 256 - 128) for i in range(dimension)]
+        response_body = json.dumps({"embeddings": {"int8": [int8_embedding]}})
         return {"body": io.BytesIO(response_body.encode("utf-8"))}
 
     mock.invoke_model.side_effect = invoke_model

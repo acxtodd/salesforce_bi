@@ -671,7 +671,7 @@ class TestDottedParentFields:
 
 class TestConstants:
     def test_embedding_model_id(self):
-        assert EMBEDDING_MODEL_ID == "amazon.titan-embed-text-v2:0"
+        assert EMBEDDING_MODEL_ID == "us.cohere.embed-v4:0"
 
     def test_embedding_dimensions(self):
         assert EMBEDDING_DIMENSIONS == 1024

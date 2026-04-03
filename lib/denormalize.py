@@ -13,7 +13,7 @@ from typing import Any
 # Embedding constants
 # ===================================================================
 
-EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
+EMBEDDING_MODEL_ID = "us.cohere.embed-v4:0"
 EMBEDDING_DIMENSIONS = 1024
 
 # ===================================================================

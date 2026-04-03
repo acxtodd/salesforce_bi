@@ -36,7 +36,7 @@ from lib.turbopuffer_backend import TurbopufferBackend
 
 LOG = logging.getLogger("validate_data")
 
-EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v2:0"
+EMBEDDING_MODEL_ID = "us.cohere.embed-v4:0"
 EMBEDDING_DIMENSIONS = 1024
 
 SYSTEM_FIELDS = ["id", "text", "object_type", "last_modified", "salesforce_org_id"]
@@ -935,12 +935,15 @@ class DataValidator:
                 contentType="application/json",
                 accept="application/json",
                 body=json.dumps({
-                    "inputText": self.query_text,
-                    "dimensions": EMBEDDING_DIMENSIONS,
-                    "normalize": True,
+                    "texts": [self.query_text],
+                    "input_type": "search_query",
+                    "embedding_types": ["int8"],
+                    "truncate": "END",
+                    "output_dimension": EMBEDDING_DIMENSIONS,
                 }),
             )
-            embedding = json.loads(response["body"].read())["embedding"]
+            resp_body = json.loads(response["body"].read())
+            embedding = [float(v) for v in resp_body["embeddings"]["int8"][0]]
         except Exception as e:
             return CheckResult(
                 name="Hybrid search",

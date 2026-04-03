@@ -73,14 +73,14 @@ def _mock_s3_get_object(payload: dict) -> MagicMock:
 
 
 def _make_bedrock_mock(dimension: int = 1024) -> MagicMock:
-    """Create a mock Bedrock client returning deterministic embeddings."""
+    """Create a mock Bedrock client returning deterministic Cohere embeddings."""
     mock = MagicMock()
 
     def invoke_model(**kwargs):
         body = json.loads(kwargs["body"])
-        dim = body["dimensions"]
-        embedding = [0.1] * dim
-        response_body = json.dumps({"embedding": embedding})
+        dim = body["output_dimension"]
+        int8_embedding = [1] * dim
+        response_body = json.dumps({"embeddings": {"int8": [int8_embedding]}})
         return {"body": io.BytesIO(response_body.encode())}
 
     mock.invoke_model.side_effect = invoke_model

@@ -637,17 +637,17 @@ class TestValidateParents:
 
 
 def _make_bedrock_mock(dimension=1024):
-    """Create a mock bedrock client that returns deterministic embeddings."""
+    """Create a mock bedrock client that returns deterministic Cohere embeddings."""
     mock = MagicMock()
 
     def invoke_model(**kwargs):
         body = json.loads(kwargs["body"])
-        text = body["inputText"]
-        dim = body["dimensions"]
+        text = body["texts"][0]
+        dim = body["output_dimension"]
         # Deterministic embedding based on text hash
         seed = hash(text) % 1000 / 1000
-        embedding = [seed] * dim
-        response_body = json.dumps({"embedding": embedding})
+        int8_embedding = [int(seed * 127)] * dim
+        response_body = json.dumps({"embeddings": {"int8": [int8_embedding]}})
         return {"body": io.BytesIO(response_body.encode())}
 
     mock.invoke_model.side_effect = invoke_model
@@ -682,7 +682,7 @@ class TestEmbedding:
 
         def invoke_side_effect(**kwargs):
             body = json.loads(kwargs["body"])
-            text = body["inputText"]
+            text = body["texts"][0]
             time_to_sleep = delays[text]
             if time_to_sleep:
                 import time
@@ -690,7 +690,7 @@ class TestEmbedding:
                 time.sleep(time_to_sleep)
             return {
                 "body": io.BytesIO(
-                    json.dumps({"embedding": [values[text]] * 2}).encode()
+                    json.dumps({"embeddings": {"int8": [[int(values[text])] * 2]}}).encode()
                 )
             }
 
@@ -712,13 +712,13 @@ class TestEmbedding:
 
         def invoke_side_effect(**kwargs):
             body = json.loads(kwargs["body"])
-            text = body["inputText"]
+            text = body["texts"][0]
             attempts[text] = attempts.get(text, 0) + 1
             if text == "retry-me" and attempts[text] == 1:
                 raise throttle_exc
             return {
                 "body": io.BytesIO(
-                    json.dumps({"embedding": [float(attempts[text])] * 2}).encode()
+                    json.dumps({"embeddings": {"int8": [[attempts[text]] * 2]}}).encode()
                 )
             }
 
@@ -754,7 +754,7 @@ class TestEmbedding:
             call_count += 1
             if call_count <= 2:
                 raise throttle_exc
-            body = json.dumps({"embedding": [0.1] * 1024})
+            body = json.dumps({"embeddings": {"int8": [[1] * 1024]}})
             return {"body": io.BytesIO(body.encode())}
 
         bedrock.invoke_model.side_effect = invoke_side_effect
@@ -973,10 +973,10 @@ class TestLoadObjectHardening:
 
         def invoke_side_effect(**kwargs):
             body = json.loads(kwargs["body"])
-            text = body["inputText"]
+            text = body["texts"][0]
             if "Bad" in text:
                 raise ValueError("record embed failed")
-            return {"body": io.BytesIO(json.dumps({"embedding": [0.1] * 1024}).encode())}
+            return {"body": io.BytesIO(json.dumps({"embeddings": {"int8": [[1] * 1024]}}).encode())}
 
         bedrock.invoke_model.side_effect = invoke_side_effect
 
@@ -1276,10 +1276,10 @@ class TestDenormAuditBulkLoad:
 
         def invoke_side_effect(**kwargs):
             body = json.loads(kwargs["body"])
-            text = body["inputText"]
+            text = body["texts"][0]
             if "Bad" in text:
                 raise ValueError("embed failed")
-            return {"body": io.BytesIO(json.dumps({"embedding": [0.1] * 1024}).encode())}
+            return {"body": io.BytesIO(json.dumps({"embeddings": {"int8": [[1] * 1024]}}).encode())}
 
         bedrock.invoke_model.side_effect = invoke_side_effect
 

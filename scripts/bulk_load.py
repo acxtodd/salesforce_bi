@@ -266,11 +266,13 @@ def create_s3_audit_client(audit_concurrency: int) -> Any:
 def _generate_embedding_request(
     bedrock_client: Any, text: str
 ) -> list[float]:
-    """Generate a single embedding request via Bedrock Titan v2."""
+    """Generate a single embedding request via Bedrock Cohere Embed v4."""
     request_body = {
-        "inputText": text,
-        "dimensions": EMBEDDING_DIMENSIONS,
-        "normalize": True,
+        "texts": [text],
+        "input_type": "search_document",
+        "embedding_types": ["int8"],
+        "truncate": "END",
+        "output_dimension": EMBEDDING_DIMENSIONS,
     }
     response = bedrock_client.invoke_model(
         modelId=EMBEDDING_MODEL_ID,
@@ -279,7 +281,7 @@ def _generate_embedding_request(
         body=json.dumps(request_body),
     )
     response_body = json.loads(response["body"].read())
-    return response_body["embedding"]
+    return [float(v) for v in response_body["embeddings"]["int8"][0]]
 
 
 def _embed_text_with_retry(

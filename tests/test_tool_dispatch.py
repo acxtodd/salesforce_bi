@@ -1133,9 +1133,21 @@ class TestSaleSemanticAliases:
         assert fs.aliases["street"] == "property_street"
         assert fs.aliases["zip"] == "property_postalcode"
         assert fs.aliases["postal_code"] == "property_postalcode"
-        assert fs.aliases["year_built"] == "property_yearbuilt"
-        assert fs.aliases["year_renovated"] == "property_yearrenovated"
         assert fs.aliases["total_units"] == "property_totalunits"
+
+    def test_text_typed_year_fields_not_advertised_as_filter_aliases(self):
+        """year_built and year_renovated are Text(255) in Salesforce, so
+        range operators are either lexicographic or backend-defined and
+        unsafe. They must NOT be exposed as filter aliases. They remain
+        indexed so Sale result documents still carry them for display."""
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        # Semantic short-form aliases must not exist
+        assert "year_built" not in fs.aliases
+        assert "year_renovated" not in fs.aliases
+        # Fields are still indexed so they show up in results
+        assert "property_yearbuilt" in fs.filterable
+        assert "property_yearrenovated" in fs.filterable
 
     def test_listing_broker_alias_resolves_to_listing_broker_company(self):
         """The 'listing_broker' short alias must map to ListingBrokerCompany,
@@ -1227,7 +1239,6 @@ class TestSaleSemanticAliases:
                     "city": "Portland",
                     "state": "OR",
                     "zip": "97225",
-                    "year_built": "1986",
                     "total_units": 108,
                     "price_per_unit_gte": 250000,
                     "listing_broker": "Marcus & Millichap, Inc.",
@@ -1240,10 +1251,26 @@ class TestSaleSemanticAliases:
         assert "property_city" in resolved
         assert "property_state" in resolved
         assert "property_postalcode" in resolved
-        assert "property_yearbuilt" in resolved
         assert "property_totalunits" in resolved
         assert "salepriceperunit_gte" in resolved
         assert "listingbrokercompany_name" in resolved
+
+    def test_sale_dispatch_rejects_year_built_range_filter(self):
+        """If the model (or a future prompt edit) tries to use year_built
+        as a filter alias, the dispatcher must reject it — year_built is
+        Text(255) and cannot be safely range-compared. The rejection is
+        the safety net that backs up the prompt-side 'do not filter'
+        guidance."""
+        d, _backend = _make_dispatcher(config=_SALE_CONFIG)
+        result = d.dispatch({
+            "name": "search_records",
+            "parameters": {
+                "object_type": "Sale",
+                "filters": {"year_built_gte": "1990"},
+            },
+        })
+        assert "error" in result, result
+        assert "year_built" in result["error"].lower() or "field" in result["error"].lower()
 
 
 class TestNewObjectTypesInRegistry:

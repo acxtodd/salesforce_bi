@@ -198,8 +198,9 @@ _SALE_FIELDS = """\
   - listing_broker_contact_name: listing broker contact (denormalized)
   - property_name: parent property name (denormalized)
   - street (property_street), city (property_city), state (property_state), zip (property_postal_code): full parent property address (denormalized)
-  - year_built (property_year_built), year_renovated (property_year_renovated): property vintage (denormalized, stored as text)
-  - total_units (property_total_units): total unit count from the linked property (denormalized) — the authoritative building-level count; the Sale-level `units` field may differ for partial-unit transactions"""
+  - total_units (property_total_units): total unit count from the linked property (denormalized) — the authoritative building-level count; the Sale-level `units` field may differ for partial-unit transactions
+
+  Year built and year renovated on the linked property are returned with Sale search results for display, but they are stored as text in Salesforce and MUST NOT be used as filters (no equality filter, no range filter). If the user asks a question like "built after 1990", explain that vintage filtering is not available and offer to narrow by city, market, or sale date instead."""
 
 _INQUIRY_FIELDS = """\
   - name: inquiry record name

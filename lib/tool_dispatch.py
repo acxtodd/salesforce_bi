@@ -200,10 +200,15 @@ SEMANTIC_ALIASES: dict[str, dict[str, str]] = {
         "street": "property_street",
         "zip": "property_postalcode",
         "postal_code": "property_postalcode",
-        "year_built": "property_yearbuilt",
-        "year_renovated": "property_yearrenovated",
         "total_units": "property_totalunits",
         "listing_broker": "listingbrokercompany_name",
+        # NOTE: property_yearbuilt / property_yearrenovated are Text(255)
+        # in Salesforce and are intentionally NOT advertised as filter
+        # aliases. They remain indexed and appear in Sale result documents
+        # for display, but range operators (_gte/_lte) on text storage
+        # are either lexicographic or backend-defined and unsafe.
+        # If a future task normalizes them to int at ingestion, add the
+        # semantic aliases back here.
     },
     "inquiry": {
         "min_size": "areaminimum",

@@ -975,18 +975,13 @@ _SALE_CONFIG = {
                 "ascendix__PostalCode__c",
                 "ascendix__PropertyClass__c",
                 "ascendix__YearBuilt__c",
-                "ascendix__YearRenovated__c",
                 "ascendix__TotalUnits__c",
             ],
             "ascendix__Buyer__c": ["Name"],
-            "ascendix__BuyerContact__c": ["Name"],
             "ascendix__BuyerRep__c": ["Name"],
-            "ascendix__BuyerRepContact__c": ["Name"],
             "ascendix__Seller__c": ["Name"],
-            "ascendix__SellerContact__c": ["Name"],
             "ascendix__SellingBroker__c": ["Name"],
             "ascendix__ListingBrokerCompany__c": ["Name"],
-            "ascendix__ListingBrokerContact__c": ["Name"],
         },
     },
 }
@@ -1135,29 +1130,26 @@ class TestSaleSemanticAliases:
         assert fs.aliases["postal_code"] == "property_postalcode"
         assert fs.aliases["total_units"] == "property_totalunits"
 
-    def test_text_typed_year_fields_not_advertised_as_filter_aliases(self):
-        """year_built and year_renovated are Text(255) in Salesforce, so
-        range operators are either lexicographic or backend-defined and
-        unsafe. They must NOT be exposed as filter aliases. They remain
-        indexed so Sale result documents still carry them for display."""
+    def test_text_typed_year_built_not_advertised_as_filter_alias(self):
+        """year_built is Text(255) in Salesforce, so range operators
+        are either lexicographic or backend-defined and unsafe. It
+        must NOT be exposed as a filter alias. It remains indexed so
+        Sale result documents still carry it for display."""
         registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
         fs = registry["sale"]
-        # Semantic short-form aliases must not exist
+        # Semantic short-form alias must not exist
         assert "year_built" not in fs.aliases
-        assert "year_renovated" not in fs.aliases
-        # Fields are still indexed so they show up in results
+        # Field is still indexed so it shows up in results
         assert "property_yearbuilt" in fs.filterable
-        assert "property_yearrenovated" in fs.filterable
 
     def test_property_yearbuilt_in_non_filterable_denylist(self):
         """Verify the NON_FILTERABLE_FIELDS denylist covers every form
-        of the text-typed vintage fields. This is the backstop against
-        the auto-generated parent alias (property_year_built) that
-        build_field_registry creates for every parent field."""
+        of the text-typed year_built field. This is the backstop
+        against the auto-generated parent alias (property_year_built)
+        that build_field_registry creates for every parent field."""
         from lib.tool_dispatch import NON_FILTERABLE_FIELDS
         sale_deny = NON_FILTERABLE_FIELDS.get("sale", set())
         assert "property_yearbuilt" in sale_deny
-        assert "property_yearrenovated" in sale_deny
 
     def test_listing_broker_alias_resolves_to_listing_broker_company(self):
         """The 'listing_broker' short alias must map to ListingBrokerCompany,
@@ -1169,21 +1161,20 @@ class TestSaleSemanticAliases:
         assert "listingbrokercompany_name" in fs.filterable
 
     def test_auto_generated_broker_aliases_remain(self):
-        """Auto snake_case aliases for all nine party parents must still work
-        so existing agent prompts referencing selling_broker_name etc. don't
-        regress."""
+        """Auto snake_case aliases for all company-form party parents
+        must still work so existing agent prompts referencing
+        selling_broker_name etc. don't regress. Contact-form lookups
+        (BuyerContact, BuyerRepContact, SellerContact, ListingBroker
+        Contact) were intentionally dropped from the Sale denorm to
+        fit the Turbopuffer 256-attribute namespace cap."""
         registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
         fs = registry["sale"]
         for alias, indexed in [
             ("selling_broker_name", "sellingbroker_name"),
             ("listing_broker_company_name", "listingbrokercompany_name"),
-            ("listing_broker_contact_name", "listingbrokercontact_name"),
             ("buyer_name", "buyer_name"),
-            ("buyer_contact_name", "buyercontact_name"),
             ("buyer_rep_name", "buyerrep_name"),
-            ("buyer_rep_contact_name", "buyerrepcontact_name"),
             ("seller_name", "seller_name"),
-            ("seller_contact_name", "sellercontact_name"),
         ]:
             assert indexed in fs.filterable, f"{indexed} not in filterable"
             # Aliases only generated when they differ from indexed form
@@ -1191,6 +1182,26 @@ class TestSaleSemanticAliases:
                 assert fs.aliases.get(alias) == indexed, (
                     f"expected alias {alias} -> {indexed}, got {fs.aliases.get(alias)}"
                 )
+
+    def test_contact_form_party_lookups_not_indexed(self):
+        """Contact-form party lookups are intentionally NOT in the
+        Sale denorm to stay under the Turbopuffer 256-attribute cap.
+        If a future reviewer re-adds them, they must also remove
+        other attributes to compensate (or move Sale to a dedicated
+        namespace). This test documents the intentional absence."""
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        for absent in (
+            "buyercontact_name",
+            "buyerrepcontact_name",
+            "sellercontact_name",
+            "listingbrokercontact_name",
+        ):
+            assert absent not in fs.filterable, (
+                f"{absent} is indexed — this will push the shared "
+                f"Turbopuffer namespace past its 256-attribute cap "
+                f"(previously observed at 261 when these were present)"
+            )
 
     def test_property_type_not_introduced_on_sale(self):
         """Guard against CLAUDE.md failure pattern 3: do not collapse
@@ -1268,22 +1279,25 @@ class TestSaleSemanticAliases:
     @pytest.mark.parametrize(
         "filter_key,reason",
         [
-            # Short-form alias: removed from SEMANTIC_ALIASES, resolves to
-            # neither filterable nor aliases → rejected as unknown field.
-            ("year_built_gte", "short-form alias no longer exists"),
-            ("year_renovated_gte", "short-form alias no longer exists"),
+            # Short-form alias: never existed in SEMANTIC_ALIASES, resolves
+            # to neither filterable nor aliases → rejected as unknown field.
+            ("year_built_gte", "short-form alias never existed"),
             # Auto-generated parent-form alias: build_field_registry still
             # creates property_year_built -> property_yearbuilt, but the
             # denylist blocks the resolved indexed name.
             ("property_year_built_gte", "auto-gen parent alias hits denylist"),
-            ("property_year_renovated_gte", "auto-gen parent alias hits denylist"),
             # Raw indexed form: direct hit in fs.filterable, but denylist
             # still blocks at _resolve_field return time.
             ("property_yearbuilt_gte", "raw indexed form hits denylist"),
-            ("property_yearrenovated_gte", "raw indexed form hits denylist"),
             # Equality is equally unsafe on text storage.
             ("property_yearbuilt", "equality filter on denylisted field"),
             ("property_year_built", "equality filter via auto-gen alias"),
+            # YearRenovated was dropped from the Sale denorm entirely to
+            # fit the Turbopuffer 256-attribute cap, so the field never
+            # reaches the registry and any form is rejected as unknown.
+            ("year_renovated_gte", "field not indexed at all"),
+            ("property_year_renovated_gte", "field not indexed at all"),
+            ("property_yearrenovated_gte", "field not indexed at all"),
         ],
     )
     def test_sale_dispatch_rejects_all_year_built_filter_paths(self, filter_key, reason):

@@ -189,18 +189,15 @@ _SALE_FIELDS = """\
   - sale_date: date the sale closed
   - date_on_market: when the property went on market
   - gross_income: gross income of the property
-  - buyer_name, seller_name: party names (denormalized Account lookups)
-  - buyer_contact_name, seller_contact_name: party contacts (denormalized)
+  - buyer_name, seller_name: party account names (denormalized)
   - buyer_rep_name: buy-side rep firm (denormalized Account)
-  - buyer_rep_contact_name: buy-side rep contact (denormalized)
   - selling_broker_name: legacy selling-broker field (denormalized; often null — prefer listing_broker)
   - listing_broker (listing_broker_company_name): primary broker of record on the sale (denormalized) — this is where Marcus & Millichap / CBRE / JLL etc. live
-  - listing_broker_contact_name: listing broker contact (denormalized)
   - property_name: parent property name (denormalized)
   - street (property_street), city (property_city), state (property_state), zip (property_postal_code): full parent property address (denormalized)
   - total_units (property_total_units): total unit count from the linked property (denormalized) — the authoritative building-level count; the Sale-level `units` field may differ for partial-unit transactions
 
-  Year built and year renovated on the linked property are returned with Sale search results for display, but they are stored as text in Salesforce and MUST NOT be used as filters (no equality filter, no range filter). If the user asks a question like "built after 1990", explain that vintage filtering is not available and offer to narrow by city, market, or sale date instead."""
+  Property year_built is returned with Sale search results for display, but it is stored as text in Salesforce and MUST NOT be used as a filter (no equality filter, no range filter). If the user asks a question like "built after 1990", explain that vintage filtering is not available and offer to narrow by city, market, or sale date instead."""
 
 _INQUIRY_FIELDS = """\
   - name: inquiry record name

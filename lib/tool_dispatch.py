@@ -289,15 +289,18 @@ SEMANTIC_ALIASES: dict[str, dict[str, str]] = {
 # The denylist only blocks them as filter targets.
 #
 # Current entries:
-#   sale.property_yearbuilt      — ascendix__YearBuilt__c is Text(255)
-#   sale.property_yearrenovated  — ascendix__YearRenovated__c is Text(255)
+#   sale.property_yearbuilt  — ascendix__YearBuilt__c is Text(255)
 #
-# When ingestion normalizes these to int (future task), remove the entry
-# and the generated `property_year_built` aliases become safely filterable.
+# (YearRenovated was dropped from the Sale denorm entirely to fit the
+# Turbopuffer 256-attribute namespace cap, so it doesn't need a
+# denylist entry.)
+#
+# When ingestion normalizes YearBuilt to int (future task), remove the
+# entry and the generated `property_year_built` alias becomes safely
+# filterable.
 NON_FILTERABLE_FIELDS: dict[str, set[str]] = {
     "sale": {
         "property_yearbuilt",
-        "property_yearrenovated",
     },
 }
 

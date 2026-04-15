@@ -179,7 +179,9 @@ _SALE_FIELDS = """\
   - property_class: building class of the sold property
   - sale_price: total sale price
   - price_psf (sale_price_per_uom): sale price per square foot (formula)
+  - price_per_unit (sale_price_per_unit): sale price per unit (formula) — use for multifamily / hotel $/door comps
   - total_area: total area sold in square feet
+  - units (number_units_rooms): number of units or rooms on the sale record itself
   - cap_rate (cap_rate_percent): capitalization rate percentage
   - noi (net_income): net operating income
   - listing_price: original listing price
@@ -187,10 +189,17 @@ _SALE_FIELDS = """\
   - sale_date: date the sale closed
   - date_on_market: when the property went on market
   - gross_income: gross income of the property
-  - number_units_rooms: number of units or rooms
-  - buyer_name, seller_name: party names (denormalized)
-  - selling_broker_name: selling broker (denormalized)
-  - property_name, property_city, property_state: parent property fields (denormalized)"""
+  - buyer_name, seller_name: party names (denormalized Account lookups)
+  - buyer_contact_name, seller_contact_name: party contacts (denormalized)
+  - buyer_rep_name: buy-side rep firm (denormalized Account)
+  - buyer_rep_contact_name: buy-side rep contact (denormalized)
+  - selling_broker_name: legacy selling-broker field (denormalized; often null — prefer listing_broker)
+  - listing_broker (listing_broker_company_name): primary broker of record on the sale (denormalized) — this is where Marcus & Millichap / CBRE / JLL etc. live
+  - listing_broker_contact_name: listing broker contact (denormalized)
+  - property_name: parent property name (denormalized)
+  - street (property_street), city (property_city), state (property_state), zip (property_postal_code): full parent property address (denormalized)
+  - year_built (property_year_built), year_renovated (property_year_renovated): property vintage (denormalized, stored as text)
+  - total_units (property_total_units): total unit count from the linked property (denormalized) — the authoritative building-level count; the Sale-level `units` field may differ for partial-unit transactions"""
 
 _INQUIRY_FIELDS = """\
   - name: inquiry record name

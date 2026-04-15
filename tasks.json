@@ -4424,6 +4424,44 @@
           ],
           "startedAt": "2026-04-03T19:25:56.889471+00:00",
           "completedAt": "2026-04-03T21:57:59.848965+00:00"
+        },
+        {
+          "id": "4.24",
+          "title": "Expand Sale denorm: address, year built, units, all transaction parties, $/unit",
+          "status": "in_progress",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-15T17:09:53.369504+00:00",
+          "updatedAt": "2026-04-15T17:46:13.321412+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-15T17:10:27.623191+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-04-15T17:10:34.399749+00:00",
+              "note": "NUMBERING COLLISION: task 4.24 also exists on branch codex/task-4-24-preserve-ingestion-keys (ingestion key normalization). Both branches allocated 4.24 independently. At merge, whichever task merges second must be renumbered (likely this one -> 4.25). Both tasks are independent and can land in either order."
+            },
+            {
+              "timestamp": "2026-04-15T17:16:15.588152+00:00",
+              "note": "Local implementation complete on branch task-4.25-sale-denorm-expansion. denorm_config.yaml, tool_dispatch SEMANTIC_ALIASES, system_prompt _SALE_FIELDS, agent_prompt_export.md all updated. 12 new Sale tests pass (267 total pass across tool_dispatch + system_prompt + denorm_generator). Local denormalize simulation against live Sylvan Ridge record (a0jdl000003fr1pAAA) produces a document containing every field on the user's requirements list: property_street=8850 SW Sylvan Ave, property_postalcode=97225, property_yearbuilt=1986, property_totalunits=108, listingbrokercompany_name=Marcus & Millichap Inc, salepriceperunit=261111.11. Deployment path: config_refresh publishes the new compiled artifact to S3, poll_sync and query Lambda pick it up on next cold start via the SSM active-version pointer. Still pending: user decision to commit/push/open PR + run config_refresh in prod + schedule poll_sync to keep freshness automatic."
+            },
+            {
+              "timestamp": "2026-04-15T17:46:13.321237+00:00",
+              "note": "Codex review found 2 P2 issues in prompt text (both fabrication/mismatch in _SALE_FIELDS, not in config/dispatcher): (1) advertised buyer_rep_company_name alias which does not exist — actual auto-alias is buyer_rep_name; removed the fabricated parenthetical. (2) listed property_class on the parent-property-fields line, but property_class resolves to the Sale direct field (propertyclass), not the parent (property_propertyclass); removed property_class from the parent line — it remains correctly documented as the Sale direct field earlier in the block. Added regression guard test_sale_prompt_aliases_all_resolve_in_registry that tokenizes _SALE_FIELDS bullet heads and fails if any advertised identifier is not in fs.filterable | fs.aliases. Verified guard catches Finding 1 when reintroduced; Finding 2 is a semantic mismatch (valid identifier, wrong meaning) that the token guard cannot catch and still needs human review. 13/13 Sale tests + 268/268 tool_dispatch+system_prompt+denorm_generator tests pass."
+            }
+          ],
+          "description": "Expand ascendix__Sale__c denormalization to cover the fields needed for a complete sale comp: Property address (Street, PostalCode, YearBuilt, YearRenovated, TotalUnits), Sale.SalePricePerUnit (\\$/unit formula), and all transaction-party lookups (BuyerContact, BuyerRep, BuyerRepContact, SellerContact, ListingBrokerCompany, ListingBrokerContact). Motivating example: Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA) — Marcus & Millichap is stored in ListingBrokerCompany which was not indexed, while SellingBroker (the field that WAS indexed) is null on this record. Update denorm_config.yaml, lib/tool_dispatch SEMANTIC_ALIASES, lib/system_prompt Sale field block, regenerate docs/agent_prompt_export.md, add tests, and re-seed Sale via poll_sync full_sync. Independent of task 4.24 (ingestion key normalization); 4.24 will later simplify the alias table but the work does not block or require 4.25.",
+          "acceptance_criteria": [
+            "denorm_config.yaml ascendix__Sale__c adds: ascendix__SalePricePerUnit__c metadata field, Property parent fields (Street, PostalCode, YearBuilt, YearRenovated, TotalUnits), and six new party lookups (BuyerContact, BuyerRep, BuyerRepContact, SellerContact, ListingBrokerCompany, ListingBrokerContact)",
+            "lib/tool_dispatch.SEMANTIC_ALIASES[\"sale\"] exposes short-form aliases for new fields (price_per_unit, street, zip, year_built, total_units, listing_broker) without collapsing property_type/record_type semantics",
+            "lib/system_prompt _SALE_FIELDS block documents the new fields; docs/agent_prompt_export.md regenerated via scripts/export_agent_prompt.py",
+            "tests/test_tool_dispatch.py covers new direct + parent field resolution, listing_broker alias returns ListingBrokerCompany, auto-generated aliases (listing_broker_company_name) remain functional",
+            "Sale namespace re-seeded via poll_sync full_sync; Sylvan Ridge audit doc contains street=8850 SW Sylvan Ave, postal_code=97225, year_built=1986, total_units=108, listing_broker=Marcus & Millichap Inc, sale_price_per_unit=261111.11"
+          ],
+          "startedAt": "2026-04-15T17:10:27.623005+00:00"
         }
       ]
     },
@@ -4498,7 +4536,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 24,
+      "4.": 25,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

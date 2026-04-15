@@ -68,6 +68,52 @@ Ascendix Search configuration may inform which objects and fields deserve
 coverage, but query-time behavior is not meant to be limited to Ascendix's UI
 or saved-search patterns.
 
+## Runtime Denorm Config Sourcing
+
+**The authoritative runtime denorm config is compiled from Ascendix Search
+Salesforce metadata, not from `denorm_config.yaml` in the repo.** This is the
+single most common source of "I edited the YAML but nothing changed at
+runtime" confusion, so it's called out explicitly here.
+
+`lambda/query` and `lambda/poll_sync` resolve denorm config in this order:
+
+1. **Active compiled artifact in S3** via the SSM active-version pointer.
+   The artifact is built by `lib/config_refresh.py::compile_config_artifact`,
+   which pulls `SearchSetting__c` and `Search__c` records via
+   `fetch_ascendix_source(sf)` and then harvests Salesforce describe metadata
+   through `SalesforceHarvester`. `denorm_config.yaml` in the repo is not
+   read at this layer.
+2. **Last-known-good cache** in `/tmp` on the Lambda.
+3. **Bundled `denorm_config.yaml`** from the Lambda deployment package as a
+   final fallback when neither S3 nor the cache is usable.
+
+Implications for contributors:
+
+- Editing `denorm_config.yaml` only affects the bundled fallback. Once the
+  SSM pointer is set to an active version, the Lambda will never read the
+  bundled YAML again in normal operation.
+- Adding fields to Sale's denormalized document in production requires
+  editing Ascendix Search config in the target Salesforce org (typically via
+  the Ascendix Search LWC / admin UI that writes to `Search__c`), then running
+  `python3 scripts/run_config_refresh.py compile --apply ...` to recompile,
+  reindex, and advance the pointer.
+- Attribute-count constraints (Turbopuffer has a hard 256 attributes per
+  namespace) apply to whatever shape the compiled Ascendix config produces.
+  Trimming fields in `denorm_config.yaml` does not help if the cap is being
+  hit by the Ascendix-driven config.
+- The bundled YAML is useful for local unit tests, the schema-discovery
+  tools, and as a readable reference of what a "reasonable" denorm looks
+  like. It should be kept roughly in sync with what Ascendix produces so the
+  fallback path does something sensible, but divergence between the two is
+  normal during active config work.
+
+Reference:
+
+- `lib/config_refresh.py` - compile / activate / rollback flow
+- `scripts/run_config_refresh.py` - CLI wrapper
+- `docs/architecture/ascendix_search_config_refresh_plan.md`
+- `docs/architecture/ascendix_search_signal_priority_and_validation.md`
+
 ## What To Trust
 
 For current connector work, trust these sources in this order:

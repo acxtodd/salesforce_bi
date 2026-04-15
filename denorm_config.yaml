@@ -319,6 +319,17 @@ ascendix__Deal__c:
     ascendix__LeadBrokerCompany__c:  # -> Account
       - Name                         # lead broker
 
+# ARCHITECTURE NOTE: This file is NOT the runtime denorm config.
+# At runtime, the /query and poll_sync Lambdas resolve denorm config from
+# (in order):
+#   1. The active compiled artifact in S3 via the SSM active-version pointer
+#      (lib/config_refresh.py :: compile_config_artifact — built from the
+#      Ascendix Search Salesforce metadata: SearchSetting__c and Search__c)
+#   2. A last-known-good cache in /tmp
+#   3. This file, bundled into the Lambda package as a final fallback
+# The authoritative source of Sale's denorm shape is Ascendix Search config
+# in the Salesforce org, NOT this YAML. Editing Sale fields here does not
+# change what reaches Turbopuffer at runtime.
 ascendix__Sale__c:
   embed_fields:
     - Name                           # nameField
@@ -326,7 +337,6 @@ ascendix__Sale__c:
   metadata_fields:
     - ascendix__SalePrice__c         # currency, filterable
     - ascendix__SalePricePerUOM__c   # currency, formula (price PSF)
-    - ascendix__SalePricePerUnit__c  # currency, formula ($ per unit)
     - ascendix__TotalArea__c         # double
     - ascendix__CapRatePercent__c    # percent (cap rate)
     - ascendix__NetIncome__c         # currency (NOI)
@@ -337,34 +347,18 @@ ascendix__Sale__c:
     - ascendix__NumberUnitsRooms__c  # double
     - ascendix__GrossIncome__c       # currency
   parents:
-    # NOTE: contact-form party lookups (BuyerContact, BuyerRepContact,
-    # SellerContact, ListingBrokerContact) and YearRenovated are
-    # intentionally NOT denormalized here — their combined attribute
-    # footprint would push the shared Turbopuffer namespace past its
-    # hard 256-attribute cap (observed 261 with them included). Company
-    # -form parties (Buyer, BuyerRep, Seller, SellingBroker,
-    # ListingBrokerCompany) cover the "all transaction parties"
-    # requirement from the task brief. If individual contacts become
-    # necessary later, either (a) drop other lower-value attributes to
-    # make room, or (b) move Sale to a dedicated namespace.
     ascendix__Property__c:           # -> ascendix__Property__c (required)
       - Name                         # property name
-      - ascendix__Street__c          # street address
       - ascendix__City__c            # property city
       - ascendix__State__c           # property state
-      - ascendix__PostalCode__c      # zip / postal code
       - ascendix__PropertyClass__c   # property class
-      - ascendix__YearBuilt__c       # year built (text, display-only via denylist)
-      - ascendix__TotalUnits__c      # total units (number)
     ascendix__Buyer__c:              # -> Account
-      - Name                         # buyer account name
-    ascendix__BuyerRep__c:           # -> Account (buy-side rep firm)
-      - Name                         # buyer rep company
+      - Name                         # buyer name
     ascendix__Seller__c:             # -> Account
-      - Name                         # seller account name
-    ascendix__SellingBroker__c:      # -> Account (legacy single-broker field)
+      - Name                         # seller name
+    ascendix__SellingBroker__c:      # -> Account
       - Name                         # selling broker
-    ascendix__ListingBrokerCompany__c:  # -> Account (listing broker firm)
+    ascendix__ListingBrokerCompany__c:  # -> Account
       - Name                         # listing broker company
 
 ascendix__Inquiry__c:

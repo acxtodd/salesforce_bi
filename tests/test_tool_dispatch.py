@@ -949,13 +949,28 @@ _DEAL_CONFIG = {
     },
 }
 
+# _SALE_CONFIG is a SYNTHETIC test fixture designed to exercise the
+# dispatcher hardening features (NON_FILTERABLE_FIELDS denylist,
+# listing_broker broker-mapping alias, prompt/registry regression
+# guard). It is NOT a representation of the runtime denorm config
+# used in production — the runtime Sale denorm is compiled from
+# Ascendix Search metadata (SearchSetting__c / Search__c) in the
+# target Salesforce org and has a different shape. See the note
+# at the top of denorm_config.yaml :: ascendix__Sale__c for the
+# runtime config sourcing order.
+#
+# The fixture includes:
+#   - ascendix__YearBuilt__c as a Property parent field so the
+#     NON_FILTERABLE_FIELDS denylist has a target to block in tests
+#   - ascendix__ListingBrokerCompany__c parent so the
+#     listing_broker alias has a target to resolve in tests
+# Everything else mirrors the pre-expansion Sale shape.
 _SALE_CONFIG = {
     "ascendix__Sale__c": {
         "embed_fields": ["Name", "ascendix__PropertyClass__c"],
         "metadata_fields": [
             "ascendix__SalePrice__c",
             "ascendix__SalePricePerUOM__c",
-            "ascendix__SalePricePerUnit__c",
             "ascendix__CapRatePercent__c",
             "ascendix__ListingPrice__c",
             "ascendix__ListingDate__c",
@@ -969,18 +984,20 @@ _SALE_CONFIG = {
         "parents": {
             "ascendix__Property__c": [
                 "Name",
-                "ascendix__Street__c",
                 "ascendix__City__c",
                 "ascendix__State__c",
-                "ascendix__PostalCode__c",
                 "ascendix__PropertyClass__c",
+                # Included only to exercise NON_FILTERABLE_FIELDS
+                # denylist in isolation. NOT in the runtime Ascendix
+                # compiled Property parent, which has only Name.
                 "ascendix__YearBuilt__c",
-                "ascendix__TotalUnits__c",
             ],
             "ascendix__Buyer__c": ["Name"],
-            "ascendix__BuyerRep__c": ["Name"],
             "ascendix__Seller__c": ["Name"],
             "ascendix__SellingBroker__c": ["Name"],
+            # Included to exercise listing_broker broker-mapping alias.
+            # ListingBrokerCompany IS in the runtime Ascendix Sale
+            # parents (with Name + several Account fields).
             "ascendix__ListingBrokerCompany__c": ["Name"],
         },
     },
@@ -1108,28 +1125,6 @@ class TestSaleSemanticAliases:
         assert "property_name" in fs.filterable
         assert "property_city" in fs.filterable
 
-    def test_price_per_unit_alias(self):
-        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
-        fs = registry["sale"]
-        assert fs.aliases["price_per_unit"] == "salepriceperunit"
-        assert "salepriceperunit" in fs.filterable
-
-    def test_address_parent_fields_indexed(self):
-        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
-        fs = registry["sale"]
-        assert "property_street" in fs.filterable
-        assert "property_postalcode" in fs.filterable
-        assert "property_yearbuilt" in fs.filterable
-        assert "property_totalunits" in fs.filterable
-
-    def test_address_short_aliases(self):
-        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
-        fs = registry["sale"]
-        assert fs.aliases["street"] == "property_street"
-        assert fs.aliases["zip"] == "property_postalcode"
-        assert fs.aliases["postal_code"] == "property_postalcode"
-        assert fs.aliases["total_units"] == "property_totalunits"
-
     def test_text_typed_year_built_not_advertised_as_filter_alias(self):
         """year_built is Text(255) in Salesforce, so range operators
         are either lexicographic or backend-defined and unsafe. It
@@ -1161,19 +1156,16 @@ class TestSaleSemanticAliases:
         assert "listingbrokercompany_name" in fs.filterable
 
     def test_auto_generated_broker_aliases_remain(self):
-        """Auto snake_case aliases for all company-form party parents
-        must still work so existing agent prompts referencing
-        selling_broker_name etc. don't regress. Contact-form lookups
-        (BuyerContact, BuyerRepContact, SellerContact, ListingBroker
-        Contact) were intentionally dropped from the Sale denorm to
-        fit the Turbopuffer 256-attribute namespace cap."""
+        """Auto snake_case aliases for the company-form party parents
+        that exist in the test fixture must still resolve correctly,
+        so existing agent prompts referencing selling_broker_name and
+        the new listing_broker_company_name don't regress."""
         registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
         fs = registry["sale"]
         for alias, indexed in [
             ("selling_broker_name", "sellingbroker_name"),
             ("listing_broker_company_name", "listingbrokercompany_name"),
             ("buyer_name", "buyer_name"),
-            ("buyer_rep_name", "buyerrep_name"),
             ("seller_name", "seller_name"),
         ]:
             assert indexed in fs.filterable, f"{indexed} not in filterable"
@@ -1182,26 +1174,6 @@ class TestSaleSemanticAliases:
                 assert fs.aliases.get(alias) == indexed, (
                     f"expected alias {alias} -> {indexed}, got {fs.aliases.get(alias)}"
                 )
-
-    def test_contact_form_party_lookups_not_indexed(self):
-        """Contact-form party lookups are intentionally NOT in the
-        Sale denorm to stay under the Turbopuffer 256-attribute cap.
-        If a future reviewer re-adds them, they must also remove
-        other attributes to compensate (or move Sale to a dedicated
-        namespace). This test documents the intentional absence."""
-        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
-        fs = registry["sale"]
-        for absent in (
-            "buyercontact_name",
-            "buyerrepcontact_name",
-            "sellercontact_name",
-            "listingbrokercontact_name",
-        ):
-            assert absent not in fs.filterable, (
-                f"{absent} is indexed — this will push the shared "
-                f"Turbopuffer namespace past its 256-attribute cap "
-                f"(previously observed at 261 when these were present)"
-            )
 
     def test_property_type_not_introduced_on_sale(self):
         """Guard against CLAUDE.md failure pattern 3: do not collapse
@@ -1248,9 +1220,11 @@ class TestSaleSemanticAliases:
             f"denorm_config Sale parents, or remove them from _SALE_FIELDS."
         )
 
-    def test_sale_dispatch_resolves_address_and_broker_aliases(self):
-        """End-to-end: short-form aliases must reach the backend as the
-        real indexed field names."""
+    def test_sale_dispatch_resolves_listing_broker_alias_to_company(self):
+        """End-to-end: the listing_broker short-form alias must reach
+        the backend as listingbrokercompany_name, not as the legacy
+        sellingbroker_name. This is the runtime-relevant broker-
+        mapping fix that PR #16 contributes on top of the revert."""
         d, backend = _make_dispatcher(config=_SALE_CONFIG)
         d.dispatch({
             "name": "search_records",
@@ -1258,10 +1232,6 @@ class TestSaleSemanticAliases:
                 "object_type": "Sale",
                 "filters": {
                     "city": "Portland",
-                    "state": "OR",
-                    "zip": "97225",
-                    "total_units": 108,
-                    "price_per_unit_gte": 250000,
                     "listing_broker": "Marcus & Millichap, Inc.",
                 },
                 "text_query": "Sylvan Ridge apartments sale",
@@ -1270,11 +1240,11 @@ class TestSaleSemanticAliases:
         call_kwargs = backend.search.call_args[1]
         resolved = call_kwargs["filters"]
         assert "property_city" in resolved
-        assert "property_state" in resolved
-        assert "property_postalcode" in resolved
-        assert "property_totalunits" in resolved
-        assert "salepriceperunit_gte" in resolved
         assert "listingbrokercompany_name" in resolved
+        # Must NOT collapse listing_broker into the legacy sellingbroker
+        # lookup, which is null on records entered via the listing-
+        # broker workflow (e.g. the Sylvan Ridge sale).
+        assert "sellingbroker_name" not in resolved
 
     @pytest.mark.parametrize(
         "filter_key,reason",

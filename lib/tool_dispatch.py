@@ -184,31 +184,32 @@ SEMANTIC_ALIASES: dict[str, dict[str, str]] = {
     "sale": {
         "sale_price": "saleprice",
         "price_psf": "salepriceperuom",
-        "price_per_unit": "salepriceperunit",
         "cap_rate": "capratepercent",
         "listing_price": "listingprice",
         "listing_date": "listingdate",
         "sale_date": "saledate",
         "total_area": "totalarea",
         "noi": "netincome",
-        "units": "numberunitsrooms",
         "property_name": "property_name",
         "property_city": "property_city",
-        "property_state": "property_state",
         "city": "property_city",
-        "state": "property_state",
-        "street": "property_street",
-        "zip": "property_postalcode",
-        "postal_code": "property_postalcode",
-        "total_units": "property_totalunits",
+        # Broker-mapping fix: primary broker of record on a sale lives in
+        # ListingBrokerCompany, not the legacy SellingBroker lookup. The
+        # compiled Ascendix runtime Sale config (SearchSetting__c /
+        # Search__c in the target org) has ListingBrokerCompany as a
+        # parent, so this alias resolves to a real indexed attribute.
         "listing_broker": "listingbrokercompany_name",
-        # NOTE: property_yearbuilt / property_yearrenovated are Text(255)
-        # in Salesforce and are intentionally NOT advertised as filter
-        # aliases. They remain indexed and appear in Sale result documents
-        # for display, but range operators (_gte/_lte) on text storage
-        # are either lexicographic or backend-defined and unsafe.
-        # If a future task normalizes them to int at ingestion, add the
-        # semantic aliases back here.
+        # NOTE: year_built and year_renovated are intentionally NOT in
+        # SEMANTIC_ALIASES. ascendix__YearBuilt__c and
+        # ascendix__YearRenovated__c are Text(255) in Salesforce, and
+        # range operators on text storage are either lexicographic or
+        # backend-defined and unsafe. The NON_FILTERABLE_FIELDS denylist
+        # below provides a second defense at _resolve_field time against
+        # auto-generated parent-form aliases
+        # (e.g. property_year_built -> property_yearbuilt) that would
+        # otherwise bypass the missing semantic alias. If ingestion is
+        # ever changed to normalize these fields to int, the denylist
+        # entry and this note can be removed together.
     },
     "inquiry": {
         "min_size": "areaminimum",

@@ -4427,11 +4427,11 @@
         },
         {
           "id": "4.24",
-          "title": "Expand Sale denorm: address, vintage, all parties, $/unit",
+          "title": "Sale dispatcher hardening: NON_FILTERABLE_FIELDS denylist, year_built safety, listing_broker mapping fix, prompt/registry regression guard",
           "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-04-15T18:24:58.079428+00:00",
-          "updatedAt": "2026-04-15T18:25:50.608743+00:00",
+          "updatedAt": "2026-04-15T20:39:28.617337+00:00",
           "files_modified": [
             "denorm_config.yaml",
             "lib/tool_dispatch.py",
@@ -4461,6 +4461,14 @@
             {
               "timestamp": "2026-04-15T18:25:50.608540+00:00",
               "note": "FOLLOW-UP: the NON_FILTERABLE_FIELDS denylist for property_yearbuilt / property_yearrenovated is a bandaid. The proper fix is to normalize ascendix__YearBuilt__c and ascendix__YearRenovated__c (Text(255) in Salesforce) to int at ingestion time. When that lands, the denylist entries can be deleted and the auto-generated property_year_built aliases become safely filterable. A config-driven version (filter_policy: display_only in denorm_config.yaml alongside the field declaration) would also remove the need for a hard-coded denylist. Worth tracking as a future task if this pattern recurs on other text-typed numeric-ish fields."
+            },
+            {
+              "timestamp": "2026-04-15T20:39:23.783272+00:00",
+              "note": "ROOT CAUSE FINDING + PR NARROWING: during post-merge deployment, discovered that the runtime denorm config is compiled from Ascendix Search Salesforce metadata (SearchSetting__c / Search__c via lib/config_refresh.py::compile_config_artifact), NOT from denorm_config.yaml. The YAML is only a bundled Lambda fallback. PR #16's YAML and prompt additions (Property.Street, Property.PostalCode, Property.YearBuilt, Property.TotalUnits, SalePricePerUnit) never reached runtime because the Lambda reads the S3 compiled artifact once the active-version pointer is set. The 261/256 Turbopuffer attribute overrun was also from the Ascendix-driven config, not from the PR additions. Per operator direction, PR #16 has been narrowed to truthful hardening only: (1) NON_FILTERABLE_FIELDS denylist mechanism at dispatcher + prompt-export layers, (2) year_built dispatch-time safety net that blocks all alias forms, (3) listing_broker -> listingbrokercompany_name semantic alias (ListingBrokerCompany IS in the compiled Ascendix Sale parents, so this is runtime-relevant), (4) prompt/registry regression guard (test_sale_prompt_aliases_all_resolve_in_registry). All dead-field additions reverted. Task 4.24 is NOT the feature-delivery PR for Sale comp fields; task 4.25 (new) is. Repo architecture note added to docs/architecture/object_scope_and_sync.md so this mistake does not repeat."
+            },
+            {
+              "timestamp": "2026-04-15T20:39:23.838667+00:00",
+              "note": "Task 4.24 remains in_progress but is NOT review-ready for the original Sale-comp-delivery scope. The hardening substrate (denylist, regression guard, broker-mapping alias) is truthfully and completely delivered by PR #16 after the narrowing. Once the narrowed scope is re-reviewed, this task will be marked complete for the HARDENING deliverable only. The Sale-comp-field deliverable continues under task 4.25 in the Salesforce config plane."
             }
           ],
           "description": "Expand ascendix__Sale__c denormalization to cover the full field surface needed for a CRE sale comp. Motivating example: the Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA) where Marcus & Millichap is stored in ListingBrokerCompany — which was not previously indexed — while the legacy SellingBroker field that WAS indexed is null on this record. The denormalization contract expands to include Property.Street/PostalCode/YearBuilt/YearRenovated/TotalUnits, Sale.SalePricePerUnit formula, and six new party lookups (BuyerContact, BuyerRep, BuyerRepContact, SellerContact, ListingBrokerCompany, ListingBrokerContact). lib/tool_dispatch SEMANTIC_ALIASES and lib/system_prompt _SALE_FIELDS updated to match; agent_prompt_export.md regenerated. Text-typed YearBuilt/YearRenovated are indexed but denylisted from filter use via new NON_FILTERABLE_FIELDS mechanism (applied at both dispatcher _resolve_field and prompt export _collect_field_names layers) to prevent unsafe lexicographic range compares on text storage. Includes prompt/registry regression guard and 8-case parameterized end-to-end test that every alias path (short-form, auto-generated parent-form, raw indexed) is rejected for the denylisted fields.",
@@ -4473,6 +4481,28 @@
             "DEPLOYMENT PENDING (per CLAUDE.md rule 6): scripts/run_config_refresh.py against ascendix-beta-sandbox, Sale namespace full re-seed via poll_sync, Sylvan Ridge audit doc contains all 12 fields (street=8850 SW Sylvan Ave, postal_code=97225, year_built=1986, total_units=108, listingbrokercompany_name=Marcus & Millichap Inc, sale_price_per_unit=261111.11), end-to-end agent query returns full Sylvan Ridge comp"
           ],
           "startedAt": "2026-04-15T18:25:50.382261+00:00"
+        },
+        {
+          "id": "4.25",
+          "title": "Sale comp delivery: add Property address, year built, broker via Ascendix Search config",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-15T20:38:51.887034+00:00",
+          "updatedAt": "2026-04-15T20:39:07.505309+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Deliver the Sale comp field surface the original 4.24 Sale denorm task tried to deliver through denorm_config.yaml but could not reach runtime. Runtime denorm is compiled from Ascendix Search Salesforce metadata (SearchSetting__c / Search__c records), not from repo YAML, so this task works in the Salesforce config plane rather than the repo code plane. Motivating example (unchanged from 4.24): Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA) — user needs property address (8850 SW Sylvan Ave, Portland OR 97225), year built (1986), total units (108), sale price (\\$28.2M), cap rate (5.75%), \\$/unit (\\$261,111), sale date (2025-03-20), and broker (Marcus & Millichap, Inc. — stored in ListingBrokerCompany). Scope: (1) investigate current Ascendix Search config for ascendix__Sale__c in the sandbox org via sf data query on SearchSetting__c and Search__c, (2) audit the compiled artifact to identify what is consuming the 261/256 attribute budget, (3) propose minimal trims (likely Lender/LenderContact or some Account fields on existing parties) to free headroom, (4) add parent Property street/address, PostalCode, and YearBuilt to Sale's denorm via Ascendix Search config edits, (5) recompile and apply via run_config_refresh, (6) run Sale full sync and verify the live audit doc for a0jdl000003fr1pAAA contains street, postal_code, year_built, listing_broker_company_name, (7) end-to-end agent query validates the full Sylvan Ridge comp. DO NOT touch denorm_config.yaml for this work — it is the bundled fallback, not the runtime source. PR #16 contributed the truthful hardening substrate (NON_FILTERABLE_FIELDS denylist, year-field denylist mechanism, listing_broker broker-mapping alias, prompt/registry regression guard) that this task can rely on.",
+          "acceptance_criteria": [
+            "Ascendix Search config investigation: sf data query on SearchSetting__c and Search__c records for ascendix__Sale__c in ascendix-beta-sandbox, documenting current field selection and attribute count contribution",
+            "Attribute budget audit: produce a before/after table showing which fields across all 11 objects consume the 256-attribute Turbopuffer namespace budget, and propose minimal trims to create headroom for Sale address + year_built",
+            "Compiled Ascendix Sale config contains parent Property fields: Name, Street, City, State, PostalCode, YearBuilt (minimum set for sale comps); verified via aws s3 cp of the compiled artifact",
+            "scripts/run_config_refresh.py compile --apply succeeds end-to-end against ascendix-beta-sandbox: new artifact compiled, published, pointer advanced, per-object reindex completed for Sale",
+            "Live Sylvan Ridge audit doc (s3://salesforce-ai-search-audit-382211616288-us-west-2/documents/00Ddl000003yx57EAA/sale/a0jdl000003fr1pAAA.json) contains property_street=8850 SW Sylvan Ave, property_postalcode=97225, property_yearbuilt=1986, listingbrokercompany_name=Marcus & Millichap Inc",
+            "End-to-end agent query: 'Tell me about the Sylvan Ridge Apartments sale' returns the full comp (address, year built, sale date, sale price, cap rate, broker) in a single response via /query Lambda",
+            "No edits to denorm_config.yaml are made as part of this task — that file is the bundled Lambda fallback, not the runtime source. The architecture note added in PR #16 (docs/architecture/object_scope_and_sync.md) is the canonical reference"
+          ]
         }
       ]
     },
@@ -4547,7 +4577,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 25,
+      "4.": 26,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

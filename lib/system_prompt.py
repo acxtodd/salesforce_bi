@@ -179,7 +179,9 @@ _SALE_FIELDS = """\
   - property_class: building class of the sold property
   - sale_price: total sale price
   - price_psf (sale_price_per_uom): sale price per square foot (formula)
+  - price_per_unit (sale_price_per_unit): sale price per unit (formula) — use for multifamily / hotel $/door comps
   - total_area: total area sold in square feet
+  - units (number_units_rooms): number of units or rooms on the sale record itself
   - cap_rate (cap_rate_percent): capitalization rate percentage
   - noi (net_income): net operating income
   - listing_price: original listing price
@@ -187,10 +189,18 @@ _SALE_FIELDS = """\
   - sale_date: date the sale closed
   - date_on_market: when the property went on market
   - gross_income: gross income of the property
-  - number_units_rooms: number of units or rooms
-  - buyer_name, seller_name: party names (denormalized)
-  - selling_broker_name: selling broker (denormalized)
-  - property_name, property_city, property_state: parent property fields (denormalized)"""
+  - buyer_name, seller_name: party names (denormalized Account lookups)
+  - buyer_contact_name, seller_contact_name: party contacts (denormalized)
+  - buyer_rep_name: buy-side rep firm (denormalized Account)
+  - buyer_rep_contact_name: buy-side rep contact (denormalized)
+  - selling_broker_name: legacy selling-broker field (denormalized; often null — prefer listing_broker)
+  - listing_broker (listing_broker_company_name): primary broker of record on the sale (denormalized) — this is where Marcus & Millichap / CBRE / JLL etc. live
+  - listing_broker_contact_name: listing broker contact (denormalized)
+  - property_name: parent property name (denormalized)
+  - street (property_street), city (property_city), state (property_state), zip (property_postal_code): full parent property address (denormalized)
+  - total_units (property_total_units): total unit count from the linked property (denormalized) — the authoritative building-level count; the Sale-level `units` field may differ for partial-unit transactions
+
+  Year built and year renovated on the linked property are returned with Sale search results for display, but they are stored as text in Salesforce and MUST NOT be used as filters (no equality filter, no range filter). If the user asks a question like "built after 1990", explain that vintage filtering is not available and offer to narrow by city, market, or sale date instead."""
 
 _INQUIRY_FIELDS = """\
   - name: inquiry record name
@@ -871,14 +881,28 @@ def _collect_field_names(config: dict) -> dict[str, list[str]]:
 
     Returns a dict mapping object type (lowercase) to a sorted list of
     user-facing field names (aliases preferred over raw indexed names).
+
+    Fields listed in :data:`lib.tool_dispatch.NON_FILTERABLE_FIELDS` are
+    omitted so the model is never told they are filterable. Those fields
+    still appear in search result payloads for display; the exported
+    list only covers fields the model may pass into search/aggregate
+    filter parameters.
     """
+    from lib.tool_dispatch import NON_FILTERABLE_FIELDS  # local import avoids cycle
+
     registry = build_field_registry(config)
     result: dict[str, list[str]] = {}
 
     for obj_type, fs in registry.items():
-        # Build reverse alias map: indexed -> preferred alias
+        denylist = NON_FILTERABLE_FIELDS.get(obj_type, set())
+
+        # Build reverse alias map: indexed -> preferred alias.
+        # Skip aliases pointing at denylisted indexed fields entirely
+        # so those aliases never leak into the user-facing list.
         reverse: dict[str, str] = {}
         for alias, indexed in fs.aliases.items():
+            if indexed in denylist:
+                continue
             # Prefer shorter / more readable aliases
             if indexed not in reverse or len(alias) < len(reverse[indexed]):
                 reverse[indexed] = alias
@@ -887,13 +911,16 @@ def _collect_field_names(config: dict) -> dict[str, list[str]]:
         # Platform fields we suppress from the user-facing list
         _suppress = {"object_type", "text", "last_modified", "salesforce_org_id", "id", "dist"}
         for field_name in fs.filterable:
-            if field_name in _suppress:
+            if field_name in _suppress or field_name in denylist:
                 continue
             # Use the alias if one exists, otherwise the raw name
             names.add(reverse.get(field_name, field_name))
 
-        # Also include semantic aliases as valid names
-        for alias in (SEMANTIC_ALIASES.get(obj_type, {})):
+        # Also include semantic aliases as valid names, but only if they
+        # resolve to a non-denylisted indexed field.
+        for alias, indexed in SEMANTIC_ALIASES.get(obj_type, {}).items():
+            if indexed in denylist:
+                continue
             names.add(alias)
 
         result[obj_type] = sorted(names)

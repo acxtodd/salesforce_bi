@@ -951,18 +951,42 @@ _DEAL_CONFIG = {
 
 _SALE_CONFIG = {
     "ascendix__Sale__c": {
-        "embed_fields": ["Name"],
+        "embed_fields": ["Name", "ascendix__PropertyClass__c"],
         "metadata_fields": [
             "ascendix__SalePrice__c",
             "ascendix__SalePricePerUOM__c",
+            "ascendix__SalePricePerUnit__c",
             "ascendix__CapRatePercent__c",
             "ascendix__ListingPrice__c",
             "ascendix__ListingDate__c",
+            "ascendix__SaleDate__c",
             "ascendix__TotalArea__c",
             "ascendix__NetIncome__c",
+            "ascendix__NumberUnitsRooms__c",
+            "ascendix__GrossIncome__c",
+            "ascendix__DateOnMarket__c",
         ],
         "parents": {
-            "ascendix__Property__c": ["Name", "ascendix__City__c"],
+            "ascendix__Property__c": [
+                "Name",
+                "ascendix__Street__c",
+                "ascendix__City__c",
+                "ascendix__State__c",
+                "ascendix__PostalCode__c",
+                "ascendix__PropertyClass__c",
+                "ascendix__YearBuilt__c",
+                "ascendix__YearRenovated__c",
+                "ascendix__TotalUnits__c",
+            ],
+            "ascendix__Buyer__c": ["Name"],
+            "ascendix__BuyerContact__c": ["Name"],
+            "ascendix__BuyerRep__c": ["Name"],
+            "ascendix__BuyerRepContact__c": ["Name"],
+            "ascendix__Seller__c": ["Name"],
+            "ascendix__SellerContact__c": ["Name"],
+            "ascendix__SellingBroker__c": ["Name"],
+            "ascendix__ListingBrokerCompany__c": ["Name"],
+            "ascendix__ListingBrokerContact__c": ["Name"],
         },
     },
 }
@@ -1088,6 +1112,222 @@ class TestSaleSemanticAliases:
         fs = registry["sale"]
         assert "property_name" in fs.filterable
         assert "property_city" in fs.filterable
+
+    def test_price_per_unit_alias(self):
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        assert fs.aliases["price_per_unit"] == "salepriceperunit"
+        assert "salepriceperunit" in fs.filterable
+
+    def test_address_parent_fields_indexed(self):
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        assert "property_street" in fs.filterable
+        assert "property_postalcode" in fs.filterable
+        assert "property_yearbuilt" in fs.filterable
+        assert "property_totalunits" in fs.filterable
+
+    def test_address_short_aliases(self):
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        assert fs.aliases["street"] == "property_street"
+        assert fs.aliases["zip"] == "property_postalcode"
+        assert fs.aliases["postal_code"] == "property_postalcode"
+        assert fs.aliases["total_units"] == "property_totalunits"
+
+    def test_text_typed_year_fields_not_advertised_as_filter_aliases(self):
+        """year_built and year_renovated are Text(255) in Salesforce, so
+        range operators are either lexicographic or backend-defined and
+        unsafe. They must NOT be exposed as filter aliases. They remain
+        indexed so Sale result documents still carry them for display."""
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        # Semantic short-form aliases must not exist
+        assert "year_built" not in fs.aliases
+        assert "year_renovated" not in fs.aliases
+        # Fields are still indexed so they show up in results
+        assert "property_yearbuilt" in fs.filterable
+        assert "property_yearrenovated" in fs.filterable
+
+    def test_property_yearbuilt_in_non_filterable_denylist(self):
+        """Verify the NON_FILTERABLE_FIELDS denylist covers every form
+        of the text-typed vintage fields. This is the backstop against
+        the auto-generated parent alias (property_year_built) that
+        build_field_registry creates for every parent field."""
+        from lib.tool_dispatch import NON_FILTERABLE_FIELDS
+        sale_deny = NON_FILTERABLE_FIELDS.get("sale", set())
+        assert "property_yearbuilt" in sale_deny
+        assert "property_yearrenovated" in sale_deny
+
+    def test_listing_broker_alias_resolves_to_listing_broker_company(self):
+        """The 'listing_broker' short alias must map to ListingBrokerCompany,
+        NOT the legacy SellingBroker field which is often null on records
+        entered via the listing-broker workflow (e.g. Sylvan Ridge sale)."""
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        assert fs.aliases["listing_broker"] == "listingbrokercompany_name"
+        assert "listingbrokercompany_name" in fs.filterable
+
+    def test_auto_generated_broker_aliases_remain(self):
+        """Auto snake_case aliases for all nine party parents must still work
+        so existing agent prompts referencing selling_broker_name etc. don't
+        regress."""
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        for alias, indexed in [
+            ("selling_broker_name", "sellingbroker_name"),
+            ("listing_broker_company_name", "listingbrokercompany_name"),
+            ("listing_broker_contact_name", "listingbrokercontact_name"),
+            ("buyer_name", "buyer_name"),
+            ("buyer_contact_name", "buyercontact_name"),
+            ("buyer_rep_name", "buyerrep_name"),
+            ("buyer_rep_contact_name", "buyerrepcontact_name"),
+            ("seller_name", "seller_name"),
+            ("seller_contact_name", "sellercontact_name"),
+        ]:
+            assert indexed in fs.filterable, f"{indexed} not in filterable"
+            # Aliases only generated when they differ from indexed form
+            if alias != indexed:
+                assert fs.aliases.get(alias) == indexed, (
+                    f"expected alias {alias} -> {indexed}, got {fs.aliases.get(alias)}"
+                )
+
+    def test_property_type_not_introduced_on_sale(self):
+        """Guard against CLAUDE.md failure pattern 3: do not collapse
+        record_type / property_type / use_type semantics. Sale must not
+        gain a property_type alias via the expanded parent config."""
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        assert "property_type" not in fs.aliases
+        assert "property_propertytype" not in fs.filterable
+
+    def test_sale_prompt_aliases_all_resolve_in_registry(self):
+        """Every field name mentioned in lib.system_prompt._SALE_FIELDS —
+        including parenthetical alternate forms — must be a real alias or
+        indexed field exposed by build_field_registry for Sale.
+
+        Guard against prompt/registry drift: if the prompt advertises a
+        filter the dispatcher does not expose, the model will emit tool
+        calls that _resolve_field rejects, silently breaking Sale search.
+        """
+        import re
+        from lib.system_prompt import _SALE_FIELDS
+
+        registry = build_field_registry(_SALE_CONFIG, SEMANTIC_ALIASES)
+        fs = registry["sale"]
+        known = fs.filterable | set(fs.aliases.keys())
+
+        advertised: set[str] = set()
+        # Each bullet begins with "  - <names>: <description>". Names may
+        # be a comma-separated list where each entry is either "name" or
+        # "name (alternate_name)". Split on ':' to drop the description,
+        # then extract identifiers before and inside parentheses.
+        for line in _SALE_FIELDS.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("- "):
+                continue
+            head = stripped[2:].split(":", 1)[0]
+            for token in re.findall(r"[a-z_][a-z0-9_]*", head):
+                advertised.add(token)
+
+        missing = sorted(advertised - known)
+        assert not missing, (
+            f"Sale prompt advertises aliases not present in registry: "
+            f"{missing}. Either add them to SEMANTIC_ALIASES['sale'] or "
+            f"denorm_config Sale parents, or remove them from _SALE_FIELDS."
+        )
+
+    def test_sale_dispatch_resolves_address_and_broker_aliases(self):
+        """End-to-end: short-form aliases must reach the backend as the
+        real indexed field names."""
+        d, backend = _make_dispatcher(config=_SALE_CONFIG)
+        d.dispatch({
+            "name": "search_records",
+            "parameters": {
+                "object_type": "Sale",
+                "filters": {
+                    "city": "Portland",
+                    "state": "OR",
+                    "zip": "97225",
+                    "total_units": 108,
+                    "price_per_unit_gte": 250000,
+                    "listing_broker": "Marcus & Millichap, Inc.",
+                },
+                "text_query": "Sylvan Ridge apartments sale",
+            },
+        })
+        call_kwargs = backend.search.call_args[1]
+        resolved = call_kwargs["filters"]
+        assert "property_city" in resolved
+        assert "property_state" in resolved
+        assert "property_postalcode" in resolved
+        assert "property_totalunits" in resolved
+        assert "salepriceperunit_gte" in resolved
+        assert "listingbrokercompany_name" in resolved
+
+    @pytest.mark.parametrize(
+        "filter_key,reason",
+        [
+            # Short-form alias: removed from SEMANTIC_ALIASES, resolves to
+            # neither filterable nor aliases → rejected as unknown field.
+            ("year_built_gte", "short-form alias no longer exists"),
+            ("year_renovated_gte", "short-form alias no longer exists"),
+            # Auto-generated parent-form alias: build_field_registry still
+            # creates property_year_built -> property_yearbuilt, but the
+            # denylist blocks the resolved indexed name.
+            ("property_year_built_gte", "auto-gen parent alias hits denylist"),
+            ("property_year_renovated_gte", "auto-gen parent alias hits denylist"),
+            # Raw indexed form: direct hit in fs.filterable, but denylist
+            # still blocks at _resolve_field return time.
+            ("property_yearbuilt_gte", "raw indexed form hits denylist"),
+            ("property_yearrenovated_gte", "raw indexed form hits denylist"),
+            # Equality is equally unsafe on text storage.
+            ("property_yearbuilt", "equality filter on denylisted field"),
+            ("property_year_built", "equality filter via auto-gen alias"),
+        ],
+    )
+    def test_sale_dispatch_rejects_all_year_built_filter_paths(self, filter_key, reason):
+        """Every alias form that lands on the text-typed vintage fields
+        must be rejected end-to-end, regardless of whether the caller
+        uses the short-form, auto-generated parent-form, or raw indexed
+        form, and regardless of operator suffix (range or equality).
+
+        This is the fix for the Codex finding that the previous round
+        only blocked `year_built_gte` and left `property_year_built_gte`
+        and `property_yearbuilt_gte` as live unsafe paths through the
+        auto-generated parent-alias surface."""
+        d, backend = _make_dispatcher(config=_SALE_CONFIG)
+        result = d.dispatch({
+            "name": "search_records",
+            "parameters": {
+                "object_type": "Sale",
+                "filters": {filter_key: "1990"},
+            },
+        })
+        assert "error" in result, f"{filter_key} should be rejected ({reason}): got {result}"
+        # Backend must never see the denied filter
+        assert not backend.search.called, (
+            f"{filter_key} reached the backend despite denylist ({reason})"
+        )
+
+    def test_sale_prompt_export_does_not_advertise_year_built(self):
+        """The exported tool schema (_collect_field_names) must not list
+        any year_built/year_renovated variant for Sale. The denylist must
+        apply at the prompt layer too, not just at dispatch time — the
+        model should never be told these fields are filterable."""
+        from lib.system_prompt import _collect_field_names
+
+        field_names = _collect_field_names(_ALL_11_CONFIG)
+        sale_fields = set(field_names.get("sale", []))
+        for forbidden in (
+            "year_built", "year_renovated",
+            "property_year_built", "property_year_renovated",
+            "property_yearbuilt", "property_yearrenovated",
+        ):
+            assert forbidden not in sale_fields, (
+                f"{forbidden} appears in the exported Sale filter field list — "
+                f"denylist did not flow through to _collect_field_names"
+            )
 
 
 class TestNewObjectTypesInRegistry:

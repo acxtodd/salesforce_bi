@@ -326,6 +326,7 @@ ascendix__Sale__c:
   metadata_fields:
     - ascendix__SalePrice__c         # currency, filterable
     - ascendix__SalePricePerUOM__c   # currency, formula (price PSF)
+    - ascendix__SalePricePerUnit__c  # currency, formula ($ per unit)
     - ascendix__TotalArea__c         # double
     - ascendix__CapRatePercent__c    # percent (cap rate)
     - ascendix__NetIncome__c         # currency (NOI)
@@ -338,15 +339,32 @@ ascendix__Sale__c:
   parents:
     ascendix__Property__c:           # -> ascendix__Property__c (required)
       - Name                         # property name
+      - ascendix__Street__c          # street address
       - ascendix__City__c            # property city
       - ascendix__State__c           # property state
+      - ascendix__PostalCode__c      # zip / postal code
       - ascendix__PropertyClass__c   # property class
+      - ascendix__YearBuilt__c       # year built (text)
+      - ascendix__YearRenovated__c   # year renovated (text)
+      - ascendix__TotalUnits__c      # total units (number)
     ascendix__Buyer__c:              # -> Account
-      - Name                         # buyer name
+      - Name                         # buyer account name
+    ascendix__BuyerContact__c:       # -> Contact
+      - Name                         # buyer contact name
+    ascendix__BuyerRep__c:           # -> Account (buy-side rep firm)
+      - Name                         # buyer rep company
+    ascendix__BuyerRepContact__c:    # -> Contact
+      - Name                         # buyer rep contact
     ascendix__Seller__c:             # -> Account
-      - Name                         # seller name
-    ascendix__SellingBroker__c:      # -> Account
+      - Name                         # seller account name
+    ascendix__SellerContact__c:      # -> Contact
+      - Name                         # seller contact name
+    ascendix__SellingBroker__c:      # -> Account (legacy single-broker field)
       - Name                         # selling broker
+    ascendix__ListingBrokerCompany__c:  # -> Account (listing broker firm)
+      - Name                         # listing broker company
+    ascendix__ListingBrokerContact__c:  # -> Contact
+      - Name                         # listing broker contact
 
 ascendix__Inquiry__c:
   embed_fields:

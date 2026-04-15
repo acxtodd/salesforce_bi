@@ -4424,6 +4424,55 @@
           ],
           "startedAt": "2026-04-03T19:25:56.889471+00:00",
           "completedAt": "2026-04-03T21:57:59.848965+00:00"
+        },
+        {
+          "id": "4.24",
+          "title": "Expand Sale denorm: address, vintage, all parties, $/unit",
+          "status": "in_progress",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-15T18:24:58.079428+00:00",
+          "updatedAt": "2026-04-15T18:25:50.608743+00:00",
+          "files_modified": [
+            "denorm_config.yaml",
+            "lib/tool_dispatch.py",
+            "lib/system_prompt.py",
+            "docs/agent_prompt_export.md",
+            "tests/test_tool_dispatch.py"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-15T18:25:50.382484+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-04-15T18:25:50.438053+00:00",
+              "note": "PR #16 merged to main via merge commit ebb7707 on 2026-04-15. Feature history preserved as three commits: 37fab1f (initial implementation), 6f36b03 (Codex round 2: removed fabricated buyer_rep_company_name alias, fixed property_class semantic mismatch, reverted tasks.json collision), be04d0e (Codex round 3: added NON_FILTERABLE_FIELDS denylist closing the auto-generated parent-alias path for year_built / year_renovated). Codex final verdict: no findings, 10 focused tests passing locally, denylist closes all paths that resolve to property_yearbuilt/property_yearrenovated, prompt export no longer advertises those fields."
+            },
+            {
+              "timestamp": "2026-04-15T18:25:50.492641+00:00",
+              "note": "NUMBERING: this task is 4.24 on main. A separate branch (codex/task-4-24-preserve-ingestion-keys, tracked as task 99.54 downstream) also allocated 4.24 independently before this PR merged. When that branch eventually merges, it will conflict on tasks.json and must be renumbered (likely to 4.25) via task_manager.py renumber-phase. Both tasks are substantively independent and can land in either order."
+            },
+            {
+              "timestamp": "2026-04-15T18:25:50.549145+00:00",
+              "note": "Status NOT yet complete per CLAUDE.md rule 6 — deployment validation still pending. Required before marking complete: (1) run scripts/run_config_refresh.py --bucket salesforce-ai-search-data-382211616288-us-west-2 --target-org ascendix-beta-sandbox to compile and publish the new denorm artifact, (2) invoke salesforce-ai-search-poll-sync with full_sync:true for ascendix__Sale__c, (3) pull Sylvan Ridge audit doc (a0jdl000003fr1pAAA) from s3://salesforce-ai-search-audit-382211616288-us-west-2 and verify all 12 user-requested fields are present, (4) end-to-end query test against the agent: 'Tell me about the Sylvan Ridge Apartments sale' should return address, year built (from display), total units, broker (Marcus & Millichap from ListingBrokerCompany), cap rate, $/unit, sale price."
+            },
+            {
+              "timestamp": "2026-04-15T18:25:50.608540+00:00",
+              "note": "FOLLOW-UP: the NON_FILTERABLE_FIELDS denylist for property_yearbuilt / property_yearrenovated is a bandaid. The proper fix is to normalize ascendix__YearBuilt__c and ascendix__YearRenovated__c (Text(255) in Salesforce) to int at ingestion time. When that lands, the denylist entries can be deleted and the auto-generated property_year_built aliases become safely filterable. A config-driven version (filter_policy: display_only in denorm_config.yaml alongside the field declaration) would also remove the need for a hard-coded denylist. Worth tracking as a future task if this pattern recurs on other text-typed numeric-ish fields."
+            }
+          ],
+          "description": "Expand ascendix__Sale__c denormalization to cover the full field surface needed for a CRE sale comp. Motivating example: the Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA) where Marcus & Millichap is stored in ListingBrokerCompany — which was not previously indexed — while the legacy SellingBroker field that WAS indexed is null on this record. The denormalization contract expands to include Property.Street/PostalCode/YearBuilt/YearRenovated/TotalUnits, Sale.SalePricePerUnit formula, and six new party lookups (BuyerContact, BuyerRep, BuyerRepContact, SellerContact, ListingBrokerCompany, ListingBrokerContact). lib/tool_dispatch SEMANTIC_ALIASES and lib/system_prompt _SALE_FIELDS updated to match; agent_prompt_export.md regenerated. Text-typed YearBuilt/YearRenovated are indexed but denylisted from filter use via new NON_FILTERABLE_FIELDS mechanism (applied at both dispatcher _resolve_field and prompt export _collect_field_names layers) to prevent unsafe lexicographic range compares on text storage. Includes prompt/registry regression guard and 8-case parameterized end-to-end test that every alias path (short-form, auto-generated parent-form, raw indexed) is rejected for the denylisted fields.",
+          "acceptance_criteria": [
+            "denorm_config.yaml ascendix__Sale__c adds: ascendix__SalePricePerUnit__c metadata field, Property parent fields (Street, PostalCode, YearBuilt, YearRenovated, TotalUnits), and six new party lookups (BuyerContact, BuyerRep, BuyerRepContact, SellerContact, ListingBrokerCompany, ListingBrokerContact)",
+            "lib/tool_dispatch.SEMANTIC_ALIASES[\"sale\"] exposes short-form aliases for new fields (price_per_unit, units, street, zip, postal_code, total_units, listing_broker, state, property_state) without collapsing property_type/record_type semantics",
+            "lib/system_prompt _SALE_FIELDS block documents the new fields; docs/agent_prompt_export.md regenerated via scripts/export_agent_prompt.py per CLAUDE.md rule 4",
+            "NON_FILTERABLE_FIELDS denylist in lib/tool_dispatch.py blocks year_built/year_renovated at both dispatcher _resolve_field and prompt export _collect_field_names layers; fields remain indexed in documents for display only",
+            "Tests cover new direct + parent field resolution, listing_broker alias returns ListingBrokerCompany, prompt/registry regression guard (test_sale_prompt_aliases_all_resolve_in_registry), and 8-case parameterized end-to-end rejection of every year_built filter path (short-form, auto-gen parent-form, raw indexed, equality + range operators)",
+            "DEPLOYMENT PENDING (per CLAUDE.md rule 6): scripts/run_config_refresh.py against ascendix-beta-sandbox, Sale namespace full re-seed via poll_sync, Sylvan Ridge audit doc contains all 12 fields (street=8850 SW Sylvan Ave, postal_code=97225, year_built=1986, total_units=108, listingbrokercompany_name=Marcus & Millichap Inc, sale_price_per_unit=261111.11), end-to-end agent query returns full Sylvan Ridge comp"
+          ],
+          "startedAt": "2026-04-15T18:25:50.382261+00:00"
         }
       ]
     },
@@ -4498,7 +4547,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 24,
+      "4.": 25,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

@@ -270,6 +270,39 @@ SEMANTIC_ALIASES: dict[str, dict[str, str]] = {
 # rent_high instead.  See spec §8 Availability document schema.
 
 # ---------------------------------------------------------------------------
+# Non-filterable field denylist
+# ---------------------------------------------------------------------------
+#
+# Indexed field names that must NOT be used as search/aggregate/group_by
+# filters, even when the registry exposes them via auto-generated aliases.
+# Keyed by object type (lowercase). Applied at two layers:
+#
+#   1. Dispatcher (_resolve_field): rejects the filter before it reaches
+#      the backend, covering every alias form that resolves to the denied
+#      indexed name.
+#   2. Prompt export (_collect_field_names in system_prompt): omits the
+#      field from the advertised filter field list so the model is never
+#      trained to try it in the first place.
+#
+# Fields are still indexed in the document (denorm_config controls that
+# separately) and still appear in search result payloads for display.
+# The denylist only blocks them as filter targets.
+#
+# Current entries:
+#   sale.property_yearbuilt      — ascendix__YearBuilt__c is Text(255)
+#   sale.property_yearrenovated  — ascendix__YearRenovated__c is Text(255)
+#
+# When ingestion normalizes these to int (future task), remove the entry
+# and the generated `property_year_built` aliases become safely filterable.
+NON_FILTERABLE_FIELDS: dict[str, set[str]] = {
+    "sale": {
+        "property_yearbuilt",
+        "property_yearrenovated",
+    },
+}
+
+
+# ---------------------------------------------------------------------------
 # Field registry
 # ---------------------------------------------------------------------------
 
@@ -453,20 +486,40 @@ class ToolDispatcher:
         """Resolve *field_name* to the indexed attribute name.
 
         Checks (in order):
-        1. Exact match in filterable set → return as-is.
-        2. Match in aliases dict → return mapped name.
-        3. Raise :exc:`FieldValidationError`.
+        1. Exact match in filterable set → candidate is *field_name*.
+        2. Match in aliases dict → candidate is the mapped name.
+        3. No match → raise :exc:`FieldValidationError`.
+
+        The candidate is then checked against the per-object
+        :data:`NON_FILTERABLE_FIELDS` denylist. A denylisted match
+        raises :exc:`FieldValidationError` regardless of which alias
+        form the caller used, so every path that lands on the same
+        indexed attribute is blocked uniformly.
         """
         fs = self._registry[object_type]
         if field_name in fs.filterable:
-            return field_name
-        if field_name in fs.aliases:
-            return fs.aliases[field_name]
-        valid = sorted(fs.filterable | set(fs.aliases.keys()))
-        raise FieldValidationError(
-            f"Invalid field '{field_name}' for object type '{object_type}'. "
-            f"Valid fields: {valid}"
-        )
+            candidate = field_name
+        elif field_name in fs.aliases:
+            candidate = fs.aliases[field_name]
+        else:
+            valid = sorted(
+                (fs.filterable | set(fs.aliases.keys()))
+                - NON_FILTERABLE_FIELDS.get(object_type, set())
+            )
+            raise FieldValidationError(
+                f"Invalid field '{field_name}' for object type '{object_type}'. "
+                f"Valid fields: {valid}"
+            )
+
+        denylist = NON_FILTERABLE_FIELDS.get(object_type, set())
+        if candidate in denylist:
+            raise FieldValidationError(
+                f"Field '{field_name}' (indexed as '{candidate}') is not available "
+                f"as a filter on '{object_type}'. It is stored as text and cannot "
+                f"be safely equality- or range-compared. The value is still "
+                f"returned in search results for display."
+            )
+        return candidate
 
     def _resolve_filters(self, filters: dict, object_type: str) -> dict:
         """Resolve alias names and preserve operator suffixes."""

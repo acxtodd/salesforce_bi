@@ -1149,6 +1149,16 @@ class TestSaleSemanticAliases:
         assert "property_yearbuilt" in fs.filterable
         assert "property_yearrenovated" in fs.filterable
 
+    def test_property_yearbuilt_in_non_filterable_denylist(self):
+        """Verify the NON_FILTERABLE_FIELDS denylist covers every form
+        of the text-typed vintage fields. This is the backstop against
+        the auto-generated parent alias (property_year_built) that
+        build_field_registry creates for every parent field."""
+        from lib.tool_dispatch import NON_FILTERABLE_FIELDS
+        sale_deny = NON_FILTERABLE_FIELDS.get("sale", set())
+        assert "property_yearbuilt" in sale_deny
+        assert "property_yearrenovated" in sale_deny
+
     def test_listing_broker_alias_resolves_to_listing_broker_company(self):
         """The 'listing_broker' short alias must map to ListingBrokerCompany,
         NOT the legacy SellingBroker field which is often null on records
@@ -1255,22 +1265,69 @@ class TestSaleSemanticAliases:
         assert "salepriceperunit_gte" in resolved
         assert "listingbrokercompany_name" in resolved
 
-    def test_sale_dispatch_rejects_year_built_range_filter(self):
-        """If the model (or a future prompt edit) tries to use year_built
-        as a filter alias, the dispatcher must reject it — year_built is
-        Text(255) and cannot be safely range-compared. The rejection is
-        the safety net that backs up the prompt-side 'do not filter'
-        guidance."""
-        d, _backend = _make_dispatcher(config=_SALE_CONFIG)
+    @pytest.mark.parametrize(
+        "filter_key,reason",
+        [
+            # Short-form alias: removed from SEMANTIC_ALIASES, resolves to
+            # neither filterable nor aliases → rejected as unknown field.
+            ("year_built_gte", "short-form alias no longer exists"),
+            ("year_renovated_gte", "short-form alias no longer exists"),
+            # Auto-generated parent-form alias: build_field_registry still
+            # creates property_year_built -> property_yearbuilt, but the
+            # denylist blocks the resolved indexed name.
+            ("property_year_built_gte", "auto-gen parent alias hits denylist"),
+            ("property_year_renovated_gte", "auto-gen parent alias hits denylist"),
+            # Raw indexed form: direct hit in fs.filterable, but denylist
+            # still blocks at _resolve_field return time.
+            ("property_yearbuilt_gte", "raw indexed form hits denylist"),
+            ("property_yearrenovated_gte", "raw indexed form hits denylist"),
+            # Equality is equally unsafe on text storage.
+            ("property_yearbuilt", "equality filter on denylisted field"),
+            ("property_year_built", "equality filter via auto-gen alias"),
+        ],
+    )
+    def test_sale_dispatch_rejects_all_year_built_filter_paths(self, filter_key, reason):
+        """Every alias form that lands on the text-typed vintage fields
+        must be rejected end-to-end, regardless of whether the caller
+        uses the short-form, auto-generated parent-form, or raw indexed
+        form, and regardless of operator suffix (range or equality).
+
+        This is the fix for the Codex finding that the previous round
+        only blocked `year_built_gte` and left `property_year_built_gte`
+        and `property_yearbuilt_gte` as live unsafe paths through the
+        auto-generated parent-alias surface."""
+        d, backend = _make_dispatcher(config=_SALE_CONFIG)
         result = d.dispatch({
             "name": "search_records",
             "parameters": {
                 "object_type": "Sale",
-                "filters": {"year_built_gte": "1990"},
+                "filters": {filter_key: "1990"},
             },
         })
-        assert "error" in result, result
-        assert "year_built" in result["error"].lower() or "field" in result["error"].lower()
+        assert "error" in result, f"{filter_key} should be rejected ({reason}): got {result}"
+        # Backend must never see the denied filter
+        assert not backend.search.called, (
+            f"{filter_key} reached the backend despite denylist ({reason})"
+        )
+
+    def test_sale_prompt_export_does_not_advertise_year_built(self):
+        """The exported tool schema (_collect_field_names) must not list
+        any year_built/year_renovated variant for Sale. The denylist must
+        apply at the prompt layer too, not just at dispatch time — the
+        model should never be told these fields are filterable."""
+        from lib.system_prompt import _collect_field_names
+
+        field_names = _collect_field_names(_ALL_11_CONFIG)
+        sale_fields = set(field_names.get("sale", []))
+        for forbidden in (
+            "year_built", "year_renovated",
+            "property_year_built", "property_year_renovated",
+            "property_yearbuilt", "property_yearrenovated",
+        ):
+            assert forbidden not in sale_fields, (
+                f"{forbidden} appears in the exported Sale filter field list — "
+                f"denylist did not flow through to _collect_field_names"
+            )
 
 
 class TestNewObjectTypesInRegistry:

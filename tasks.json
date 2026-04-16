@@ -4484,24 +4484,51 @@
         },
         {
           "id": "4.25",
-          "title": "Sale comp delivery: add Property address, year built, broker via Ascendix Search config",
+          "title": "Sale comp: denormalize Property Street, PostalCode, YearBuilt + wire sale-side broker onto Sale documents",
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-15T20:38:51.887034+00:00",
-          "updatedAt": "2026-04-15T20:39:07.505309+00:00",
+          "updatedAt": "2026-04-15T20:42:14.951874+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [],
-          "description": "Deliver the Sale comp field surface the original 4.24 Sale denorm task tried to deliver through denorm_config.yaml but could not reach runtime. Runtime denorm is compiled from Ascendix Search Salesforce metadata (SearchSetting__c / Search__c records), not from repo YAML, so this task works in the Salesforce config plane rather than the repo code plane. Motivating example (unchanged from 4.24): Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA) — user needs property address (8850 SW Sylvan Ave, Portland OR 97225), year built (1986), total units (108), sale price (\\$28.2M), cap rate (5.75%), \\$/unit (\\$261,111), sale date (2025-03-20), and broker (Marcus & Millichap, Inc. — stored in ListingBrokerCompany). Scope: (1) investigate current Ascendix Search config for ascendix__Sale__c in the sandbox org via sf data query on SearchSetting__c and Search__c, (2) audit the compiled artifact to identify what is consuming the 261/256 attribute budget, (3) propose minimal trims (likely Lender/LenderContact or some Account fields on existing parties) to free headroom, (4) add parent Property street/address, PostalCode, and YearBuilt to Sale's denorm via Ascendix Search config edits, (5) recompile and apply via run_config_refresh, (6) run Sale full sync and verify the live audit doc for a0jdl000003fr1pAAA contains street, postal_code, year_built, listing_broker_company_name, (7) end-to-end agent query validates the full Sylvan Ridge comp. DO NOT touch denorm_config.yaml for this work — it is the bundled fallback, not the runtime source. PR #16 contributed the truthful hardening substrate (NON_FILTERABLE_FIELDS denylist, year-field denylist mechanism, listing_broker broker-mapping alias, prompt/registry regression guard) that this task can rely on.",
+          "description": "Narrow feature delivery for Sale sale-comp output. Property already has correct Street, PostalCode, and YearBuilt in the sandbox org (confirmed via screenshots). The gap is on the Sale object's denormalization: the compiled Ascendix runtime Sale config currently has only [Name] in the Property parent and no canonical sale-side broker surfacing. Deliverables are: (1) Sale's denormalized Property parent must include Street, PostalCode, and YearBuilt (these three, not more, not less), so every Sale result carries the linked property's full address and vintage. (2) Sale must surface the correct sale-side broker for the transaction itself — investigate which Sale broker field is canonical (ListingBrokerCompany was populated on the Sylvan Ridge record but may not be the right field org-wide) and expose it. The Property broker is NOT a substitute. Validation target: Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA). The Sale card/result must show correct property address, correct property year built, correct sale-side broker. Work happens in the Salesforce config plane (Ascendix SearchSetting__c / Search__c edits + run_config_refresh compile+apply) — do NOT touch denorm_config.yaml. If the 256-attribute Turbopuffer namespace cap blocks the additions, propose the minimal trim from Sale's existing attribute footprint to make room and execute it in the same control plane.",
           "acceptance_criteria": [
-            "Ascendix Search config investigation: sf data query on SearchSetting__c and Search__c records for ascendix__Sale__c in ascendix-beta-sandbox, documenting current field selection and attribute count contribution",
-            "Attribute budget audit: produce a before/after table showing which fields across all 11 objects consume the 256-attribute Turbopuffer namespace budget, and propose minimal trims to create headroom for Sale address + year_built",
-            "Compiled Ascendix Sale config contains parent Property fields: Name, Street, City, State, PostalCode, YearBuilt (minimum set for sale comps); verified via aws s3 cp of the compiled artifact",
-            "scripts/run_config_refresh.py compile --apply succeeds end-to-end against ascendix-beta-sandbox: new artifact compiled, published, pointer advanced, per-object reindex completed for Sale",
-            "Live Sylvan Ridge audit doc (s3://salesforce-ai-search-audit-382211616288-us-west-2/documents/00Ddl000003yx57EAA/sale/a0jdl000003fr1pAAA.json) contains property_street=8850 SW Sylvan Ave, property_postalcode=97225, property_yearbuilt=1986, listingbrokercompany_name=Marcus & Millichap Inc",
-            "End-to-end agent query: 'Tell me about the Sylvan Ridge Apartments sale' returns the full comp (address, year built, sale date, sale price, cap rate, broker) in a single response via /query Lambda",
-            "No edits to denorm_config.yaml are made as part of this task — that file is the bundled Lambda fallback, not the runtime source. The architecture note added in PR #16 (docs/architecture/object_scope_and_sync.md) is the canonical reference"
+            "Canonical sale-side broker field identified: survey ascendix__Sale__c records across the sandbox to determine which broker field (ascendix__SellingBroker__c, ascendix__ListingBrokerCompany__c, ascendix__BuyerRep__c, or another) is actually populated on transactions org-wide; document the decision and rationale in a progress note",
+            "Compiled Ascendix Sale config (s3://salesforce-ai-search-data-382211616288-us-west-2/config/.../compiled/) contains Property parent with EXACTLY these fields at minimum: Name, ascendix__Street__c, ascendix__PostalCode__c, ascendix__YearBuilt__c",
+            "Compiled Ascendix Sale config surfaces the canonical sale-side broker field identified above, so the Sale document contains a readable broker name attribute (e.g. listingbrokercompany_name or equivalent based on canonical field choice)",
+            "Turbopuffer 256-attribute namespace cap is respected: if current usage plus the three new Property parent fields plus any new broker attribute exceeds 256, the task proposes and executes the minimal trim from Sale's existing attribute footprint (prefer trimming low-value Account fields on existing parent lookups like Type/Website/Industry/AnnualRevenue before trimming entire parent lookups)",
+            "scripts/run_config_refresh.py compile --apply succeeds end-to-end against ascendix-beta-sandbox: new compiled artifact published, SSM active-version pointer advanced, targeted Sale re-seed via poll_sync completes with zero client-side or backend errors",
+            "Sylvan Ridge live validation: S3 audit doc for a0jdl000003fr1pAAA contains property_street=8850 SW Sylvan Ave, property_postalcode=97225, property_yearbuilt=1986, and a populated sale-side broker name attribute with value 'Marcus & Millichap, Inc.' (or whatever the canonical broker field for Sylvan Ridge resolves to after the investigation in AC1)",
+            "Sylvan Ridge end-to-end agent query: 'Tell me about the Sylvan Ridge Apartments sale' returns one Sale card whose response text contains the correct address (8850 SW Sylvan Ave, Portland OR 97225), correct year built (1986), and correct broker for the transaction. The Property broker must NOT be used as a substitute for the Sale broker in any result",
+            "No edits to denorm_config.yaml or any Lambda bundle are made. All config changes happen via Ascendix SearchSetting__c / Search__c edits in the sandbox org and run_config_refresh. The architecture note added in PR #16 (docs/architecture/object_scope_and_sync.md :: Runtime Denorm Config Sourcing) remains the canonical reference"
+          ]
+        },
+        {
+          "id": "4.25.1",
+          "title": "Document Sylvan Ridge Sale indexing investigation",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-16T06:30:15.119683+00:00",
+          "updatedAt": "2026-04-16T07:04:42.933301+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-16T06:30:39.628968+00:00",
+              "note": "Investigation summary as of 2026-04-16: (1) Live Salesforce SOQL for ascendix__Sale__c a0jdl000003fr1pAAA (Sylvan Ridge - Sale) shows ascendix__ListingBrokerCompany__r.Name = 'Marcus & Millichap, Inc.' and ascendix__SellingBroker__c = null. (2) Active compiled runtime config version 20260415T192655-75e7d0ebea94 shows Sale embed_fields = [Name, SaleDate, ListingPrice, SalePrice, ListingDate], metadata_fields = [CapRatePercent, Property.Name], and parents include ListingBrokerCompany[Name,Type,Phone,Website,Industry,AnnualRevenue] plus Property[Name] only. (3) Audit payload documents/00Ddl000003yx57EAA/sale/a0jdl000003fr1pAAA.json confirms denormalization already contains ListingBrokerCompany parent data with Name='Marcus & Millichap, Inc.' and the generated text includes 'Listing Broker Company Name: Marcus & Millichap, Inc.' Therefore the broker company is NOT missing from denormalization. The verified missing Sale-side parent enrichments are Property Street, Property PostalCode, and Property YearBuilt. If the broker is absent in a user-facing Sale result, the likely defect is downstream of denormalization (query shaping / card rendering / field selection), not in the current Sale audit payload."
+            },
+            {
+              "timestamp": "2026-04-16T07:04:42.933146+00:00",
+              "note": "Turbopuffer limit research as of 2026-04-16: official docs at https://turbopuffer.com/docs/limits list the following current production limits relevant to this investigation: Max attribute names per namespace = 256, Max attribute name length = 128 bytes, Max filterable value size = 4 KiB, Max attribute value size = 8 MiB, Max vector columns per namespace = 2, Max dimensions = 10,752, Max document size = 64 MiB. The immediate Sale-comp risk in this repo is the 256-attribute namespace cap, not value size. Repo evidence already records live contact with this limit: tasks.json notes under earlier work say the namespace attribute count exceeded 256 after relationship metadata expansion and the indexed relationship payload had to be trimmed. docs/architecture/object_scope_and_sync.md also states Turbopuffer has a hard 256-attribute namespace cap. Operational implication for task 4.25: adding Property Street, PostalCode, YearBuilt, plus any new sale-side broker attribute must be evaluated against the shared namespace-wide 256 attribute-name ceiling. Because the cap is per namespace, not per object, even a surgical Sale config addition can require trimming low-value existing attributes elsewhere in the Sale shape to stay within the limit."
+            }
+          ],
+          "parent": "4.25",
+          "acceptance_criteria": [
+            "Task notes include the live Salesforce SOQL result for a0jdl000003fr1pAAA showing ListingBrokerCompany = Marcus & Millichap, Inc. and SellingBroker = null",
+            "Task notes include the audit payload evidence for documents/00Ddl000003yx57EAA/sale/a0jdl000003fr1pAAA.json showing Marcus & Millichap is already present in the denormalized Sale payload while Property Street, PostalCode, and YearBuilt are absent"
           ]
         }
       ]
@@ -4589,7 +4616,8 @@
       "4.17.": 9,
       "4.19.": 5,
       "4.20.": 5,
-      "4.16.": 6
+      "4.16.": 6,
+      "4.25.": 2
     }
   }
 }

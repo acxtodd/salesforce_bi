@@ -438,6 +438,8 @@ class TestPhantomFieldExclusion:
 
         assert "Owner" not in meta.field_scores
         assert "Owner" not in direct_fields
+        # OwnerId is globally excluded from parent emission; this verifies
+        # relationship routing still feeds that exclusion gate.
         assert "OwnerId" not in cfg["parents"]
 
     def test_relationship_context_does_not_score_lookup_field(self):

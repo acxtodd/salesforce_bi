@@ -32,6 +32,7 @@ from lib.config_refresh import (
     normalize_ascendix_source,
     rollback_to_version,
 )
+from lib.denormalize import build_soql
 from lib.system_prompt import build_system_prompt, build_tool_definitions
 
 
@@ -201,6 +202,168 @@ class _FakeRefreshSalesforce:
         raise AssertionError(f"Unexpected REST path: {path}")
 
 
+class _FakePhantomFieldSalesforce:
+    def query(self, soql: str) -> dict:
+        return {"records": []}
+
+    def restful(self, path: str) -> dict:
+        object_describes = {
+            "Account": {
+                "label": "Account",
+                "keyPrefix": "001",
+                "fields": [
+                    _field("Name", name_field=True),
+                    _field("Industry"),
+                    _reference_field("OwnerId", "User", "Owner"),
+                ],
+            },
+            "Contact": {
+                "label": "Contact",
+                "keyPrefix": "003",
+                "fields": [
+                    _field("Name", name_field=True),
+                    _field("Email"),
+                    _reference_field("AccountId", "Account", "Account"),
+                    _reference_field("OwnerId", "User", "Owner"),
+                ],
+            },
+            "ascendix__Property__c": {
+                "label": "Property",
+                "keyPrefix": "a0P",
+                "fields": [
+                    _field("Name", name_field=True),
+                    _field("ascendix__City__c"),
+                ],
+            },
+        }
+        for object_name, describe in object_describes.items():
+            if path == f"sobjects/{object_name}/describe":
+                return {**describe, "childRelationships": []}
+            if path == f"sobjects/{object_name}/describe/compactLayouts/":
+                return {"compactLayouts": []}
+            if path == f"search/layout/?q={object_name}":
+                return []
+            if path == f"sobjects/{object_name}/describe/layouts":
+                return {"layouts": []}
+            if path == f"sobjects/{object_name}/listviews":
+                return {"listviews": []}
+        raise AssertionError(f"Unexpected REST path: {path}")
+
+
+def _field(name: str, *, name_field: bool = False) -> dict:
+    return {
+        "name": name,
+        "type": "string",
+        "nameField": name_field,
+        "nillable": True,
+        "createable": True,
+        "filterable": True,
+        "groupable": True,
+        "calculated": False,
+    }
+
+
+def _reference_field(name: str, parent_object: str, relationship_name: str) -> dict:
+    return {
+        "name": name,
+        "type": "reference",
+        "nameField": False,
+        "nillable": True,
+        "createable": True,
+        "filterable": True,
+        "groupable": True,
+        "calculated": False,
+        "referenceTo": [parent_object],
+        "relationshipName": relationship_name,
+    }
+
+
+def _make_phantom_field_raw_source() -> dict:
+    selected_objects = [
+        {
+            "name": "Account",
+            "label": "Account",
+            "isSearchable": True,
+            "isSearchOrResultFieldsFiltered": False,
+            "fields": [],
+        },
+        {
+            "name": "Contact",
+            "label": "Contact",
+            "isSearchable": True,
+            "isSearchOrResultFieldsFiltered": False,
+            "fields": [],
+        },
+        {
+            "name": "ascendix__Property__c",
+            "label": "Property",
+            "isSearchable": True,
+            "isSearchOrResultFieldsFiltered": False,
+            "fields": [],
+        },
+    ]
+    return {
+        "search_settings": [
+            {
+                "Name": "Selected Objects",
+                "ascendix_search__Value__c": json.dumps(selected_objects),
+            },
+        ],
+        "saved_searches": [
+            {
+                "Id": "a1",
+                "Name": "Account Owner Phantom",
+                "ascendix_search__Template__c": json.dumps(
+                    {
+                        "sectionsList": [
+                            {
+                                "objectName": "Account",
+                                "fieldsList": [{"logicalName": "Owner"}],
+                            }
+                        ],
+                        "resultColumns": [{"logicalName": "Owner"}],
+                    }
+                ),
+            },
+            {
+                "Id": "a2",
+                "Name": "Contact Account Phantom",
+                "ascendix_search__Template__c": json.dumps(
+                    {
+                        "sectionsList": [
+                            {
+                                "objectName": "Contact",
+                                "fieldsList": [
+                                    {"logicalName": "Account"},
+                                    {"logicalName": "Owner"},
+                                ],
+                            }
+                        ],
+                        "resultColumns": [{"logicalName": "Account.Name"}],
+                    }
+                ),
+            },
+            {
+                "Id": "a3",
+                "Name": "Property Self Phantom",
+                "ascendix_search__Template__c": json.dumps(
+                    {
+                        "sectionsList": [
+                            {
+                                "objectName": "ascendix__Property__c",
+                                "fieldsList": [
+                                    {"logicalName": "ascendix__Property__c"}
+                                ],
+                            }
+                        ],
+                        "resultColumns": [{"logicalName": "ascendix__Property__c"}],
+                    }
+                ),
+            },
+        ],
+    }
+
+
 def test_normalize_ascendix_source_reconstructs_actual_payload_shape():
     normalized = normalize_ascendix_source(_make_raw_source())
 
@@ -240,6 +403,44 @@ def test_compile_config_artifact_live_path_honors_selected_object_field_allowlis
     property_config = result.denorm_config["ascendix__Property__c"]
     assert property_config["embed_fields"] == ["Name"]
     assert property_config["metadata_fields"] == ["ascendix__City__c"]
+
+
+def test_compile_config_artifact_live_path_excludes_phantom_relationship_fields():
+    result = compile_config_artifact(
+        sf=_FakePhantomFieldSalesforce(),
+        org_id="00DTEST",
+        raw_source=_make_phantom_field_raw_source(),
+        target_objects=["Account", "Contact", "ascendix__Property__c"],
+    )
+
+    account_config = result.denorm_config["Account"]
+    account_direct = set(account_config["embed_fields"]) | set(account_config["metadata_fields"])
+    assert "Owner" not in account_direct
+    assert "OwnerId" not in account_config["parents"]
+
+    contact_config = result.denorm_config["Contact"]
+    contact_direct = set(contact_config["embed_fields"]) | set(contact_config["metadata_fields"])
+    assert "Account" not in contact_direct
+    assert "Owner" not in contact_direct
+    assert contact_config["parents"]["AccountId"] == ["Name"]
+    assert "OwnerId" not in contact_config["parents"]
+
+    property_config = result.denorm_config["ascendix__Property__c"]
+    property_direct = set(property_config["embed_fields"]) | set(property_config["metadata_fields"])
+    assert "ascendix__Property__c" not in property_direct
+    assert "ascendix__Property__c" not in property_config["parents"]
+
+    contact_soql = build_soql(
+        "Contact",
+        contact_config["embed_fields"],
+        contact_config["metadata_fields"],
+        contact_config["parents"],
+        {"AccountId": {"relationship_name": "Account"}},
+        "WHERE LastModifiedDate > 2026-04-16T06:45:00Z",
+    )
+    assert " Account," not in contact_soql
+    assert " Owner," not in contact_soql
+    assert "Account.Name" in contact_soql
 
 
 def test_diff_runtime_artifacts_classifies_scope_changes():

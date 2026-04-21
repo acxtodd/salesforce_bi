@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
 
@@ -313,6 +314,142 @@ class TestHarvestResolvesRelationshipPaths:
 
         # No parent refs should have been recorded
         assert not meta.ascendix_parent_refs
+
+
+# =========================================================================
+# Phantom field exclusion (Task 4.26)
+# =========================================================================
+
+
+class TestPhantomFieldExclusion:
+    """Saved-search relationship signals must not become direct SELECT fields."""
+
+    def _string_field(self, name: str, *, name_field: bool = False) -> dict:
+        return {
+            "name": name,
+            "type": "string",
+            "nameField": name_field,
+            "nillable": True,
+            "createable": True,
+            "filterable": True,
+            "groupable": True,
+            "calculated": False,
+        }
+
+    def _reference_field(
+        self,
+        name: str,
+        parent_object: str,
+        relationship_name: str,
+    ) -> dict:
+        return {
+            "name": name,
+            "type": "reference",
+            "nameField": False,
+            "nillable": True,
+            "createable": True,
+            "filterable": True,
+            "groupable": True,
+            "calculated": False,
+            "referenceTo": [parent_object],
+            "relationshipName": relationship_name,
+        }
+
+    def _make_contact_meta(self) -> ObjectMetadata:
+        meta = ObjectMetadata("Contact")
+        meta.name_field = "Name"
+        meta.fields["Name"] = self._string_field("Name", name_field=True)
+        meta.fields["Email"] = self._string_field("Email")
+        meta.fields["AccountId"] = self._reference_field("AccountId", "Account", "Account")
+        meta.fields["OwnerId"] = self._reference_field("OwnerId", "User", "Owner")
+        meta.reference_fields["AccountId"] = "Account"
+        meta.reference_fields["OwnerId"] = "User"
+        meta.ensure_field_score("Name").is_name_field = True
+        return meta
+
+    def _harvest_signals(self, meta: ObjectMetadata, signals: list[SimpleNamespace]) -> None:
+        parser = MagicMock()
+        parser.parse_saved_search.return_value = signals
+        harvester = SalesforceHarvester(
+            MagicMock(),
+            ascendix_search=True,
+            normalized_ascendix_source={
+                "saved_searches": [
+                    {
+                        "Name": "Regression Search",
+                        "template_json": json.dumps({"sectionsList": []}),
+                        "target_objects": [meta.api_name],
+                        "primary_object": meta.api_name,
+                    }
+                ]
+            },
+        )
+        harvester._get_template_parser = MagicMock(return_value=parser)
+        harvester._harvest_ascendix_search(meta)
+
+    def test_unknown_direct_field_is_excluded(self):
+        meta = self._make_contact_meta()
+
+        assert _is_excluded_direct_field(meta, "Owner")
+        assert _is_excluded_direct_field(meta, "Account")
+        assert _is_excluded_direct_field(meta, "Account.Name")
+
+    def test_valid_scalar_signal_is_scored(self):
+        meta = self._make_contact_meta()
+
+        self._harvest_signals(
+            meta,
+            [SimpleNamespace(field="Email", context="filter")],
+        )
+
+        assert meta.field_scores["Email"].ascendix_filter_appearances == 1
+
+    def test_bare_standard_relationship_routes_to_parent_ref(self):
+        meta = self._make_contact_meta()
+
+        self._harvest_signals(
+            meta,
+            [SimpleNamespace(field="Account", context="filter")],
+        )
+
+        assert "Account" not in meta.field_scores
+        assert meta.ascendix_parent_refs["AccountId"] == {"Name"}
+
+    def test_dotted_relationship_routes_to_parent_ref_field(self):
+        meta = self._make_contact_meta()
+
+        self._harvest_signals(
+            meta,
+            [SimpleNamespace(field="Account.Name", context="result_column")],
+        )
+
+        assert "Account.Name" not in meta.field_scores
+        assert meta.ascendix_parent_refs["AccountId"] == {"Name"}
+
+    def test_excluded_owner_relationship_does_not_emit_direct_or_parent_config(self):
+        meta = self._make_contact_meta()
+
+        self._harvest_signals(
+            meta,
+            [SimpleNamespace(field="Owner", context="filter")],
+        )
+        cfg = build_config_for_object(meta, MockParentFetcher(), {"Contact"}, "ascendix__")
+        direct_fields = set(cfg["embed_fields"]) | set(cfg["metadata_fields"])
+
+        assert "Owner" not in meta.field_scores
+        assert "Owner" not in direct_fields
+        assert "OwnerId" not in cfg["parents"]
+
+    def test_relationship_context_does_not_score_lookup_field(self):
+        meta = self._make_contact_meta()
+
+        self._harvest_signals(
+            meta,
+            [SimpleNamespace(field="Account", context="relationship")],
+        )
+
+        assert "Account" not in meta.field_scores
+        assert meta.ascendix_parent_refs["AccountId"] == set()
 
 
 # =========================================================================

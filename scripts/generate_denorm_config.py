@@ -155,6 +155,8 @@ def _is_excluded_direct_field(meta: "ObjectMetadata", field_name: str) -> bool:
     """Return True when a direct field should not be emitted in current configs."""
     if field_name in EXCLUDED_DIRECT_FIELD_NAMES or field_name.startswith("toLabel("):
         return True
+    if field_name not in meta.fields:
+        return True
     finfo = meta.fields.get(field_name, {})
     if finfo.get("type") == "reference":
         return True
@@ -653,6 +655,16 @@ class SalesforceHarvester:
         # Accumulate cross-object relationship refs from templates
         if not hasattr(meta, "ascendix_parent_refs"):
             meta.ascendix_parent_refs: Dict[str, Set[str]] = {}  # ref_field → {parent_fields}
+        relationship_to_ref_field: Dict[str, str] = {}
+        for ref_field in meta.reference_fields:
+            finfo = meta.fields.get(ref_field, {})
+            relationship_name = finfo.get("relationshipName")
+            if relationship_name:
+                relationship_to_ref_field[relationship_name] = ref_field
+            if ref_field.endswith("__c"):
+                relationship_to_ref_field.setdefault(ref_field[:-3] + "__r", ref_field)
+            elif ref_field.endswith("Id"):
+                relationship_to_ref_field.setdefault(ref_field[:-2], ref_field)
 
         normalized_source = self._normalized_ascendix_source or {}
         field_allowlist: Set[str] = set()
@@ -721,17 +733,48 @@ class SalesforceHarvester:
                         template_json, search_name, meta.api_name
                     )
                     for signal in signals:
-                        fs = meta.ensure_field_score(signal.field)
+                        field_name = signal.field
+                        if "." in field_name:
+                            rel_name, parent_field = field_name.split(".", 1)
+                            ref_field = (
+                                relationship_to_ref_field.get(rel_name)
+                                or _resolve_relationship_to_ref_field(
+                                    rel_name, meta.reference_fields
+                                )
+                            )
+                            if ref_field and parent_field:
+                                meta.ascendix_parent_refs.setdefault(
+                                    ref_field, set()
+                                ).add(parent_field)
+                            continue
+
+                        ref_from_relationship = (
+                            relationship_to_ref_field.get(field_name)
+                            or _resolve_relationship_to_ref_field(
+                                field_name, meta.reference_fields
+                            )
+                        )
+                        if signal.context == "relationship":
+                            if ref_from_relationship:
+                                meta.ascendix_parent_refs.setdefault(
+                                    ref_from_relationship, set()
+                                )
+                            continue
+
+                        if ref_from_relationship and field_name not in meta.fields:
+                            meta.ascendix_parent_refs.setdefault(
+                                ref_from_relationship, set()
+                            ).add("Name")
+                            continue
+
+                        if field_name not in meta.fields:
+                            continue
+
+                        fs = meta.ensure_field_score(field_name)
                         if signal.context == "filter":
                             fs.ascendix_filter_appearances += 1
                         elif signal.context in ("result_column", "sort"):
                             fs.ascendix_result_appearances += 1
-                        elif signal.context == "relationship":
-                            ref_field = _resolve_relationship_to_ref_field(
-                                signal.field, meta.reference_fields
-                            )
-                            if ref_field:
-                                meta.ascendix_parent_refs.setdefault(ref_field, set())
                 except Exception as e:
                     print(f"  Warning: failed to parse saved search '{search_name}': {e}")
 

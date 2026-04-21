@@ -4530,6 +4530,89 @@
             "Task notes include the live Salesforce SOQL result for a0jdl000003fr1pAAA showing ListingBrokerCompany = Marcus & Millichap, Inc. and SellingBroker = null",
             "Task notes include the audit payload evidence for documents/00Ddl000003yx57EAA/sale/a0jdl000003fr1pAAA.json showing Marcus & Millichap is already present in the denormalized Sale payload while Property Street, PostalCode, and YearBuilt are absent"
           ]
+        },
+        {
+          "id": "4.26",
+          "title": "Fix Ascendix Search config compiler emitting bare relationship fields and cross-object field contamination",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T14:27:27.997365+00:00",
+          "updatedAt": "2026-04-21T14:35:34.513165+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "The active compiled runtime config artifact (s3://salesforce-ai-search-data-382211616288-us-west-2/config/00Ddl000003yx57EAA/compiled/20260415T192655-75e7d0ebea94.yaml) contains two classes of compiler bugs that block poll_sync against Account, Contact, and ascendix__Property__c. Bug class 1 — bare relationship names: Account.embed_fields has 'Owner', Contact.embed_fields has 'Owner' and 'Account'. These produce invalid SOQL like 'SELECT Owner FROM Account' which Salesforce rejects with INVALID_FIELD. Bug class 2 — cross-object field contamination: ascendix__Property__c.embed_fields contains 13 fields that are not columns on the Property object (ascendix__Property__c self-reference, plus Deal/Sale fields like ascendix__SalesStage__c/GrossFeeAmount__c/CloseDateEstimated__c and Availability/Lease fields like ascendix__LeaseRatePerUOM__c/TermCommencementDate__c/TermExpirationDate__c). The Property SOQL fails with 'No such column ascendix__Property__c on entity ascendix__Property__c'. Impact: poll_sync cannot run for Account/Contact/Property. cdc_sync is unaffected because it consumes the CDC payload rather than issuing SELECT, so live CDC flow continues to work for these objects. Latent since PR 2c5bd7f (Task 4.9.6-4.9.10, Ascendix config control plane). Only surfaced today (2026-04-21) during the CDC outage backfill attempt — Account/Contact were never in POLL_OBJECTS scope previously, and Property went into poll_sync for the first time today. Context: originally introduced during Phase 4.9 when the compiler began emitting from ascendix_search__SearchSetting__c 'Selected Objects' + 'Default Layout' records. Scope for the fix: (1) root-cause and patch lib/config_refresh.py so embed_fields only contains scalar direct fields of the target object, relationship names get emitted as relationship traversals (Owner.Name, Account.Name), and fields from other objects are routed into the appropriate object's config rather than hoisted into Property. (2) Rerun scripts/run_config_refresh.py --apply to produce a clean artifact and advance the active-version pointer. (3) Replay poll_sync backfill from watermark 2026-04-16T06:45:00Z for Account, Contact, ascendix__Property__c to close the remaining CDC outage gap. Today's partial backfill only covered ascendix__Lease__c and ascendix__Availability__c (both returned records_synced=0).",
+          "acceptance_criteria": [
+            "Compiler lib/config_refresh.py emits valid SOQL field names: scalar columns as-is, relationship names as '<RelName>.Name' traversals (e.g. Owner -> Owner.Name, Account -> Account.Name), and no field appears in an object's embed_fields unless it is actually a column on that object (verified against SF describe).",
+            "ascendix__Property__c.embed_fields in the compiled artifact contains only Property columns (no Deal, Sale, Availability, Lease, or self-reference contamination), verified by diffing compiled embed_fields against sobject describe.",
+            "Account and Contact embed_fields in the compiled artifact contain no bare 'Owner' or 'Account' entries; any needed owner/account context is expressed via relationship traversals.",
+            "scripts/run_config_refresh.py --apply against ascendix-beta-sandbox succeeds, the active-version SSM pointer advances, and a fresh poll_sync invocation per object (Account, Contact, ascendix__Property__c) with full_sync:false completes without SalesforceAPIError and reports records_synced consistent with expected modification counts.",
+            "Outage backfill replay: watermark for Account, Contact, and ascendix__Property__c is re-seeded to 2026-04-16T06:45:00Z (Type=String) and poll_sync is re-invoked for each, closing the CDC outage gap that today's partial backfill left open. Verify by running /query against at least one Account and one Contact known to have been edited during 2026-04-16 → recovery and confirm the post-outage state is returned.",
+            "Replay guardrails (explicit, supersedes AC5 where they differ): (a) only after compiler fix is deployed AND scripts/run_config_refresh.py --apply has advanced the active-version SSM pointer to a verified-clean artifact; (b) re-seed watermarks for Account, Contact, and ascendix__Property__c to '2026-04-16T06:45:00Z|' via aws ssm put-parameter --type String (NOT SecureString — lambda/poll_sync/index.py:237 reads without WithDecryption=True; a SecureString seed would silently fall back to epoch at :241 and re-poll all history); (c) invoke salesforce-ai-search-poll-sync one object at a time with payload {\"objects\":[\"<single>\"],\"full_sync\":false} — never batch all three in a single invocation (5-min Lambda timeout, sequential processing, any failure aborts remaining objects); (d) persist each raw Lambda response to /tmp/poll_<Object>_iter<N>.json; (e) loop per-object only while that object's response reports continuation_needed:true; (f) verification for each of the 3 objects requires all four: raw response (statusCode=200, FunctionError=None, summary.<Object>.records_synced, summary.<Object>.watermark, summary.<Object>.continuation_needed), poll_sync CloudWatch logs showing 'Polling <Object> from watermark:' through 'Poll sync for <Object> complete:' with no ERROR lines, SalesforceAISearch/PollSync.RecordsSynced metric emitted with SObject dimension, AND user-visible /query validation for at least one record per object known to have been modified during 2026-04-16 → recovery (if such a record exists — if records_synced=0, note this in the task as a proven-empty gap, not as missing validation)."
+          ]
+        },
+        {
+          "id": "4.27",
+          "title": "CDC pipeline recovery (2026-04-21): AppFlow resubscription + SSM token rotation + outage gap backfill",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T14:33:58.565177+00:00",
+          "updatedAt": "2026-04-21T14:38:09.296319+00:00",
+          "files_modified": [
+            "lib/ingestion-stack.ts"
+          ],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-21T14:34:46.267055+00:00",
+              "note": "Phase A (2026-04-21 ~14:00-15:00 UTC): SSM /salesforce/access_token rotated to version 21 via sf CLI. Lambda env bumps on cdc_sync + poll_sync succeeded with all pre-existing env vars preserved and a new TOKEN_REFRESHED_AT key added (merge-preserving update via file:// JSON). CDK code edit to lib/ingestion-stack.ts added appflowGeneration context + flowName suffix (defaults to empty = no-op on normal deploys). Change-set preview showed exactly 5 AWS::AppFlow::Flow replacements with Replacement:True + in-place ConnectorProfile JWT update; no unrelated destructive changes. cdk deploy executed with appflowGeneration=v2-20260421 in 35 seconds. CloudFormation sequence was UPDATE on 5 new flows → stack cleanup → DELETE_COMPLETE on 5 old flows — atomic, no orphans. End-to-end test: edited Name on ascendix__Property__c a0afk000000SSpOAAW to 'Testing2 cdcping150334' at 14:03:37Z; S3 CDC object landed at 14:03:50Z (13s); cdc_sync log 'Upserted ascendix__Property__c a0afk000000SSpOAAW' with CDC sync: 1 succeeded, 0 failed (total_lag=27807ms); zero INVALID_SESSION_ID. /query via Lambda Function URL with x-api-key returned correct post-edit state in 4.8s (model: claude-haiku-4-5). Revert cycle equally clean (total_lag=23015ms). Org left in original state (Name=Testing2)."
+            },
+            {
+              "timestamp": "2026-04-21T14:34:46.323717+00:00",
+              "note": "Phase B (2026-04-21 ~15:18-15:26 UTC): Seeded SSM watermarks as Type=String (not SecureString — reader at lambda/poll_sync/index.py:237 does not set WithDecryption=True) for all 5 objects at value '2026-04-16T06:45:00Z|'. Per-object invocation one-at-a-time with full_sync:false and continuation_needed loop. Raw responses saved to /tmp/poll_<Object>_iter<N>.json. Account: HTTP 400 'No such column Owner on entity Account' — watermark unchanged. ascendix__Property__c: HTTP 400 'No such column ascendix__Property__c on entity ascendix__Property__c' — watermark unchanged. Contact: not attempted (same compiler bug class, deferred per operator direction). ascendix__Lease__c: SOQL succeeded, No more records, records_synced=0, watermark unchanged. ascendix__Availability__c: SOQL succeeded, No more records, records_synced=0, watermark unchanged. CloudWatch metric SalesforceAISearch/PollSync.RecordsSynced emitted for both clean objects with SObject dimension. No changed records existed in the gap for either clean object, so no user-visible /query validation possible for the completed subset (the gap for Lease/Availability is provably empty, not a silent miss)."
+            },
+            {
+              "timestamp": "2026-04-21T14:34:46.380364+00:00",
+              "note": "Compiler bug discovery: Account/Contact were never in POLL_OBJECTS scope before today (env POLL_OBJECTS=ascendix__Deal__c,ascendix__Sale__c,ascendix__Inquiry__c,ascendix__Listing__c,ascendix__Preference__c,Task); Property was never invoked via poll_sync before today either. cdc_sync for these objects has been working because it consumes the CDC payload rather than issuing SELECT, so the bug was latent. Latent since PR 2c5bd7f (Task 4.9.6-4.9.10). Follow-up task 4.26 tracks the compiler fix + replay."
+            },
+            {
+              "timestamp": "2026-04-21T14:38:09.296114+00:00",
+              "note": "Durable follow-ups created: 4.26 (Ascendix config compiler fix — HARD BLOCKER for closing this task; must complete before Account/Contact/Property backfill replay can run), 99.5 (SF token refresh helper — completes JWT Bearer flow missing from mint_jwt.py), 99.6 (scheduled refresh Lambda, depends on 99.5), 99.7 (AppFlow suspension alarm — addresses the 5-day silent-outage root-cause observability gap), 99.8 (SalesforceClient OAuth Client Credentials migration — long-term durable fix that obsoletes 99.5 and 99.6). Dependencies set: 4.27→4.26, 99.6→99.5, 99.8→{99.5,99.6}. Memory takeaways saved for future sessions (lambda env merge pattern, CF replacement lever, SSM Type match, user-visible validation)."
+            }
+          ],
+          "description": "Operational recovery work for the 2026-04-16 to 2026-04-21 CDC outage. Two compounding failures: (1) all 5 AppFlow Salesforce CDC flows (Account, Contact, Property, Lease, Availability) were Suspended with Cometd replay IDs rejected because Salesforce aged out the saved replay position during idle time; (2) the /salesforce/access_token SSM parameter was 5 days stale, causing cdc_sync to fail with SalesforceAuthenticationError on any enrichment path. Recovery strategy: rotate SSM token, merge-preserving Lambda env bump to force cold start on cdc_sync and poll_sync, add appflowGeneration CDK context param so renaming flowName forces CloudFormation to replace (delete+create) the 5 flows with fresh Cometd subscriptions, redeploy Ingestion stack, then watermarked backfill via poll_sync one-object-at-a-time with String watermarks seeded at 2026-04-16T06:45:00Z. Phase A (live restore) completed and verified end-to-end. Phase B (backfill) partial: 2 of 5 objects proven gap-free (ascendix__Lease__c and ascendix__Availability__c both returned records_synced=0 because no records were modified during the outage window), 3 of 5 objects (Account, Contact, ascendix__Property__c) blocked by a pre-existing compiler bug surfaced during today's work and deferred to task 4.26. Live CDC is fully restored; the deferred objects do not have known-missed data but cannot be confirmed gap-free until 4.26 ships and backfill replays.",
+          "acceptance_criteria": [
+            "Phase A (live restore) complete: 5 AppFlow flows with -v2-20260421 suffix Active (renamed via CDK appflowGeneration context, replacement forced by flowName change — only Replacement:True property on CfnFlow). cdc_sync logs show Upserted success and zero INVALID_SESSION_ID after SSM token rotation. End-to-end /query validation confirmed the pipeline delivers a Salesforce edit to Turbopuffer within ~15 seconds (total_lag metric).",
+            "Phase B (backfill) partial: ascendix__Lease__c records_synced=0, ascendix__Availability__c records_synced=0, both with SOQL returning 'No more records' — proven gap-free, not silent failures.",
+            "Phase B blocked for Account, Contact, and ascendix__Property__c: active compiled runtime config artifact (compiled/20260415T192655-75e7d0ebea94.yaml) contains bare relationship names in Account/Contact embed_fields (Owner, Account) and cross-object field contamination plus self-reference in ascendix__Property__c embed_fields (13 non-Property fields from Deal/Sale/Availability/Lease). Salesforce rejects the generated SOQL with INVALID_FIELD. cdc_sync is unaffected because it consumes the CDC payload; only poll_sync triggers the bug. Deferred to 4.26.",
+            "Memory-worthy takeaways saved to auto-memory: feedback_lambda_env_merge (merge-preserve env vars), feedback_cf_resource_replacement (force CF replacement via Replacement:True property + change-set confirmation), feedback_ssm_parameter_type_match (SSM Type must match reader's decryption expectations), feedback_user_visible_validation (logs are not user-visible validation).",
+            "This task cannot be marked complete until 4.26 lands and Account/Contact/Property backfill replay closes the outage gap for the 3 deferred objects. Per CLAUDE.md rule 6, the outstanding live-validation on 3/5 objects is an explicit blocker; keep status in_progress."
+          ],
+          "depends_on": [
+            "4.26"
+          ]
+        },
+        {
+          "id": "4.28",
+          "title": "Unify cdc_sync runtime config loading with query and poll_sync",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T15:04:00.874500+00:00",
+          "updatedAt": "2026-04-21T15:04:09.573900+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "cdc_sync currently loads only the bundled denorm_config.yaml, while query and poll_sync load the active compiled artifact from S3 via CONFIG_ARTIFACT_BUCKET and the active-version pointer. This creates runtime config divergence: poll_sync can fail on compiled-artifact bugs that cdc_sync does not see, and CDC freshness behavior may not match query/runtime scope. Keep this out of task 4.26 so the compiler fix and outage replay stay tightly scoped; implement as a separate live-CDC change with focused tests and rollback.",
+          "acceptance_criteria": [
+            "cdc_sync uses RuntimeConfigLoader with the same resolution order as query/poll_sync: active S3 compiled artifact via SSM active-version pointer, then /tmp last-known-good cache, then bundled denorm_config.yaml fallback.",
+            "IngestionStack sets CONFIG_ARTIFACT_BUCKET and CONFIG_ARTIFACT_PREFIX for salesforce-ai-search-cdc-sync, grants read access to config artifacts, and grants SSM read access for /salesforce-ai-search/config/* without removing existing CDC env vars or permissions.",
+            "Unit tests cover active artifact load, last-known-good or bundled fallback behavior, and unchanged behavior when no CONFIG_ARTIFACT_BUCKET is configured.",
+            "Live CDC validation proves a controlled update for at least Property plus one standard object (Account or Contact) still enriches via SOQL and upserts successfully after cdc_sync reads runtime config from S3.",
+            "Rollback path is documented: how to revert the active-version pointer or redeploy cdc_sync without CONFIG_ARTIFACT_BUCKET, and what validation to run after rollback."
+          ]
         }
       ]
     },
@@ -4588,6 +4671,92 @@
             "4.17.3",
             "4.17.8"
           ]
+        },
+        {
+          "id": "99.5",
+          "title": "Salesforce token refresh helper: complete JWT Bearer flow to produce access_token and write to SSM",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T14:35:53.528135+00:00",
+          "updatedAt": "2026-04-21T14:36:09.600153+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Today's (2026-04-21) CDC outage traced in part to /salesforce/access_token being 5 days stale in SSM — cdc_sync was failing with SalesforceAuthenticationError on enrichment describe() calls. The existing scripts/mint_jwt.py only produces the signed JWT assertion half of the JWT Bearer flow; it does NOT POST the assertion to /services/oauth2/token to exchange for an access_token. The gap is filled manually today with 'sf org display → aws ssm put-parameter', which is the same pattern referenced in archived handoffs (docs/archive/handoffs/HANDOFF-2025-12-06-DERIVED-VIEW-BACKFILL.md:19-24). This task adds scripts/refresh_sf_token.py that (1) invokes mint_jwt.py to produce a fresh signed assertion, (2) POSTs to https://test.salesforce.com/services/oauth2/token with grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer, (3) extracts access_token from the response, (4) writes to SSM /salesforce/access_token as SecureString. Turns manual multi-step rotation into one-command ops. Prerequisite for 99.6 (scheduled refresh).",
+          "acceptance_criteria": [
+            "scripts/refresh_sf_token.py exists, produces a fresh Salesforce access_token via JWT Bearer flow (assertion mint + token exchange POST), and writes it to SSM /salesforce/access_token as SecureString with --overwrite.",
+            "Script is idempotent and safe to run on demand; fails loudly (non-zero exit + explicit stderr) on JWT signing error, token exchange HTTP error, or SSM write error — no partial/silent success.",
+            "Script triggers cold start of salesforce-ai-search-cdc-sync and salesforce-ai-search-poll-sync using the merge-preserving env-bump pattern documented in memory/feedback_lambda_env_merge.md (fetch current env via get-function-configuration, add a refresh key, push back as file:// JSON — never clobber the whole Variables map).",
+            "End-to-end verification: after running the script, (a) aws ssm get-parameter LastModifiedDate on /salesforce/access_token shows within the last minute, (b) a controlled SF edit flows through CDC and cdc_sync logs Upserted with zero INVALID_SESSION_ID."
+          ]
+        },
+        {
+          "id": "99.6",
+          "title": "Scheduled Salesforce token refresh: EventBridge + Lambda to run 99.5 automatically",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T14:36:19.368064+00:00",
+          "updatedAt": "2026-04-21T14:36:40.158418+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Even with the one-command helper from 99.5, the rotation is still manual — which is what left /salesforce/access_token 5 days stale during the 2026-04-16 → 2026-04-21 CDC outage. This task wraps the 99.5 refresh logic in a Lambda invoked by an EventBridge rule (cron) every ~90 minutes (well inside the Salesforce access_token expiry window). Eliminates the 'SSM token is N days old' failure class entirely without requiring a full SalesforceClient refactor (which is the longer-term fix in 99.8). Lambda implementation should be a thin wrapper that calls the same JWT assertion + token exchange path as 99.5 with the private key material loaded from the SalesforceConnectedAppSecret (Secrets Manager). Monitored via CloudWatch alarm on Lambda errors.",
+          "depends_on": [
+            "99.5"
+          ],
+          "acceptance_criteria": [
+            "New Lambda function (e.g. salesforce-ai-search-sf-token-refresh) deployed via IngestionStack or a dedicated operational stack. Private key and consumer key sourced from salesforce-ai-search/appflow-creds secret and/or a dedicated private-key secret — no key material in code or env.",
+            "EventBridge rule invokes the Lambda every ~90 min (well inside Salesforce access_token expiry). Rule + Lambda provisioned in CDK, not created manually in the console.",
+            "Successful refresh updates /salesforce/access_token SSM param and bumps cdc_sync + poll_sync via merge-preserving env pattern so warm containers recycle on next invocation.",
+            "CloudWatch alarm on Lambda Errors > 0 → SNS topic → operator channel. Refresh failures must page someone — silent failure is the thing we are trying to eliminate.",
+            "Verification: kill the existing SSM token (write a known-invalid string), wait for the next scheduled run, confirm the token is refreshed automatically, cdc_sync resumes without manual intervention, and the CDC pipeline delivers a controlled SF edit end-to-end."
+          ]
+        },
+        {
+          "id": "99.7",
+          "title": "AppFlow suspension / failure alarm: detect silent multi-day CDC outage",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T14:37:06.162548+00:00",
+          "updatedAt": "2026-04-21T14:37:20.958497+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "During 2026-04-16 → 2026-04-21, all 5 Salesforce CDC flows were Suspended in AWS (Cometd subscription rejected by Salesforce with an aged-out replay ID) and nobody noticed for 5 days — there was no alarm. The user discovered it during an ad-hoc health check, not via proactive monitoring. This task adds a CloudWatch alarm that fires when any AppFlow Salesforce CDC flow transitions to a non-Active state OR experiences repeated subscription failures. Two viable implementations: (a) CloudWatch alarm on AWS/AppFlow FlowExecutionsFailed metric with a threshold + SNS, or (b) a lightweight Lambda scheduled every 5-10 minutes that calls appflow:ListFlows, checks flowStatus != Active for the 5 CDC flows, and publishes a custom CloudWatch metric + alarm. Option (b) is more reliable because Suspended flows emit no FlowExecutions at all — the absence of metric is exactly what we need to detect. Either way, alarm fires → SNS → operator channel. This class of failure must never be discovered by a curious user 5 days later.",
+          "acceptance_criteria": [
+            "CloudWatch alarm + SNS topic provisioned in CDK (MonitoringStack or IngestionStack) that fires when any of the 5 CDC flows (Account, Contact, ascendix__Property__c, ascendix__Lease__c, ascendix__Availability__c) enters a non-Active state. Covers both 'flow Suspended by Salesforce replay error' and 'flow execution repeatedly failing'.",
+            "Implementation handles the silence-is-not-success problem: Suspended flows do NOT emit FlowExecutionsFailed metrics because no execution is attempted. Either a scheduled health-check Lambda or a metric-absence alarm pattern must be used.",
+            "Alarm latency: the 2026-04-16 → 2026-04-21 outage lasted ~5 days before discovery. This alarm must page within 15 minutes of a Suspended flow being detected.",
+            "Alarm is tested by manually stopping one CDC flow (aws appflow stop-flow), confirming the alarm fires and the SNS subscriber receives notification within the target latency, then restarting the flow.",
+            "Runbook note added to docs/runbooks/ (or environments.md) explaining recovery procedure: resume-vs-replace decision tree for Suspended flows (per 2026-04-21 incident — resume will re-fail on aged-out replay IDs; replacement via CDK appflowGeneration context is the known-good recovery)."
+          ]
+        },
+        {
+          "id": "99.8",
+          "title": "SalesforceClient migration to OAuth Client Credentials with in-process refresh-on-401",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T14:37:34.459820+00:00",
+          "updatedAt": "2026-04-21T14:37:49.009786+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Durable fix for the Salesforce-auth-staleness failure class that caused half of the 2026-04-21 CDC outage. Currently lambda/common/salesforce_client.py loads a static access_token from SSM (from_ssm at :136) and caches it as a module-level singleton (_salesforce_client at :494). There is no refresh path — if the token expires mid-execution, the Lambda fails with INVALID_SESSION_ID and the token stays stale in SSM until somebody runs 'sf org display → aws ssm put-parameter' manually. Tasks 99.5 and 99.6 mitigate via external rotation but add operational surface area. The durable fix is to switch SalesforceClient to OAuth Client Credentials (or JWT Bearer with in-process exchange) and catch 401 responses to refresh the token automatically in-band. This makes 99.5 and 99.6 obsolete — the token is managed inside the Lambda's auth client and SSM is no longer the source of truth. Referenced as 'Task 46' in docs/archive/handoffs/HANDOFF-2025-12-15-SCHEMA-CACHE-RECOVERY.md:139 and HANDOFF-2025-12-14-TASK35-SCHEMA-EXPORT-VERIFIED.md:178. Scope is larger than 99.5/99.6 (touches production code, needs test coverage for refresh-on-401, needs backward-compat during rollout) so explicitly sized as a Phase 99 backlog item rather than a quick-win.",
+          "acceptance_criteria": [
+            "lambda/common/salesforce_client.py replaces the static-SSM access_token path with an OAuth Client Credentials (or JWT Bearer with in-process exchange) flow. Client holds credentials (consumer key + private key or client_secret) sourced from Secrets Manager, not SSM.",
+            "On any 401 / INVALID_SESSION_ID response, the client automatically refreshes the token and retries the failed request once. Refresh is rate-limited (e.g. at most once per N seconds) to avoid thundering-herd refresh storms on an auth outage.",
+            "Tests: unit tests for refresh-on-401 including retry behavior, refresh storm suppression, and graceful handling of genuine auth config errors (wrong client_id → do NOT infinite-retry).",
+            "Rollout plan in the task description: migrate cdc_sync, poll_sync, schema_discovery, schema_drift_checker one Lambda at a time, each with staged verification, before retiring the manual rotation path. Note that schema_discovery already has its own OAuth Client Credentials path at lambda/schema_discovery/discoverer.py:132 — study it as the reference implementation.",
+            "Once all Lambdas are migrated: retire /salesforce/access_token SSM param, delete scripts/refresh_sf_token.py (99.5), delete the scheduled refresh Lambda (99.6). Update memory/feedback_lambda_env_merge.md and the CDC runbook to reflect the new auth model."
+          ],
+          "depends_on": [
+            "99.5",
+            "99.6"
+          ]
         }
       ]
     }
@@ -4604,7 +4773,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 26,
+      "4.": 29,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,
@@ -4612,7 +4781,7 @@
       "4.9.": 11,
       "4.12.": 6,
       "4.13.": 2,
-      "99.": 5,
+      "99.": 9,
       "4.17.": 9,
       "4.19.": 5,
       "4.20.": 5,

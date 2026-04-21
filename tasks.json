@@ -4534,10 +4534,10 @@
         {
           "id": "4.26",
           "title": "Fix Ascendix Search config compiler emitting bare relationship fields and cross-object field contamination",
-          "status": "in_progress",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-04-21T14:27:27.997365+00:00",
-          "updatedAt": "2026-04-21T17:38:50.835361+00:00",
+          "updatedAt": "2026-04-21T21:26:59.223119+00:00",
           "files_modified": [
             "tests/test_generate_denorm_config.py",
             "tests/test_config_refresh.py",
@@ -4557,6 +4557,26 @@
             {
               "timestamp": "2026-04-21T17:38:50.835131+00:00",
               "note": "R2 QA verdict (2026-04-21): candidate 20260421T172143-75e7d0ebea94 APPROVED with one documented waiver. Describe-backed gate: candidate has 1 violation (ContentNote.parents.LatestContentId parent field 'Name' not on ContentBody). Same gate against the pre-4.26 active artifact (20260415T192655-75e7d0ebea94) returns 35 violations — candidate eliminates 34, introduces 0. The residual ContentNote violation is pre-existing, unrelated to the compiler fix, and is tracked as waiver task 99.9. ContentNote is not in POLL_OBJECTS, not in the CDC flow list, and not part of the 2026-04-16 outage replay path; promoting this candidate does not worsen ContentNote behavior. R4 promotion remains gated on explicit operator approval."
+            },
+            {
+              "timestamp": "2026-04-21T21:26:11.415082+00:00",
+              "note": "R4 promotion (2026-04-21T19:11:18+01:00): python3 scripts/run_config_refresh.py rollback --version 20260421T172143-75e7d0ebea94 advanced the active-version SSM pointer from 20260415T192655-75e7d0ebea94 to 20260421T172143-75e7d0ebea94. rolled_back JSON confirmed previous_version and rolled_back_to fields; apply + approval records written to S3. run_config_refresh.py status reported active_version=20260421T172143-75e7d0ebea94 with approval_state.state=rolled_back. Zero --apply, zero poll_sync invocations, zero watermark writes, zero Salesforce edits during R4."
+            },
+            {
+              "timestamp": "2026-04-21T21:26:24.153332+00:00",
+              "note": "R5 poll_sync cold-start (2026-04-21T18:11:44Z): merge-preserving env bump added CONFIG_PROMOTED_AT=1776795103 via file:// JSON. Pre-bump 11 env keys (AUDIT_BUCKET, CONFIG_ARTIFACT_BUCKET, CONFIG_ARTIFACT_PREFIX, DENORM_CONFIG_PATH, FORCE_COLD_START, LOG_LEVEL, POLL_BATCH_SIZE, POLL_OBJECTS, SALESFORCE_ORG_ID, TOKEN_REFRESHED_AT, TURBOPUFFER_API_KEY) all preserved post-bump plus CONFIG_PROMOTED_AT = 12 keys. aws lambda wait function-updated completed; final LastUpdateStatus=Successful. cdc_sync deliberately NOT bumped (LastModified remained 2026-04-21T13:58:06Z) — tracked separately in 4.28."
+            },
+            {
+              "timestamp": "2026-04-21T21:26:39.258280+00:00",
+              "note": "R6 backfill replay (2026-04-21T18:26-18:27Z): per-object invocations against salesforce-ai-search-poll-sync with {\"objects\":[\"<OBJ>\"],\"full_sync\":false}, String watermarks seeded at 2026-04-16T06:45:00Z|. Contact watermark re-seeded from original 2025-05-23 value to 2026-04-16T06:45:00Z| via the R6 preflight. Results: Account records_synced=0 (proven empty gap, No more records); Contact records_synced=0 (proven empty gap); ascendix__Property__c records_synced=2 with watermark advanced to 2026-04-21T14:11:07.000+0000|a0afk000000SSpOAAW — records were a0adl00000APw4fAAD Elmonica Park (2026-04-16T07:57:57) and a0afk000000SSpOAAW Testing2 (2026-04-21T14:11:07, Phase A revert). User-visible /query validation for both Property records returned correct IDs + Names with 1 tool_call/2 turns each; Elmonica Park response included parent-traversal fields (Listing Broker: Kidder Mathews - Portland, Record Type: Multi-Family, Year Built: 1989) confirming the compiler fix works end-to-end through parents emission. Stop-rule checks all green: zero Lambda FunctionError, zero payload non-200, zero SalesforceAPIError, zero unresolved continuations, all three response watermarks matched SSM post-write. RecordsSynced CloudWatch metric emitted with SObject dimension for all 3 objects. cdc_sync not bumped; no Salesforce edits during R6."
+            },
+            {
+              "timestamp": "2026-04-21T21:26:54.222739+00:00",
+              "note": "Closure (2026-04-21): all 6 ACs satisfied. AC1/AC2/AC3 verified via describe-backed gate — candidate 20260421T172143-75e7d0ebea94 eliminates 34 of 35 pre-existing violations, introduces 0. The residual ContentNote violation is pre-existing (present in active 20260415T192655) and orthogonal to the outage replay path; tracked under waiver task 99.9 per QA sign-off. AC4 superseded by AC6 per explicit operator direction: compile --apply replaced by compile → describe-gate → rollback-to-version pointer promotion; rationale is that --apply runs the targeted reindex callback against the currently-active (pre-fix) artifact which would re-hit the Owner/Property SOQL errors before promotion. AC5 / AC6 executed in R6 with all guardrails: one object at a time, String watermarks, raw response persistence to /tmp/poll_<Object>_iter<N>.json, continuation_needed loops, raw response + logs + metric + /query four-layer verification per object. Related PRs merged: #18 (compiler fix), #19 (R2 QA approval + 99.9 waiver)."
+            },
+            {
+              "timestamp": "2026-04-21T21:26:59.223122+00:00",
+              "note": "Task completed"
             }
           ],
           "description": "The active compiled runtime config artifact (s3://salesforce-ai-search-data-382211616288-us-west-2/config/00Ddl000003yx57EAA/compiled/20260415T192655-75e7d0ebea94.yaml) contains two classes of compiler bugs that block poll_sync against Account, Contact, and ascendix__Property__c. Bug class 1 — bare relationship names: Account.embed_fields has 'Owner', Contact.embed_fields has 'Owner' and 'Account'. These produce invalid SOQL like 'SELECT Owner FROM Account' which Salesforce rejects with INVALID_FIELD. Bug class 2 — cross-object field contamination: ascendix__Property__c.embed_fields contains 13 fields that are not columns on the Property object (ascendix__Property__c self-reference, plus Deal/Sale fields like ascendix__SalesStage__c/GrossFeeAmount__c/CloseDateEstimated__c and Availability/Lease fields like ascendix__LeaseRatePerUOM__c/TermCommencementDate__c/TermExpirationDate__c). The Property SOQL fails with 'No such column ascendix__Property__c on entity ascendix__Property__c'. Impact: poll_sync cannot run for Account/Contact/Property. cdc_sync is unaffected because it consumes the CDC payload rather than issuing SELECT, so live CDC flow continues to work for these objects. Latent since PR 2c5bd7f (Task 4.9.6-4.9.10, Ascendix config control plane). Only surfaced today (2026-04-21) during the CDC outage backfill attempt — Account/Contact were never in POLL_OBJECTS scope previously, and Property went into poll_sync for the first time today. Context: originally introduced during Phase 4.9 when the compiler began emitting from ascendix_search__SearchSetting__c 'Selected Objects' + 'Default Layout' records. Scope for the fix: (1) root-cause and patch lib/config_refresh.py so embed_fields only contains scalar direct fields of the target object, relationship names get emitted as relationship traversals (Owner.Name, Account.Name), and fields from other objects are routed into the appropriate object's config rather than hoisted into Property. (2) Rerun scripts/run_config_refresh.py --apply to produce a clean artifact and advance the active-version pointer. (3) Replay poll_sync backfill from watermark 2026-04-16T06:45:00Z for Account, Contact, ascendix__Property__c to close the remaining CDC outage gap. Today's partial backfill only covered ascendix__Lease__c and ascendix__Availability__c (both returned records_synced=0).",
@@ -4568,15 +4588,16 @@
             "Outage backfill replay: watermark for Account, Contact, and ascendix__Property__c is re-seeded to 2026-04-16T06:45:00Z (Type=String) and poll_sync is re-invoked for each, closing the CDC outage gap that today's partial backfill left open. Verify by running /query against at least one Account and one Contact known to have been edited during 2026-04-16 → recovery and confirm the post-outage state is returned.",
             "Replay guardrails (explicit, supersedes AC5 where they differ): (a) only after compiler fix is deployed AND scripts/run_config_refresh.py --apply has advanced the active-version SSM pointer to a verified-clean artifact; (b) re-seed watermarks for Account, Contact, and ascendix__Property__c to '2026-04-16T06:45:00Z|' via aws ssm put-parameter --type String (NOT SecureString — lambda/poll_sync/index.py:237 reads without WithDecryption=True; a SecureString seed would silently fall back to epoch at :241 and re-poll all history); (c) invoke salesforce-ai-search-poll-sync one object at a time with payload {\"objects\":[\"<single>\"],\"full_sync\":false} — never batch all three in a single invocation (5-min Lambda timeout, sequential processing, any failure aborts remaining objects); (d) persist each raw Lambda response to /tmp/poll_<Object>_iter<N>.json; (e) loop per-object only while that object's response reports continuation_needed:true; (f) verification for each of the 3 objects requires all four: raw response (statusCode=200, FunctionError=None, summary.<Object>.records_synced, summary.<Object>.watermark, summary.<Object>.continuation_needed), poll_sync CloudWatch logs showing 'Polling <Object> from watermark:' through 'Poll sync for <Object> complete:' with no ERROR lines, SalesforceAISearch/PollSync.RecordsSynced metric emitted with SObject dimension, AND user-visible /query validation for at least one record per object known to have been modified during 2026-04-16 → recovery (if such a record exists — if records_synced=0, note this in the task as a proven-empty gap, not as missing validation)."
           ],
-          "startedAt": "2026-04-21T16:18:29.398509+00:00"
+          "startedAt": "2026-04-21T16:18:29.398509+00:00",
+          "completedAt": "2026-04-21T21:26:59.222897+00:00"
         },
         {
           "id": "4.27",
           "title": "CDC pipeline recovery (2026-04-21): AppFlow resubscription + SSM token rotation + outage gap backfill",
-          "status": "pending",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-04-21T14:33:58.565177+00:00",
-          "updatedAt": "2026-04-21T14:38:09.296319+00:00",
+          "updatedAt": "2026-04-21T21:27:20.174787+00:00",
           "files_modified": [
             "lib/ingestion-stack.ts"
           ],
@@ -4598,6 +4619,14 @@
             {
               "timestamp": "2026-04-21T14:38:09.296114+00:00",
               "note": "Durable follow-ups created: 4.26 (Ascendix config compiler fix — HARD BLOCKER for closing this task; must complete before Account/Contact/Property backfill replay can run), 99.5 (SF token refresh helper — completes JWT Bearer flow missing from mint_jwt.py), 99.6 (scheduled refresh Lambda, depends on 99.5), 99.7 (AppFlow suspension alarm — addresses the 5-day silent-outage root-cause observability gap), 99.8 (SalesforceClient OAuth Client Credentials migration — long-term durable fix that obsoletes 99.5 and 99.6). Dependencies set: 4.27→4.26, 99.6→99.5, 99.8→{99.5,99.6}. Memory takeaways saved for future sessions (lambda env merge pattern, CF replacement lever, SSM Type match, user-visible validation)."
+            },
+            {
+              "timestamp": "2026-04-21T21:27:14.241986+00:00",
+              "note": "Closure (2026-04-21): 4.26 R6 backfill replay closed the outage gap for Account, Contact, and ascendix__Property__c. All 5 CDC objects in the 2026-04-16T06:45:00Z → recovery window are now accounted for: (1) ascendix__Lease__c — Phase B, records_synced=0 proven empty; (2) ascendix__Availability__c — Phase B, records_synced=0 proven empty; (3) Account — 4.26 R6, records_synced=0 proven empty; (4) Contact — 4.26 R6 (after preflight watermark re-seed from original 2025-05-23 to 2026-04-16T06:45:00Z|), records_synced=0 proven empty; (5) ascendix__Property__c — 4.26 R6, records_synced=2 (a0adl00000APw4fAAD Elmonica Park + a0afk000000SSpOAAW Testing2), watermark advanced, both records user-visible-validated through /query. Live CDC remains flowing via the 5 -v2-20260421 AppFlow flows from Phase A. No known-missed data in the outage window."
+            },
+            {
+              "timestamp": "2026-04-21T21:27:20.174791+00:00",
+              "note": "Task completed"
             }
           ],
           "description": "Operational recovery work for the 2026-04-16 to 2026-04-21 CDC outage. Two compounding failures: (1) all 5 AppFlow Salesforce CDC flows (Account, Contact, Property, Lease, Availability) were Suspended with Cometd replay IDs rejected because Salesforce aged out the saved replay position during idle time; (2) the /salesforce/access_token SSM parameter was 5 days stale, causing cdc_sync to fail with SalesforceAuthenticationError on any enrichment path. Recovery strategy: rotate SSM token, merge-preserving Lambda env bump to force cold start on cdc_sync and poll_sync, add appflowGeneration CDK context param so renaming flowName forces CloudFormation to replace (delete+create) the 5 flows with fresh Cometd subscriptions, redeploy Ingestion stack, then watermarked backfill via poll_sync one-object-at-a-time with String watermarks seeded at 2026-04-16T06:45:00Z. Phase A (live restore) completed and verified end-to-end. Phase B (backfill) partial: 2 of 5 objects proven gap-free (ascendix__Lease__c and ascendix__Availability__c both returned records_synced=0 because no records were modified during the outage window), 3 of 5 objects (Account, Contact, ascendix__Property__c) blocked by a pre-existing compiler bug surfaced during today's work and deferred to task 4.26. Live CDC is fully restored; the deferred objects do not have known-missed data but cannot be confirmed gap-free until 4.26 ships and backfill replays.",
@@ -4610,7 +4639,8 @@
           ],
           "depends_on": [
             "4.26"
-          ]
+          ],
+          "completedAt": "2026-04-21T21:27:20.174525+00:00"
         },
         {
           "id": "4.28",

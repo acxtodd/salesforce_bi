@@ -155,10 +155,17 @@ export class IngestionStack extends cdk.Stack {
         },
       ];
 
-      // Create AppFlow flow for each CDC object
+      // Create AppFlow flow for each CDC object.
+      // appflowGeneration context is the replacement lever for resetting Cometd
+      // subscriptions when flows suspend on aged-out replay IDs. CfnFlow's only
+      // Replacement: True property in scope is flowName, so the suffix forces
+      // CloudFormation to delete + recreate the resource.
+      const appflowGeneration: string =
+        (this.node.tryGetContext("appflowGeneration") as string) ?? "";
+      const flowNameSuffix = appflowGeneration ? `-${appflowGeneration}` : "";
       cdcObjects.forEach(({ changeEventObject, sobjectName }) => {
         const flow = new appflow.CfnFlow(this, `CDCFlow${changeEventObject}`, {
-          flowName: `salesforce-ai-search-cdc-${sobjectName.toLowerCase()}`,
+          flowName: `salesforce-ai-search-cdc-${sobjectName.toLowerCase()}${flowNameSuffix}`,
           flowStatus: "Active",
           triggerConfig: {
             triggerType: "Event",

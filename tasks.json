@@ -4537,7 +4537,7 @@
           "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-04-21T14:27:27.997365+00:00",
-          "updatedAt": "2026-04-21T16:18:49.687304+00:00",
+          "updatedAt": "2026-04-21T17:38:50.835361+00:00",
           "files_modified": [
             "tests/test_generate_denorm_config.py",
             "tests/test_config_refresh.py",
@@ -4553,6 +4553,10 @@
             {
               "timestamp": "2026-04-21T16:18:49.687088+00:00",
               "note": "R1 local implementation completed on branch task-4.26-config-compiler-fields: generate_denorm_config now excludes unknown direct fields from emitted config and routes Ascendix saved-search relationship signals (bare standard relationships, dotted relationship traversals, and relationship-context signals) into ascendix_parent_refs instead of direct field_scores. Added TestPhantomFieldExclusion unit coverage plus a compile_config_artifact live-path regression covering Account.Owner, Contact.Account/Owner, Contact Account.Name traversal, and Property self-reference contamination. Verification: python3 -m pytest tests/test_generate_denorm_config.py tests/test_config_refresh.py -q (43 passed); python3 -m pytest tests/test_denormalize.py tests/test_poll_sync.py tests/test_bulk_load.py -q (129 passed). Full python3 -m pytest -q still cannot collect because docs/archive/test_automation/adaptive_threshold_precision_test.py exits when SALESFORCE_AI_SEARCH_API_URL and SALESFORCE_AI_SEARCH_API_KEY are unset."
+            },
+            {
+              "timestamp": "2026-04-21T17:38:50.835131+00:00",
+              "note": "R2 QA verdict (2026-04-21): candidate 20260421T172143-75e7d0ebea94 APPROVED with one documented waiver. Describe-backed gate: candidate has 1 violation (ContentNote.parents.LatestContentId parent field 'Name' not on ContentBody). Same gate against the pre-4.26 active artifact (20260415T192655-75e7d0ebea94) returns 35 violations — candidate eliminates 34, introduces 0. The residual ContentNote violation is pre-existing, unrelated to the compiler fix, and is tracked as waiver task 99.9. ContentNote is not in POLL_OBJECTS, not in the CDC flow list, and not part of the 2026-04-16 outage replay path; promoting this candidate does not worsen ContentNote behavior. R4 promotion remains gated on explicit operator approval."
             }
           ],
           "description": "The active compiled runtime config artifact (s3://salesforce-ai-search-data-382211616288-us-west-2/config/00Ddl000003yx57EAA/compiled/20260415T192655-75e7d0ebea94.yaml) contains two classes of compiler bugs that block poll_sync against Account, Contact, and ascendix__Property__c. Bug class 1 — bare relationship names: Account.embed_fields has 'Owner', Contact.embed_fields has 'Owner' and 'Account'. These produce invalid SOQL like 'SELECT Owner FROM Account' which Salesforce rejects with INVALID_FIELD. Bug class 2 — cross-object field contamination: ascendix__Property__c.embed_fields contains 13 fields that are not columns on the Property object (ascendix__Property__c self-reference, plus Deal/Sale fields like ascendix__SalesStage__c/GrossFeeAmount__c/CloseDateEstimated__c and Availability/Lease fields like ascendix__LeaseRatePerUOM__c/TermCommencementDate__c/TermExpirationDate__c). The Property SOQL fails with 'No such column ascendix__Property__c on entity ascendix__Property__c'. Impact: poll_sync cannot run for Account/Contact/Property. cdc_sync is unaffected because it consumes the CDC payload rather than issuing SELECT, so live CDC flow continues to work for these objects. Latent since PR 2c5bd7f (Task 4.9.6-4.9.10, Ascendix config control plane). Only surfaced today (2026-04-21) during the CDC outage backfill attempt — Account/Contact were never in POLL_OBJECTS scope previously, and Property went into poll_sync for the first time today. Context: originally introduced during Phase 4.9 when the compiler began emitting from ascendix_search__SearchSetting__c 'Selected Objects' + 'Default Layout' records. Scope for the fix: (1) root-cause and patch lib/config_refresh.py so embed_fields only contains scalar direct fields of the target object, relationship names get emitted as relationship traversals (Owner.Name, Account.Name), and fields from other objects are routed into the appropriate object's config rather than hoisted into Property. (2) Rerun scripts/run_config_refresh.py --apply to produce a clean artifact and advance the active-version pointer. (3) Replay poll_sync backfill from watermark 2026-04-16T06:45:00Z for Account, Contact, ascendix__Property__c to close the remaining CDC outage gap. Today's partial backfill only covered ascendix__Lease__c and ascendix__Availability__c (both returned records_synced=0).",
@@ -4771,6 +4775,24 @@
             "99.5",
             "99.6"
           ]
+        },
+        {
+          "id": "99.9",
+          "title": "Fix ContentNote config parent mismatch: LatestContentId -> ContentBody lacks Name field",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T17:38:12.805436+00:00",
+          "updatedAt": "2026-04-21T17:38:12.974712+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Pre-existing defect surfaced during 4.26 R2 QA gate (2026-04-21). The compiled runtime config for ContentNote includes parents[LatestContentId]=[Name], but the FK LatestContentId points to ContentBody, which does not have a Name column per Salesforce describe. This produces a malformed SOQL path (SELECT LatestContent.Name FROM ContentNote) that would fail if poll_sync ever targeted ContentNote. Violation is present in both the pre-4.26 active artifact (20260415T192655-75e7d0ebea94) and the 4.26 candidate artifact (20260421T172143-75e7d0ebea94) — 4.26 does not introduce it and does not fix it. Out of scope for 4.26 because ContentNote is not in POLL_OBJECTS, is not in the CDC flow list, and is not part of the 2026-04-16 outage replay path. Fix approach: either remove LatestContentId from ContentNote parent config (if no runtime uses it), or replace the parent_field list with a real ContentBody column (e.g. FileType, or ContentDocumentId leading elsewhere). Verify via the describe-backed artifact gate script (/tmp/describe_gate.py used in 4.26 QA); after fix, the gate should report zero violations across all 13 objects. Referenced as the sole waiver on the 4.26 R2 package per QA sign-off.",
+          "acceptance_criteria": [
+            "Compiler emits ContentNote.parents without the invalid LatestContentId -> [Name] entry; either the ref_field is dropped (preferred if no runtime consumer uses ContentBody context) or the parent_field list is replaced with fields that actually exist on ContentBody per describe (e.g. FileType).",
+            "Describe-backed artifact gate (the /tmp/describe_gate.py validator from the 4.26 R2 QA package) reports zero violations on the newly compiled artifact across all 13 objects.",
+            "Document in the fix PR whether runtime code actually reads parents[LatestContentId] for ContentNote anywhere — if yes, the fix must preserve equivalent behavior; if no, dropping the parent is the cleaner fix."
+          ]
         }
       ]
     }
@@ -4795,7 +4817,7 @@
       "4.9.": 11,
       "4.12.": 6,
       "4.13.": 2,
-      "99.": 9,
+      "99.": 10,
       "4.17.": 9,
       "4.19.": 5,
       "4.20.": 5,

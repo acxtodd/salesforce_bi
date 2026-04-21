@@ -4534,14 +4534,27 @@
         {
           "id": "4.26",
           "title": "Fix Ascendix Search config compiler emitting bare relationship fields and cross-object field contamination",
-          "status": "pending",
+          "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-04-21T14:27:27.997365+00:00",
-          "updatedAt": "2026-04-21T14:35:34.513165+00:00",
-          "files_modified": [],
+          "updatedAt": "2026-04-21T16:18:49.687304+00:00",
+          "files_modified": [
+            "tests/test_generate_denorm_config.py",
+            "tests/test_config_refresh.py",
+            "scripts/generate_denorm_config.py"
+          ],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-21T16:18:29.398725+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-04-21T16:18:49.687088+00:00",
+              "note": "R1 local implementation completed on branch task-4.26-config-compiler-fields: generate_denorm_config now excludes unknown direct fields from emitted config and routes Ascendix saved-search relationship signals (bare standard relationships, dotted relationship traversals, and relationship-context signals) into ascendix_parent_refs instead of direct field_scores. Added TestPhantomFieldExclusion unit coverage plus a compile_config_artifact live-path regression covering Account.Owner, Contact.Account/Owner, Contact Account.Name traversal, and Property self-reference contamination. Verification: python3 -m pytest tests/test_generate_denorm_config.py tests/test_config_refresh.py -q (43 passed); python3 -m pytest tests/test_denormalize.py tests/test_poll_sync.py tests/test_bulk_load.py -q (129 passed). Full python3 -m pytest -q still cannot collect because docs/archive/test_automation/adaptive_threshold_precision_test.py exits when SALESFORCE_AI_SEARCH_API_URL and SALESFORCE_AI_SEARCH_API_KEY are unset."
+            }
+          ],
           "description": "The active compiled runtime config artifact (s3://salesforce-ai-search-data-382211616288-us-west-2/config/00Ddl000003yx57EAA/compiled/20260415T192655-75e7d0ebea94.yaml) contains two classes of compiler bugs that block poll_sync against Account, Contact, and ascendix__Property__c. Bug class 1 — bare relationship names: Account.embed_fields has 'Owner', Contact.embed_fields has 'Owner' and 'Account'. These produce invalid SOQL like 'SELECT Owner FROM Account' which Salesforce rejects with INVALID_FIELD. Bug class 2 — cross-object field contamination: ascendix__Property__c.embed_fields contains 13 fields that are not columns on the Property object (ascendix__Property__c self-reference, plus Deal/Sale fields like ascendix__SalesStage__c/GrossFeeAmount__c/CloseDateEstimated__c and Availability/Lease fields like ascendix__LeaseRatePerUOM__c/TermCommencementDate__c/TermExpirationDate__c). The Property SOQL fails with 'No such column ascendix__Property__c on entity ascendix__Property__c'. Impact: poll_sync cannot run for Account/Contact/Property. cdc_sync is unaffected because it consumes the CDC payload rather than issuing SELECT, so live CDC flow continues to work for these objects. Latent since PR 2c5bd7f (Task 4.9.6-4.9.10, Ascendix config control plane). Only surfaced today (2026-04-21) during the CDC outage backfill attempt — Account/Contact were never in POLL_OBJECTS scope previously, and Property went into poll_sync for the first time today. Context: originally introduced during Phase 4.9 when the compiler began emitting from ascendix_search__SearchSetting__c 'Selected Objects' + 'Default Layout' records. Scope for the fix: (1) root-cause and patch lib/config_refresh.py so embed_fields only contains scalar direct fields of the target object, relationship names get emitted as relationship traversals (Owner.Name, Account.Name), and fields from other objects are routed into the appropriate object's config rather than hoisted into Property. (2) Rerun scripts/run_config_refresh.py --apply to produce a clean artifact and advance the active-version pointer. (3) Replay poll_sync backfill from watermark 2026-04-16T06:45:00Z for Account, Contact, ascendix__Property__c to close the remaining CDC outage gap. Today's partial backfill only covered ascendix__Lease__c and ascendix__Availability__c (both returned records_synced=0).",
           "acceptance_criteria": [
             "Compiler lib/config_refresh.py emits valid SOQL field names: scalar columns as-is, relationship names as '<RelName>.Name' traversals (e.g. Owner -> Owner.Name, Account -> Account.Name), and no field appears in an object's embed_fields unless it is actually a column on that object (verified against SF describe).",
@@ -4550,7 +4563,8 @@
             "scripts/run_config_refresh.py --apply against ascendix-beta-sandbox succeeds, the active-version SSM pointer advances, and a fresh poll_sync invocation per object (Account, Contact, ascendix__Property__c) with full_sync:false completes without SalesforceAPIError and reports records_synced consistent with expected modification counts.",
             "Outage backfill replay: watermark for Account, Contact, and ascendix__Property__c is re-seeded to 2026-04-16T06:45:00Z (Type=String) and poll_sync is re-invoked for each, closing the CDC outage gap that today's partial backfill left open. Verify by running /query against at least one Account and one Contact known to have been edited during 2026-04-16 → recovery and confirm the post-outage state is returned.",
             "Replay guardrails (explicit, supersedes AC5 where they differ): (a) only after compiler fix is deployed AND scripts/run_config_refresh.py --apply has advanced the active-version SSM pointer to a verified-clean artifact; (b) re-seed watermarks for Account, Contact, and ascendix__Property__c to '2026-04-16T06:45:00Z|' via aws ssm put-parameter --type String (NOT SecureString — lambda/poll_sync/index.py:237 reads without WithDecryption=True; a SecureString seed would silently fall back to epoch at :241 and re-poll all history); (c) invoke salesforce-ai-search-poll-sync one object at a time with payload {\"objects\":[\"<single>\"],\"full_sync\":false} — never batch all three in a single invocation (5-min Lambda timeout, sequential processing, any failure aborts remaining objects); (d) persist each raw Lambda response to /tmp/poll_<Object>_iter<N>.json; (e) loop per-object only while that object's response reports continuation_needed:true; (f) verification for each of the 3 objects requires all four: raw response (statusCode=200, FunctionError=None, summary.<Object>.records_synced, summary.<Object>.watermark, summary.<Object>.continuation_needed), poll_sync CloudWatch logs showing 'Polling <Object> from watermark:' through 'Poll sync for <Object> complete:' with no ERROR lines, SalesforceAISearch/PollSync.RecordsSynced metric emitted with SObject dimension, AND user-visible /query validation for at least one record per object known to have been modified during 2026-04-16 → recovery (if such a record exists — if records_synced=0, note this in the task as a proven-empty gap, not as missing validation)."
-          ]
+          ],
+          "startedAt": "2026-04-21T16:18:29.398509+00:00"
         },
         {
           "id": "4.27",

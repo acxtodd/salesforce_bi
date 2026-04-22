@@ -136,6 +136,7 @@ const monitoringStack = new MonitoringStack(app, `${stackPrefix}-Monitoring-${en
   sessionsTable: dataStack.sessionsTable,
   authzCacheTable: dataStack.authzCacheTable,
   rateLimitsTable: dataStack.rateLimitsTable,
+  appflowEnabled: appflowContextProvided === 3,
   tags: {
     Project: 'SalesforceAISearch',
     Environment: environment,

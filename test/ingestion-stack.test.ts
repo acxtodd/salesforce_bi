@@ -2,7 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as kms from 'aws-cdk-lib/aws-kms';
 import * as s3 from 'aws-cdk-lib/aws-s3';
-import { Template } from 'aws-cdk-lib/assertions';
+import { Match, Template } from 'aws-cdk-lib/assertions';
 import { IngestionStack } from '../lib/ingestion-stack';
 
 /**
@@ -84,5 +84,77 @@ describe('IngestionStack without Salesforce credentials', () => {
 
   test('does not create AppFlow ConnectorProfile when credentials are absent', () => {
     template.resourceCountIs('AWS::AppFlow::ConnectorProfile', 0);
+  });
+
+  test('does not create the AppFlow health check Lambda when credentials are absent', () => {
+    // Task 4.29: when AppFlow is not configured, no CDC flows exist, so the
+    // health check (and its matching alarm in MonitoringStack) must not
+    // deploy — otherwise it would page permanently on missing data.
+    const functions = template.findResources('AWS::Lambda::Function', {
+      Properties: { FunctionName: 'salesforce-ai-search-appflow-health-check' },
+    });
+    expect(Object.keys(functions)).toHaveLength(0);
+  });
+
+  test('does not create the AppFlow health check schedule rule when credentials are absent', () => {
+    const rules = template.findResources('AWS::Events::Rule', {
+      Properties: { Name: 'salesforce-ai-search-appflow-health-check-schedule' },
+    });
+    expect(Object.keys(rules)).toHaveLength(0);
+  });
+});
+
+describe('IngestionStack AppFlow health check (Task 4.29)', () => {
+  let template: Template;
+
+  beforeAll(() => {
+    template = buildStack({ withSalesforceCreds: true });
+  });
+
+  test('creates the health check Lambda with the expected function name', () => {
+    template.hasResourceProperties('AWS::Lambda::Function', {
+      FunctionName: 'salesforce-ai-search-appflow-health-check',
+      Runtime: 'python3.11',
+      Handler: 'index.lambda_handler',
+    });
+  });
+
+  test('creates a 5-minute EventBridge schedule rule for the health check', () => {
+    template.hasResourceProperties('AWS::Events::Rule', {
+      Name: 'salesforce-ai-search-appflow-health-check-schedule',
+      ScheduleExpression: 'rate(5 minutes)',
+    });
+  });
+
+  test('health check role grants appflow:ListFlows', () => {
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Action: 'appflow:ListFlows',
+            Resource: '*',
+          }),
+        ]),
+      },
+    });
+  });
+
+  test('health check role scopes PutMetricData to SalesforceAISearch/Ingestion namespace', () => {
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Effect: 'Allow',
+            Action: 'cloudwatch:PutMetricData',
+            Condition: {
+              StringEquals: {
+                'cloudwatch:namespace': 'SalesforceAISearch/Ingestion',
+              },
+            },
+          }),
+        ]),
+      },
+    });
   });
 });

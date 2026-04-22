@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 
 # Add project root + lambda to path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -15,6 +16,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "lambda"))
 
 from lib.audit_writer import AuditingBackend
 
+from cdc_sync import index as _cdc_sync_mod
 from cdc_sync.index import (
     CDC_ENTITY_MAP,
     CDCEvent,
@@ -958,3 +960,148 @@ class TestDenormAuditInCDC:
         assert ab.stats.denorm_audit_failed == 1
         # Pipeline still completed — upsert was called
         deps["_inner_backend"].upsert.assert_called_once()
+
+
+# ===================================================================
+# Runtime config loading tests (Task 4.28)
+# ===================================================================
+
+
+class TestRuntimeConfigLoading:
+    """Verify cdc_sync uses RuntimeConfigLoader with safe fallback."""
+
+    def _reset_module_state(self):
+        """Reset module-level caches between tests."""
+        _cdc_sync_mod._denorm_config = None
+        _cdc_sync_mod._denorm_config_raw_yaml = ""
+        _cdc_sync_mod._denorm_config_version = ""
+        _cdc_sync_mod._runtime_config_loader = None
+
+    def test_cdc_sync_loads_config_from_runtime_loader(self, monkeypatch):
+        """When RuntimeConfigLoader succeeds, cdc_sync uses its denorm_config."""
+        self._reset_module_state()
+
+        class FakeLoader:
+            def __init__(self):
+                self.called_org_ids = []
+
+            def load(self, org_id):
+                self.called_org_ids.append(org_id)
+                return {
+                    "version_id": "runtime-v1",
+                    "denorm_config": {
+                        "ascendix__Property__c": {
+                            "embed_fields": ["Name", "ascendix__City__c"],
+                            "metadata_fields": [],
+                            "parents": {},
+                        }
+                    },
+                }
+
+        fake_loader = FakeLoader()
+        monkeypatch.setattr(_cdc_sync_mod, "_runtime_config_loader", fake_loader)
+
+        config, raw_yaml = _cdc_sync_mod._load_denorm_config("00DTEST")
+
+        assert fake_loader.called_org_ids == ["00DTEST"]
+        assert "ascendix__Property__c" in config
+        assert "ascendix__City__c" in config["ascendix__Property__c"]["embed_fields"]
+        assert _cdc_sync_mod._denorm_config_version == "runtime-v1"
+        # raw_yaml is the safe_dumped version of the denorm_config dict
+        assert "ascendix__Property__c" in raw_yaml
+
+        self._reset_module_state()
+
+    def test_cdc_sync_falls_back_to_static_yaml_on_loader_error(
+        self, monkeypatch, tmp_path
+    ):
+        """When RuntimeConfigLoader raises, cdc_sync falls back to static YAML."""
+        self._reset_module_state()
+
+        class FailingLoader:
+            def load(self, org_id):
+                raise RuntimeError("S3 unavailable")
+
+        monkeypatch.setattr(_cdc_sync_mod, "_runtime_config_loader", FailingLoader())
+
+        fallback_config = {
+            "ascendix__Property__c": {
+                "embed_fields": ["Name"],
+                "metadata_fields": [],
+                "parents": {},
+            }
+        }
+        config_path = tmp_path / "denorm_config.yaml"
+        config_path.write_text(yaml.safe_dump(fallback_config))
+        monkeypatch.setenv("DENORM_CONFIG_PATH", str(config_path))
+
+        config, raw_yaml = _cdc_sync_mod._load_denorm_config("00DTEST")
+
+        assert "ascendix__Property__c" in config
+        assert _cdc_sync_mod._denorm_config_version == "bundled-fallback"
+
+        self._reset_module_state()
+
+    def test_cdc_sync_caches_config_after_first_load(self, monkeypatch):
+        """Config is cached at module level; second call does not re-invoke loader."""
+        self._reset_module_state()
+
+        call_count = 0
+
+        class CountingLoader:
+            def load(self, org_id):
+                nonlocal call_count
+                call_count += 1
+                return {
+                    "version_id": "cached-v1",
+                    "denorm_config": {
+                        "ascendix__Property__c": {
+                            "embed_fields": ["Name"],
+                            "metadata_fields": [],
+                            "parents": {},
+                        }
+                    },
+                }
+
+        monkeypatch.setattr(_cdc_sync_mod, "_runtime_config_loader", CountingLoader())
+
+        _cdc_sync_mod._load_denorm_config("00DTEST")
+        _cdc_sync_mod._load_denorm_config("00DTEST")
+
+        assert call_count == 1
+
+        self._reset_module_state()
+
+    def test_cdc_sync_without_config_artifact_bucket_uses_bundled(
+        self, monkeypatch, tmp_path
+    ):
+        """When CONFIG_ARTIFACT_BUCKET is unset, the loader falls through to
+        bundled YAML without attempting S3 — behavior is unchanged for
+        environments that have not been converged onto the runtime plane."""
+        self._reset_module_state()
+        # Ensure no bucket is configured so _get_runtime_config_loader()
+        # creates a loader with s3_client/ssm_client = None.
+        monkeypatch.delenv("CONFIG_ARTIFACT_BUCKET", raising=False)
+
+        fallback_config = {
+            "Account": {
+                "embed_fields": ["Name"],
+                "metadata_fields": [],
+                "parents": {},
+            }
+        }
+        config_path = tmp_path / "denorm_config.yaml"
+        config_path.write_text(yaml.safe_dump(fallback_config))
+        monkeypatch.setenv("DENORM_CONFIG_PATH", str(config_path))
+
+        config, raw_yaml = _cdc_sync_mod._load_denorm_config("00DTEST")
+
+        # Loader's bundled path wraps the dict; extract_denorm_config strips
+        # the wrapper so the returned dict is just the denorm config.
+        assert "Account" in config
+        # version_id comes from the loader's bundled wrapper, not the
+        # exception-fallback path — this proves we exercised the loader's
+        # S3-skip branch, not the outer try/except.
+        assert _cdc_sync_mod._denorm_config_version == "bundled"
+
+        self._reset_module_state()

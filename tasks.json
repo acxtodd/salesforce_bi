@@ -4333,10 +4333,10 @@
         {
           "id": "4.22",
           "title": "Fix record-page propose_edit failures: record_id missing from model context",
-          "status": "review",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-03-26T17:49:15.801178+00:00",
-          "updatedAt": "2026-03-26T17:56:24.748750+00:00",
+          "updatedAt": "2026-04-22T10:42:44.516250+00:00",
           "files_modified": [
             "lambda/query/index.py",
             "lib/write_proposal.py",
@@ -4345,7 +4345,9 @@
             "tests/test_query_lambda.py",
             "tests/test_system_prompt.py"
           ],
-          "commits": [],
+          "commits": [
+            "5f60d34"
+          ],
           "pull_requests": [],
           "progress_notes": [
             {
@@ -4355,6 +4357,14 @@
             {
               "timestamp": "2026-03-26T17:56:15.855179+00:00",
               "note": "All three fixes deployed and verified live. (A) index.py:319-329 - record_id now included in effective question bracket. (B) write_proposal.py - Salesforce ID format regex rejects non-ID strings with clear error. (C) system_prompt.py - guidance and example tell model to use exact IDs. Live replay: 8/8 record-page propose_edit attempts (4 Account, 4 Contact) returned correct recordId. Previously failed 3/4. Model now uses 1 tool call instead of 2 since ID is in context."
+            },
+            {
+              "timestamp": "2026-04-22T10:31:39.062558+00:00",
+              "note": "SPRINT PLAN \"Close 2026-04-21 Blast Radius + Sale Comp Value\"\nLINEUP: 4.29[S] + 4.30[S] + 4.31[S] + 4.25[M]. Close-outs: 4.22[XS this task], 4.24[XS, folds into 4.25].\n\nTHIS TASK: sprint-adjacent close-out. Size XS. No dependencies — can close at any point in the sprint.\nStatus: review per task_manager. Code merged. Live replay 8/8 per earlier progress notes (record_id now flows into effective question bracket; Salesforce ID regex rejects non-IDs; system prompt tells model never to fabricate an Id).\n\nAction for mid-sprint picker: find the merge commit via git log --oneline --all --since=2026-03-26 -- lambda/query/index.py lib/write_proposal.py lib/system_prompt.py (all three files listed in Files Modified), then run: python3 scripts/task_manager.py complete 4.22 --commit <sha>. No new engineering required."
+            },
+            {
+              "timestamp": "2026-04-22T10:42:44.516254+00:00",
+              "note": "Task completed, commit: 5f60d34"
             }
           ],
           "description": "When the user is on a Salesforce record page and asks the agent to edit the record, the propose_edit tool fails ~75% of the time with 'Write proposal rejected — invalid Salesforce Id'. Root cause: index.py:319-323 builds the effective question with record_name and record_type but omits record_id. The model has no reliable way to get the Salesforce ID of the viewed record, so it either passes the record name as the ID ('Todco Investments'), hallucinates an ID, or asks the user for the ID. Without record page context the model always searches first and succeeds 100%. Fix: (A) Include record_id in the effective question bracket so the model has the real ID. (B) Add Salesforce ID format validation in normalize_propose_edit_input so invalid IDs produce a clear tool error the model can self-correct from, rather than failing opaquely in Apex. (C) Add prompt guidance telling the model to use the exact id from search results or record context — never fabricate.",
@@ -4365,7 +4375,8 @@
             "Existing unit tests pass and new tests cover the ID validation and record-context paths",
             "Live replay: 4/4 record-page propose_edit attempts return a valid recordId matching the request record_id"
           ],
-          "startedAt": "2026-03-26T17:49:27.848327+00:00"
+          "startedAt": "2026-03-26T17:49:27.848327+00:00",
+          "completedAt": "2026-04-22T10:42:44.516057+00:00"
         },
         {
           "id": "4.23",
@@ -4431,7 +4442,7 @@
           "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-04-15T18:24:58.079428+00:00",
-          "updatedAt": "2026-04-15T20:39:28.617337+00:00",
+          "updatedAt": "2026-04-22T10:43:09.759738+00:00",
           "files_modified": [
             "denorm_config.yaml",
             "lib/tool_dispatch.py",
@@ -4469,16 +4480,18 @@
             {
               "timestamp": "2026-04-15T20:39:23.838667+00:00",
               "note": "Task 4.24 remains in_progress but is NOT review-ready for the original Sale-comp-delivery scope. The hardening substrate (denylist, regression guard, broker-mapping alias) is truthfully and completely delivered by PR #16 after the narrowing. Once the narrowed scope is re-reviewed, this task will be marked complete for the HARDENING deliverable only. The Sale-comp-field deliverable continues under task 4.25 in the Salesforce config plane."
+            },
+            {
+              "timestamp": "2026-04-22T10:31:51.138342+00:00",
+              "note": "SPRINT PLAN \"Close 2026-04-21 Blast Radius + Sale Comp Value\"\nLINEUP: 4.29[S] + 4.30[S] + 4.31[S] + 4.25[M]. Close-outs: 4.22[XS], 4.24[XS this task, folds into 4.25].\n\nTHIS TASK: sprint-adjacent close-out. Size XS. Folds into the 4.25 validation workflow.\nStatus: in_progress per task_manager. Code merged (PR #16 narrowed to truthful hardening only — NON_FILTERABLE_FIELDS denylist + year_built dispatch safety net + listing_broker alias + regression guard). Pending deployment validation: config refresh + Sale namespace re-seed + Sylvan Ridge audit doc + E2E agent query — these are IDENTICAL to 4.25 AC5/AC6/AC7.\n\nAction for mid-sprint picker: do NOT run 4.24 validation standalone. Run it as part of the 4.25 validation pass (same compiled artifact version, same namespace re-seed, same audit doc, same agent query). After 4.25 validation passes and is marked complete, mark 4.24 complete citing the SHARED validation evidence with a note pointing at the relevant 4.25 progress note. Per CLAUDE.md rule 8, do not mark complete until live validation lands — shared pass still counts as live validation for both."
             }
           ],
-          "description": "Expand ascendix__Sale__c denormalization to cover the full field surface needed for a CRE sale comp. Motivating example: the Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA) where Marcus & Millichap is stored in ListingBrokerCompany — which was not previously indexed — while the legacy SellingBroker field that WAS indexed is null on this record. The denormalization contract expands to include Property.Street/PostalCode/YearBuilt/YearRenovated/TotalUnits, Sale.SalePricePerUnit formula, and six new party lookups (BuyerContact, BuyerRep, BuyerRepContact, SellerContact, ListingBrokerCompany, ListingBrokerContact). lib/tool_dispatch SEMANTIC_ALIASES and lib/system_prompt _SALE_FIELDS updated to match; agent_prompt_export.md regenerated. Text-typed YearBuilt/YearRenovated are indexed but denylisted from filter use via new NON_FILTERABLE_FIELDS mechanism (applied at both dispatcher _resolve_field and prompt export _collect_field_names layers) to prevent unsafe lexicographic range compares on text storage. Includes prompt/registry regression guard and 8-case parameterized end-to-end test that every alias path (short-form, auto-generated parent-form, raw indexed) is rejected for the denylisted fields.",
+          "description": "Close-out task for the narrowed PR #16 Sale dispatcher hardening deliverable. The original Sale-comp field expansion was intentionally moved to task 4.25 after discovering runtime denorm config is compiled from Ascendix Search metadata, not repo-local denorm_config.yaml. This task now covers only the hardening that is already merged on main: NON_FILTERABLE_FIELDS denylist, year_built/year_renovated dispatch safety, listing_broker semantic alias to the runtime-relevant ListingBrokerCompany field, prompt/export consistency, and regression coverage. Do not run standalone Sale re-seed validation for 4.24; use the 4.25 Sale config-refresh/re-seed/Sylvan Ridge validation pass as the shared live validation evidence before closing.",
           "acceptance_criteria": [
-            "denorm_config.yaml ascendix__Sale__c adds: ascendix__SalePricePerUnit__c metadata field, Property parent fields (Street, PostalCode, YearBuilt, YearRenovated, TotalUnits), and six new party lookups (BuyerContact, BuyerRep, BuyerRepContact, SellerContact, ListingBrokerCompany, ListingBrokerContact)",
-            "lib/tool_dispatch.SEMANTIC_ALIASES[\"sale\"] exposes short-form aliases for new fields (price_per_unit, units, street, zip, postal_code, total_units, listing_broker, state, property_state) without collapsing property_type/record_type semantics",
-            "lib/system_prompt _SALE_FIELDS block documents the new fields; docs/agent_prompt_export.md regenerated via scripts/export_agent_prompt.py per CLAUDE.md rule 4",
-            "NON_FILTERABLE_FIELDS denylist in lib/tool_dispatch.py blocks year_built/year_renovated at both dispatcher _resolve_field and prompt export _collect_field_names layers; fields remain indexed in documents for display only",
-            "Tests cover new direct + parent field resolution, listing_broker alias returns ListingBrokerCompany, prompt/registry regression guard (test_sale_prompt_aliases_all_resolve_in_registry), and 8-case parameterized end-to-end rejection of every year_built filter path (short-form, auto-gen parent-form, raw indexed, equality + range operators)",
-            "DEPLOYMENT PENDING (per CLAUDE.md rule 6): scripts/run_config_refresh.py against ascendix-beta-sandbox, Sale namespace full re-seed via poll_sync, Sylvan Ridge audit doc contains all 12 fields (street=8850 SW Sylvan Ave, postal_code=97225, year_built=1986, total_units=108, listingbrokercompany_name=Marcus & Millichap Inc, sale_price_per_unit=261111.11), end-to-end agent query returns full Sylvan Ridge comp"
+            "Merged hardening code on main includes NON_FILTERABLE_FIELDS denylist coverage for year_built and year_renovated at dispatcher resolution and prompt/export field collection paths.",
+            "listing_broker semantic alias resolves to the runtime-relevant ListingBrokerCompany-backed field; no fabricated buyer-rep company alias remains.",
+            "Focused regression tests cover prompt/registry consistency and all known unsafe year_built/year_renovated filter paths, including auto-generated parent alias forms.",
+            "Live validation is shared with 4.25: after 4.25 config refresh, Sale re-seed, Sylvan Ridge audit-doc verification, and /query E2E pass, close 4.24 with a note pointing to that 4.25 evidence. Do not execute a standalone 4.24 validation workflow."
           ],
           "startedAt": "2026-04-15T18:25:50.382261+00:00"
         },
@@ -4488,12 +4501,21 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-15T20:38:51.887034+00:00",
-          "updatedAt": "2026-04-15T20:42:14.951874+00:00",
+          "updatedAt": "2026-04-22T10:44:20.350537+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
-          "description": "Narrow feature delivery for Sale sale-comp output. Property already has correct Street, PostalCode, and YearBuilt in the sandbox org (confirmed via screenshots). The gap is on the Sale object's denormalization: the compiled Ascendix runtime Sale config currently has only [Name] in the Property parent and no canonical sale-side broker surfacing. Deliverables are: (1) Sale's denormalized Property parent must include Street, PostalCode, and YearBuilt (these three, not more, not less), so every Sale result carries the linked property's full address and vintage. (2) Sale must surface the correct sale-side broker for the transaction itself — investigate which Sale broker field is canonical (ListingBrokerCompany was populated on the Sylvan Ridge record but may not be the right field org-wide) and expose it. The Property broker is NOT a substitute. Validation target: Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA). The Sale card/result must show correct property address, correct property year built, correct sale-side broker. Work happens in the Salesforce config plane (Ascendix SearchSetting__c / Search__c edits + run_config_refresh compile+apply) — do NOT touch denorm_config.yaml. If the 256-attribute Turbopuffer namespace cap blocks the additions, propose the minimal trim from Sale's existing attribute footprint to make room and execute it in the same control plane.",
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-22T10:31:27.294496+00:00",
+              "note": "SPRINT PLAN \"Close 2026-04-21 Blast Radius + Sale Comp Value\"\nLINEUP: 4.29[S] + 4.30[S] + 4.31[S, blocks on 4.30] + 4.25[M this task]. Close-outs: 4.22[XS], 4.24[XS, folds into THIS task].\nSTART ORDER: 4.29, 4.30, 4.25 in parallel (no blockers). 4.31 after 4.30 lands. 4.24 piggybacks on 4.25 validation.\n\nTHIS TASK: user-value lane B solo. Size M. No blockers.\nWhy: Sale comps are a core CRE use case. Sale cards today are missing property address, year built, and correct sale-side broker. Sylvan Ridge (a0jdl000003fr1pAAA) is the validation target. Also the first post-4.28 exercise of the Ascendix config-refresh path on a user-visible surface — proves the unified runtime-config loader works end-to-end on a new denorm change.\n\nRESEARCH 2026-04-22 (sanity delta from original task description):\n- Active compiled artifact 20260421T172143-75e7d0ebea94 has Sale.parents.ascendix__Property__c = [Name] only -> Street/PostalCode/YearBuilt gap is UNCHANGED.\n- IMPORTANT NARROWING: Sale.parents.ascendix__ListingBrokerCompany__c ALREADY = [Name, Type, Phone, Website, Industry, AnnualRevenue] in compiled artifact. Sale-side broker name is already reaching denorm. AC1 canonical-broker-field survey is partially pre-answered — remaining question is org-wide population coverage.\n- Sale own fields: embed_fields = [Name, SaleDate, ListingPrice, SalePrice, ListingDate], metadata_fields = [CapRatePercent], fields = []. Tight footprint.\n- Property embed_fields (on Property object) already includes ascendix__Street__c and ascendix__YearBuilt__c -> denormalizing those to Sale Property parent list is a parent-fields edit, not a new-field schema change.\n- ascendix__PostalCode__c is NOT in Property embed/metadata on the Property object side, but parent_field lists pull fields via SOQL dot-traversal at denorm time; should work as long as the field exists on Property per describe.\n- Audit bucket has ZERO Sale docs under documents/00Ddl000003yx57EAA/ascendix__Sale__c/ -> full re-seed via poll_sync (or bulk_load) is REQUIRED before AC6 validation can run.\n\nAPPROACH (decided, step-by-step):\n1. AC1 broker survey (do this first, can run parallel to 4.29/4.30): SOQL against sandbox counting non-null population of ascendix__SellingBroker__c, ascendix__ListingBrokerCompany__c, ascendix__BuyerRep__c across all ascendix__Sale__c records. Document canonical-field choice + rationale in a progress note on this task.\n2. Ascendix config edits (Salesforce side, ascendix-beta-sandbox org): open SearchSetting__c / Search__c records for the Sale search config and add Street, PostalCode, YearBuilt to the Property parent-field list. DO NOT TOUCH denorm_config.yaml (AC8 + architecture note in docs/architecture/object_scope_and_sync.md — runtime reads the compiled artifact, YAML is fallback only).\n3. Compile + apply: python3 scripts/run_config_refresh.py --bucket salesforce-ai-search-data-382211616288-us-west-2 --target-org ascendix-beta-sandbox -> confirm new compiled artifact published, SSM /salesforce-ai-search/config/00Ddl000003yx57EAA/active-version pointer advances to the new version_id.\n4. 256-attr cap check BEFORE re-seed: count attributes in the new compiled artifact for Sale. Current: 13 parent lookups x 4-6 fields each + own embed/metadata. Adding 3 parent Property fields may still fit. If not, trim low-value Account-parent fields (Type/Website/Industry/AnnualRevenue) from the lowest-value lookups (e.g. Lender, Seller) — do NOT trim ListingBrokerCompany.\n5. Sale namespace re-seed via poll_sync (or bulk_load): aws lambda invoke salesforce-ai-search-poll-sync with payload {\"object\":\"ascendix__Sale__c\",\"full_sync\":true}.\n6. Validation:\n   - Pull Sylvan Ridge audit doc from s3://salesforce-ai-search-audit-382211616288-us-west-2/documents/00Ddl000003yx57EAA/ascendix__Sale__c/a0jdl000003fr1pAAA.json (will exist after re-seed). Verify property_street = 8850 SW Sylvan Ave, property_postalcode = 97225, property_yearbuilt = 1986, and a populated sale-side broker name field.\n   - Spot-check 2-3 other Sale records from AC1 survey to confirm parity — Sylvan Ridge alone is thin.\n   - Agent query E2E: \"Tell me about the Sylvan Ridge Apartments sale\" must return address, year built, and broker (Marcus & Millichap). Property broker must NOT substitute for the Sale broker (AC7).\n\n4.24 close-out handshake: 4.24 pending deployment validation (Sale namespace re-seed + Sylvan Ridge audit + agent E2E) is IDENTICAL to this task AC5/AC6/AC7. Run the validation pass once and close BOTH tasks with the shared evidence. Mark 4.24 complete after this task validation passes.\n\nHANDOFF:\n- 4.28 landed the unified runtime config loader across cdc_sync/query/poll_sync. If the compile+apply step goes sideways, check cdc_sync and query Lambda logs for \"loaded runtime config version\" lines to confirm all three Lambdas picked up the new artifact version_id.\n- AC4 (Turbopuffer 256-attribute cap) bit Sale before — see 4.24 progress notes for the 261/256 overrun context and prior trim.\n- CLAUDE.md rule 8: do NOT mark complete until BOTH audit-doc validation AND live agent query pass. Deployment logs and S3 arrivals are not enough."
+            },
+            {
+              "timestamp": "2026-04-22T10:42:27.552870+00:00",
+              "note": "QA readiness patch (2026-04-22): command/payload correction for the sprint handoff. The exact config command shape must use the compile subcommand, e.g. python3 scripts/run_config_refresh.py compile --bucket salesforce-ai-search-data-382211616288-us-west-2 --target-org ascendix-beta-sandbox --apply [--objects ascendix__Sale__c if narrowing is supported by the current workflow]. The Lambda invoke payload for Sale re-seed must use {\"objects\":[\"ascendix__Sale__c\"],\"full_sync\":true}, not a singular \"object\" key. Keep the one-object-at-a-time evidence pattern from 4.26/4.27: raw response, logs, metric, audit doc, and /query validation."
+            }
+          ],
+          "description": "Narrow feature delivery for Sale sale-comp output in the compiled Ascendix runtime config plane. Property already has correct Street, PostalCode, and YearBuilt in the sandbox org; the remaining Sale gap is that Sale.parents.ascendix__Property__c currently contains only [Name], so Sale documents do not carry the linked property's full address and vintage. Add exactly Street, PostalCode, and YearBuilt to the Sale -> Property parent fields through Ascendix SearchSetting__c / Search__c config, then compile/apply the runtime artifact and re-seed Sale. Sale.parents.ascendix__ListingBrokerCompany__c already contains Name and related Account fields in active artifact 20260421T172143-75e7d0ebea94, so the broker work is now an org-wide canonical-field survey and validation step: confirm ListingBrokerCompany is the right sale-side broker field or identify the better populated Sale broker lookup before changing config. Validation target: Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA). The final Sale card/result must show correct property address, correct property year built, and correct sale-side broker; the Property broker must not be used as a substitute. Do not touch denorm_config.yaml or Lambda bundles. If the 256-attribute Turbopuffer namespace cap blocks additions, propose and execute the minimal trim from Sale's existing compiled attribute footprint in the same control plane.",
           "acceptance_criteria": [
             "Canonical sale-side broker field identified: survey ascendix__Sale__c records across the sandbox to determine which broker field (ascendix__SellingBroker__c, ascendix__ListingBrokerCompany__c, ascendix__BuyerRep__c, or another) is actually populated on transactions org-wide; document the decision and rationale in a progress note",
             "Compiled Ascendix Sale config (s3://salesforce-ai-search-data-382211616288-us-west-2/config/.../compiled/) contains Property parent with EXACTLY these fields at minimum: Name, ascendix__Street__c, ascendix__PostalCode__c, ascendix__YearBuilt__c",
@@ -4691,6 +4713,104 @@
           ],
           "technical_context": "QA dev-assignment handoff for 4.28 (2026-04-22): keep this as a focused live-CDC convergence task, separate from the completed 4.26/4.27 outage closure. Primary code pattern to copy is lambda/poll_sync/index.py RuntimeConfigLoader usage: import RuntimeConfigLoader, bundled_paths_from_env, extract_denorm_config; add _denorm_config_version and _runtime_config_loader module globals; add _get_runtime_config_loader(); change _load_denorm_config to accept org_id, load active compiled artifact from S3/SSM, safe_dump extract_denorm_config(artifact) for audit raw_yaml, log the loaded runtime config version, and fallback to bundled DENORM_CONFIG_PATH on loader failure. Then pass SALESFORCE_ORG_ID into _load_denorm_config from lambda_handler before write_config_snapshot.\n\nExpected write scope: lambda/cdc_sync/index.py, lib/ingestion-stack.ts, tests/test_cdc_sync.py, and any minimal CDK/unit test files needed to verify env/IAM. Do not change poll_sync, query runtime loading, compiler output, active-version pointer, watermarks, AppFlow flow names, or cdc_sync business logic beyond config loading.\n\nCDK expectations: add CONFIG_ARTIFACT_BUCKET=dataBucket.bucketName and CONFIG_ARTIFACT_PREFIX=config to salesforce-ai-search-cdc-sync without removing existing env vars; grant read access to dataBucket config/*; grant ssm:GetParameter/GetParameters only as needed for /salesforce-ai-search/config/*; preserve existing /salesforce/* SSM, CDC bucket, audit bucket, KMS, DLQ, Turbopuffer, CloudWatch permissions.\n\nLocal verification expected before PR review: python3 -m pytest tests/test_cdc_sync.py tests/test_runtime_config.py -q; any existing poll_sync runtime-config tests that are touched; npm run build; git diff --check. Full pytest may still be blocked by docs/archive/test_automation/adaptive_threshold_precision_test.py requiring SALESFORCE_AI_SEARCH_API_URL/API_KEY, so report that separately if still true.\n\nRuntime/deploy validation is gated and must be reviewed before execution: CDK synth/diff or change-set should show only cdc_sync env/IAM/code changes needed for this task, no AppFlow replacements, no active-version change, no watermark changes, no poll_sync/cdc_sync invocations before approval. Live validation should cold-start cdc_sync, then perform a controlled Salesforce edit for Property plus Account or Contact and verify cdc_sync logs include the active runtime config version, SOQL/upsert success, zero INVALID_FIELD/INVALID_SESSION_ID, and user-visible /query returns the edited records.",
           "completedAt": "2026-04-22T08:55:56.843256+00:00"
+        },
+        {
+          "id": "4.29",
+          "title": "AppFlow suspension / failure alarm: detect silent multi-day CDC outage",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T14:37:06.162548+00:00",
+          "updatedAt": "2026-04-22T10:41:56.925931+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-22T09:55:49.948142+00:00",
+              "note": "Promoted from 99.7 (Promoted from Phase 99 backlog to Phase 4 active as sprint pick #1. Rationale: 2026-04-21 CDC outage was silent for 5 days; AppFlow suspension alarm is the highest-leverage reliability gap remaining.)"
+            },
+            {
+              "timestamp": "2026-04-22T10:29:53.621746+00:00",
+              "note": "SPRINT PLAN \"Close 2026-04-21 Blast Radius + Sale Comp Value\"\nLINEUP: 4.29[S] + 4.30[S] + 4.31[S, blocks on 4.30] + 4.25[M]. Close-outs: 4.22[XS], 4.24[XS, folds into 4.25].\nSTART ORDER: 4.29, 4.30, 4.25 in parallel (no blockers). 4.31 after 4.30 lands. 4.24 piggybacks on 4.25 validation. 4.22 close any time.\nORDER LOGIC: 4.31 reuses 4.30 token-exchange logic (plan: shared lib/sf_token_refresh.py). 4.24 deployment validation == 4.25 Sale re-seed workflow, so cheapest together. Reliability lane (4.29/4.30/4.31) and user-value lane (4.25) are independent surfaces.\n\nTHIS TASK: reliability lane A start. Size S. No blockers. Highest-leverage reliability pick: 2026-04-16 to 2026-04-21 outage was silent for 5 days.\n\nAPPROACH (decided): AC2 option (b) scheduled health-check Lambda, NOT metric-absence alarm. Suspended flows emit no FlowExecution metrics, so absence-of-metric alarms are unreliable.\n- New Lambda salesforce-ai-search-appflow-health-check in IngestionStack\n- Body: appflow:ListFlows -> flowStatus != Active check for 5 CDC flow prefixes (salesforce-ai-search-cdc-{account|contact|ascendix__property__c|ascendix__lease__c|ascendix__availability__c}-*) -> publish SalesforceAISearch/Ingestion::CDCFlowHealthy (1=healthy, 0=any degraded)\n- EventBridge rate(5 minutes)\n- Alarm: CDCFlowHealthy < 1 for 3 consecutive datapoints -> 15-min SLA per AC3\n- Subscribe to existing criticalAlarmTopic at lib/monitoring-stack.ts:46 — do NOT create new SNS topic\n- Runbook: add docs/runbooks/appflow_cdc_recovery.md with resume-vs-replace decision tree (per 4.27: resume re-fails on aged-out replay IDs; CDK appflowGeneration context replacement is the known-good recovery)\n\nRESEARCH 2026-04-22: grep for appflow|FlowStatus|FlowExecutions in lib/monitoring-stack.ts -> 0 hits. Zero appflow-named alarms in the AWS account. Existing cdc-lag-critical alarm depends on cdc_sync emitting CDCEventLag -> silent when flows Suspended -> does NOT cover this failure class. Current flows all Active with suffix -v2-20260421 (set by CDK appflowGeneration in bin/app.ts:53-56).\n\nVALIDATION (AC4): aws appflow stop-flow --flow-name salesforce-ai-search-cdc-account-v2-20260421 --region us-west-2 -> wait <= 15 min -> confirm SNS delivery to operator channel -> start-flow to restore.\n\nHANDOFF: match flow names by PREFIX (salesforce-ai-search-cdc-<object>-), not literal suffix — appflowGeneration rotates the suffix on replay resets. Current suffix is -v2-20260421."
+            }
+          ],
+          "description": "During 2026-04-16 → 2026-04-21, all 5 Salesforce CDC flows were Suspended in AWS (Cometd subscription rejected by Salesforce with an aged-out replay ID) and nobody noticed for 5 days — there was no alarm. The user discovered it during an ad-hoc health check, not via proactive monitoring. This task adds a CloudWatch alarm that fires when any AppFlow Salesforce CDC flow transitions to a non-Active state OR experiences repeated subscription failures. Two viable implementations: (a) CloudWatch alarm on AWS/AppFlow FlowExecutionsFailed metric with a threshold + SNS, or (b) a lightweight Lambda scheduled every 5-10 minutes that calls appflow:ListFlows, checks flowStatus != Active for the 5 CDC flows, and publishes a custom CloudWatch metric + alarm. Option (b) is more reliable because Suspended flows emit no FlowExecutions at all — the absence of metric is exactly what we need to detect. Either way, alarm fires → SNS → operator channel. This class of failure must never be discovered by a curious user 5 days later.",
+          "acceptance_criteria": [
+            "CloudWatch alarm + SNS topic provisioned in CDK (MonitoringStack or IngestionStack) that fires when any of the 5 CDC flows (Account, Contact, ascendix__Property__c, ascendix__Lease__c, ascendix__Availability__c) enters a non-Active state. Covers both 'flow Suspended by Salesforce replay error' and 'flow execution repeatedly failing'.",
+            "Implementation handles the silence-is-not-success problem: Suspended flows do NOT emit FlowExecutionsFailed metrics because no execution is attempted. Either a scheduled health-check Lambda or a metric-absence alarm pattern must be used.",
+            "Alarm latency: the 2026-04-16 → 2026-04-21 outage lasted ~5 days before discovery. This alarm must page within 15 minutes of a Suspended flow being detected.",
+            "Alarm is tested by manually stopping one CDC flow (aws appflow stop-flow), confirming the alarm fires and the SNS subscriber receives notification within the target latency, then restarting the flow.",
+            "Runbook note added to docs/runbooks/ (or environments.md) explaining recovery procedure: resume-vs-replace decision tree for Suspended flows (per 2026-04-21 incident — resume will re-fail on aged-out replay IDs; replacement via CDK appflowGeneration context is the known-good recovery).",
+            "Health-check flow matching is generation-safe: match the 5 CDC flows by salesforce-ai-search-cdc-<object>- prefix, not by the current -v2-20260421 suffix, so future appflowGeneration replacements do not break monitoring. Alarm notifications route to the existing criticalAlarmTopic instead of creating an untracked operator channel."
+          ]
+        },
+        {
+          "id": "4.30",
+          "title": "Salesforce token refresh helper: complete JWT Bearer flow to produce access_token and write to SSM",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T14:35:53.528135+00:00",
+          "updatedAt": "2026-04-22T10:43:19.399433+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-22T09:55:59.126757+00:00",
+              "note": "Promoted from 99.5 (Promoted from Phase 99 backlog to Phase 4 active as sprint pick #2a. Prerequisite for 4.31 (scheduled refresh). Rationale: 2026-04-21 CDC outage root cause included a 5-day stale SSM token with no automated rotation path.)"
+            },
+            {
+              "timestamp": "2026-04-22T10:30:17.907182+00:00",
+              "note": "SPRINT PLAN \"Close 2026-04-21 Blast Radius + Sale Comp Value\"\nLINEUP: 4.29[S] + 4.30[S] + 4.31[S, blocks on 4.30] + 4.25[M]. Close-outs: 4.22[XS], 4.24[XS, folds into 4.25].\nSTART ORDER: 4.29, 4.30, 4.25 in parallel (no blockers). 4.31 after 4.30 lands. 4.24 piggybacks on 4.25 validation. 4.22 close any time.\n\nTHIS TASK: reliability lane A. Size S. No blockers. Prerequisite for 4.31.\nWhy: 2026-04-21 outage root cause included a 5-day stale SSM token with no automated rotation path.\n\nAPPROACH (decided): new scripts/refresh_sf_token.py completing the JWT Bearer flow that mint_jwt.py leaves half-done.\n- Load Connected App creds + private key from Secrets Manager salesforce-ai-search/appflow-creds (NOT .env — per memory/feedback_no_hardcoded_secrets)\n- Mint JWT assertion via mint_jwt.py (prefer import over subprocess for clean error propagation)\n- POST https://test.salesforce.com/services/oauth2/token with grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer — sandbox audience, not login.salesforce.com\n- Parse access_token + instance_url from response; write /salesforce/access_token as SecureString via aws ssm put-parameter --type SecureString --overwrite (matches reader expectations per memory/feedback_ssm_parameter_type_match)\n- Cold-start cdc_sync + poll_sync via env-merge pattern (per memory/feedback_lambda_env_merge): fetch current env with get-function-configuration, add SF_TOKEN_REFRESHED_AT=<ts>, push back via --environment file://env.json. NEVER Variables={...} shorthand — it clobbers all other env keys.\n- Fail loud: non-zero exit + explicit stderr on any of JWT sign error, HTTP non-200, SSM write error, Lambda update error. No partial/silent success.\n\nFUTURE SHARING: extract token-exchange into lib/sf_token_refresh.py during this task so 4.31 scheduled Lambda can import the same logic — single source of truth.\n\nRESEARCH 2026-04-22: scripts/ has mint_jwt.py (assertion only) — no refresh script exists. Grep for token.refresh / RefreshSF / salesforce-ai-search-sf-token across repo returns only tasks.json and archived docs hits. No code path POSTs to /services/oauth2/token anywhere.\n\nVALIDATION (AC4): after running script, aws ssm get-parameter /salesforce/access_token --query Parameter.LastModifiedDate shows within the last minute. Controlled SF edit on a sandbox record -> cdc_sync logs show Upserted with zero INVALID_SESSION_ID.\n\nHANDOFF:\n- Audience URL MUST default to test.salesforce.com (sandbox). Production (login.salesforce.com) should require an explicit --audience override flag to prevent accidental prod token mint.\n- Script should be safe to run on demand by ops AND importable by 4.31 Lambda handler. Keep the CLI thin; put logic in lib/sf_token_refresh.py."
+            }
+          ],
+          "description": "The 2026-04-21 CDC outage traced in part to /salesforce/access_token being stale in SSM, causing cdc_sync SalesforceAuthenticationError / INVALID_SESSION_ID during enrichment calls. Existing scripts/mint_jwt.py only produces the signed JWT assertion half of the JWT Bearer flow; it does not POST the assertion to /services/oauth2/token to exchange for an access_token. This task adds a reusable lib/sf_token_refresh.py plus thin scripts/refresh_sf_token.py CLI that (1) loads Connected App credentials from Secrets Manager, (2) mints a fresh JWT assertion, (3) POSTs to the Salesforce OAuth token endpoint with sandbox audience by default, (4) writes the returned access_token to SSM /salesforce/access_token as SecureString, and (5) merge-preserving bumps cdc_sync and poll_sync to recycle warm containers. This turns manual multi-step rotation into one-command ops and provides the shared module used by 4.31 scheduled refresh.",
+          "acceptance_criteria": [
+            "scripts/refresh_sf_token.py exists, produces a fresh Salesforce access_token via JWT Bearer flow (assertion mint + token exchange POST), and writes it to SSM /salesforce/access_token as SecureString with --overwrite.",
+            "Script is idempotent and safe to run on demand; fails loudly (non-zero exit + explicit stderr) on JWT signing error, token exchange HTTP error, or SSM write error — no partial/silent success.",
+            "Script triggers cold start of salesforce-ai-search-cdc-sync and salesforce-ai-search-poll-sync using the merge-preserving env-bump pattern documented in memory/feedback_lambda_env_merge.md (fetch current env via get-function-configuration, add a refresh key, push back as file:// JSON — never clobber the whole Variables map).",
+            "End-to-end verification: after running the script, (a) aws ssm get-parameter LastModifiedDate on /salesforce/access_token shows within the last minute, (b) a controlled SF edit flows through CDC and cdc_sync logs Upserted with zero INVALID_SESSION_ID.",
+            "Token exchange and SSM/Lambda update logic is extracted into importable lib/sf_token_refresh.py with unit tests; scripts/refresh_sf_token.py is a thin CLI wrapper over that module so 4.31 can reuse the same implementation without subprocess coupling.",
+            "JWT Bearer audience defaults to https://test.salesforce.com for the sandbox; using https://login.salesforce.com requires an explicit CLI override and must be covered by tests so accidental production-token minting is not the default."
+          ]
+        },
+        {
+          "id": "4.31",
+          "title": "Scheduled Salesforce token refresh: EventBridge + Lambda to run 4.30 automatically",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-21T14:36:19.368064+00:00",
+          "updatedAt": "2026-04-22T10:44:08.750403+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-22T09:56:05.103045+00:00",
+              "note": "Promoted from 99.6 (Promoted from Phase 99 backlog to Phase 4 active as sprint pick #2b. Depends on 4.30. Rationale: even with one-command rotation helper, manual rotation is what left token 5 days stale; scheduled refresh eliminates the failure class without waiting for 99.8 OAuth rework.)"
+            },
+            {
+              "timestamp": "2026-04-22T10:30:39.986874+00:00",
+              "note": "SPRINT PLAN \"Close 2026-04-21 Blast Radius + Sale Comp Value\"\nLINEUP: 4.29[S] + 4.30[S] + 4.31[S, blocks on 4.30] + 4.25[M]. Close-outs: 4.22[XS], 4.24[XS, folds into 4.25].\nSTART ORDER: 4.29, 4.30, 4.25 in parallel. 4.31 after 4.30 lands. 4.24 piggybacks on 4.25 validation. 4.22 close any time.\n\nTHIS TASK: reliability lane A tail. Size S. Blocks on 4.30.\nWhy: even with a one-command rotation helper, manual rotation is what left the token 5 days stale during 2026-04-16 to 2026-04-21. Scheduled refresh eliminates the failure class without waiting for the larger 99.8 OAuth rework.\n\nID RENAME NOTE: this task description still references \"99.5\" and \"99.6\" textually — those are now 4.30 and 4.31 (this task) respectively. Title also still says \"to run 99.5 automatically\" — read as \"to run 4.30 automatically\". Promote note at head of progress log captures the rename.\n\nAPPROACH (decided): new Lambda lambda/sf_token_refresh/ that imports the shared token-exchange logic extracted in 4.30 (lib/sf_token_refresh.py).\n- Lambda deployed in IngestionStack (co-located with AppFlow + cdc_sync)\n- EventBridge rate(90 minutes) — Salesforce default access_token TTL is 2h, 90 min gives buffer\n- IAM scoped to: ssm:PutParameter on /salesforce/access_token, ssm:GetParameter same, secretsmanager:GetSecretValue on salesforce-ai-search/appflow-creds, lambda:UpdateFunctionConfiguration on cdc_sync and poll_sync ARNs only\n- CloudWatch alarm: AWS/Lambda Errors > 0 on this function for 1 datapoint -> criticalAlarmTopic SNS (AC4)\n- No private key in env vars — all secrets fetched from Secrets Manager at invoke time\n\nRESEARCH 2026-04-22: no EventBridge-scheduled token refresh Lambda exists. No scheduled rule named *sf-token* or similar anywhere in the account.\n\nVALIDATION (AC5): write a known-invalid string to /salesforce/access_token via aws ssm put-parameter --overwrite --type SecureString --value \"INVALID_TEST_TOKEN\", wait <= 90 min for next scheduled fire, confirm token is refreshed (SSM LastModifiedDate moves), cdc_sync resumes without manual intervention, controlled SF edit flows end-to-end.\n\nHANDOFF:\n- Depends on lib/sf_token_refresh.py being extracted during 4.30. If 4.30 only shipped a standalone script, either back-port the extraction here or call the script via subprocess (NOT recommended — breaks error propagation and IAM scoping).\n- 99.8 (OAuth Client Credentials migration) is the durable fix that retires both 4.30 and 4.31 entirely. Do not over-invest polish here — the goal is failure-class elimination, not a permanent subsystem.\n- CloudWatch alarm is critical (AC4) — the whole point is that silent refresh failures are the thing we are trying to eliminate."
+            },
+            {
+              "timestamp": "2026-04-22T10:44:08.750185+00:00",
+              "note": "QA readiness patch (2026-04-22): stale textual references to 99.5/99.6 in the title and description were normalized to 4.30/4.31. The earlier ID RENAME NOTE remains historical only; current task fields are authoritative. Added ACs requiring direct import of lib/sf_token_refresh.py and a guarded validation window for the invalid-token test."
+            }
+          ],
+          "description": "Even with the one-command helper from 4.30, token rotation would still be manual unless scheduled. Manual rotation is what left /salesforce/access_token stale during the 2026-04-16 to 2026-04-21 CDC outage. This task wraps the shared lib/sf_token_refresh.py logic delivered by 4.30 in a Lambda invoked by an EventBridge rule every ~90 minutes, well inside the Salesforce access_token expiry window. The Lambda should be a thin wrapper that fetches private key material from Secrets Manager, exchanges a JWT Bearer assertion for an access_token, writes /salesforce/access_token, and merge-preserving bumps cdc_sync and poll_sync so warm containers recycle. CloudWatch alarm on Lambda errors must page through the operator SNS path. This is a mitigation that can be retired by 99.8 once SalesforceClient owns in-process OAuth refresh-on-401.",
+          "depends_on": [
+            "4.30"
+          ],
+          "acceptance_criteria": [
+            "New Lambda function (e.g. salesforce-ai-search-sf-token-refresh) deployed via IngestionStack or a dedicated operational stack. Private key and consumer key sourced from salesforce-ai-search/appflow-creds secret and/or a dedicated private-key secret — no key material in code or env.",
+            "EventBridge rule invokes the Lambda every ~90 min (well inside Salesforce access_token expiry). Rule + Lambda provisioned in CDK, not created manually in the console.",
+            "Successful refresh updates /salesforce/access_token SSM param and bumps cdc_sync + poll_sync via merge-preserving env pattern so warm containers recycle on next invocation.",
+            "CloudWatch alarm on Lambda Errors > 0 → SNS topic → operator channel. Refresh failures must page someone — silent failure is the thing we are trying to eliminate.",
+            "Verification: kill the existing SSM token (write a known-invalid string), wait for the next scheduled run, confirm the token is refreshed automatically, cdc_sync resumes without manual intervention, and the CDC pipeline delivers a controlled SF edit end-to-end.",
+            "Implementation imports the 4.30 shared lib/sf_token_refresh.py module directly; do not shell out to scripts/refresh_sf_token.py except as an explicitly documented fallback if the shared module was not delivered.",
+            "AC5 destructive-token validation runs only in an approved validation window: capture the pre-test token version/timestamp, write the invalid token, wait for one scheduled run, and if refresh does not succeed restore via the 4.30 helper before leaving the session."
+          ]
         }
       ]
     },
@@ -4751,89 +4871,27 @@
           ]
         },
         {
-          "id": "99.5",
-          "title": "Salesforce token refresh helper: complete JWT Bearer flow to produce access_token and write to SSM",
-          "status": "pending",
-          "owner": "Todd Terry",
-          "createdAt": "2026-04-21T14:35:53.528135+00:00",
-          "updatedAt": "2026-04-21T14:36:09.600153+00:00",
-          "files_modified": [],
-          "commits": [],
-          "pull_requests": [],
-          "progress_notes": [],
-          "description": "Today's (2026-04-21) CDC outage traced in part to /salesforce/access_token being 5 days stale in SSM — cdc_sync was failing with SalesforceAuthenticationError on enrichment describe() calls. The existing scripts/mint_jwt.py only produces the signed JWT assertion half of the JWT Bearer flow; it does NOT POST the assertion to /services/oauth2/token to exchange for an access_token. The gap is filled manually today with 'sf org display → aws ssm put-parameter', which is the same pattern referenced in archived handoffs (docs/archive/handoffs/HANDOFF-2025-12-06-DERIVED-VIEW-BACKFILL.md:19-24). This task adds scripts/refresh_sf_token.py that (1) invokes mint_jwt.py to produce a fresh signed assertion, (2) POSTs to https://test.salesforce.com/services/oauth2/token with grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer, (3) extracts access_token from the response, (4) writes to SSM /salesforce/access_token as SecureString. Turns manual multi-step rotation into one-command ops. Prerequisite for 99.6 (scheduled refresh).",
-          "acceptance_criteria": [
-            "scripts/refresh_sf_token.py exists, produces a fresh Salesforce access_token via JWT Bearer flow (assertion mint + token exchange POST), and writes it to SSM /salesforce/access_token as SecureString with --overwrite.",
-            "Script is idempotent and safe to run on demand; fails loudly (non-zero exit + explicit stderr) on JWT signing error, token exchange HTTP error, or SSM write error — no partial/silent success.",
-            "Script triggers cold start of salesforce-ai-search-cdc-sync and salesforce-ai-search-poll-sync using the merge-preserving env-bump pattern documented in memory/feedback_lambda_env_merge.md (fetch current env via get-function-configuration, add a refresh key, push back as file:// JSON — never clobber the whole Variables map).",
-            "End-to-end verification: after running the script, (a) aws ssm get-parameter LastModifiedDate on /salesforce/access_token shows within the last minute, (b) a controlled SF edit flows through CDC and cdc_sync logs Upserted with zero INVALID_SESSION_ID."
-          ]
-        },
-        {
-          "id": "99.6",
-          "title": "Scheduled Salesforce token refresh: EventBridge + Lambda to run 99.5 automatically",
-          "status": "pending",
-          "owner": "Todd Terry",
-          "createdAt": "2026-04-21T14:36:19.368064+00:00",
-          "updatedAt": "2026-04-21T14:36:40.158418+00:00",
-          "files_modified": [],
-          "commits": [],
-          "pull_requests": [],
-          "progress_notes": [],
-          "description": "Even with the one-command helper from 99.5, the rotation is still manual — which is what left /salesforce/access_token 5 days stale during the 2026-04-16 → 2026-04-21 CDC outage. This task wraps the 99.5 refresh logic in a Lambda invoked by an EventBridge rule (cron) every ~90 minutes (well inside the Salesforce access_token expiry window). Eliminates the 'SSM token is N days old' failure class entirely without requiring a full SalesforceClient refactor (which is the longer-term fix in 99.8). Lambda implementation should be a thin wrapper that calls the same JWT assertion + token exchange path as 99.5 with the private key material loaded from the SalesforceConnectedAppSecret (Secrets Manager). Monitored via CloudWatch alarm on Lambda errors.",
-          "depends_on": [
-            "99.5"
-          ],
-          "acceptance_criteria": [
-            "New Lambda function (e.g. salesforce-ai-search-sf-token-refresh) deployed via IngestionStack or a dedicated operational stack. Private key and consumer key sourced from salesforce-ai-search/appflow-creds secret and/or a dedicated private-key secret — no key material in code or env.",
-            "EventBridge rule invokes the Lambda every ~90 min (well inside Salesforce access_token expiry). Rule + Lambda provisioned in CDK, not created manually in the console.",
-            "Successful refresh updates /salesforce/access_token SSM param and bumps cdc_sync + poll_sync via merge-preserving env pattern so warm containers recycle on next invocation.",
-            "CloudWatch alarm on Lambda Errors > 0 → SNS topic → operator channel. Refresh failures must page someone — silent failure is the thing we are trying to eliminate.",
-            "Verification: kill the existing SSM token (write a known-invalid string), wait for the next scheduled run, confirm the token is refreshed automatically, cdc_sync resumes without manual intervention, and the CDC pipeline delivers a controlled SF edit end-to-end."
-          ]
-        },
-        {
-          "id": "99.7",
-          "title": "AppFlow suspension / failure alarm: detect silent multi-day CDC outage",
-          "status": "pending",
-          "owner": "Todd Terry",
-          "createdAt": "2026-04-21T14:37:06.162548+00:00",
-          "updatedAt": "2026-04-21T14:37:20.958497+00:00",
-          "files_modified": [],
-          "commits": [],
-          "pull_requests": [],
-          "progress_notes": [],
-          "description": "During 2026-04-16 → 2026-04-21, all 5 Salesforce CDC flows were Suspended in AWS (Cometd subscription rejected by Salesforce with an aged-out replay ID) and nobody noticed for 5 days — there was no alarm. The user discovered it during an ad-hoc health check, not via proactive monitoring. This task adds a CloudWatch alarm that fires when any AppFlow Salesforce CDC flow transitions to a non-Active state OR experiences repeated subscription failures. Two viable implementations: (a) CloudWatch alarm on AWS/AppFlow FlowExecutionsFailed metric with a threshold + SNS, or (b) a lightweight Lambda scheduled every 5-10 minutes that calls appflow:ListFlows, checks flowStatus != Active for the 5 CDC flows, and publishes a custom CloudWatch metric + alarm. Option (b) is more reliable because Suspended flows emit no FlowExecutions at all — the absence of metric is exactly what we need to detect. Either way, alarm fires → SNS → operator channel. This class of failure must never be discovered by a curious user 5 days later.",
-          "acceptance_criteria": [
-            "CloudWatch alarm + SNS topic provisioned in CDK (MonitoringStack or IngestionStack) that fires when any of the 5 CDC flows (Account, Contact, ascendix__Property__c, ascendix__Lease__c, ascendix__Availability__c) enters a non-Active state. Covers both 'flow Suspended by Salesforce replay error' and 'flow execution repeatedly failing'.",
-            "Implementation handles the silence-is-not-success problem: Suspended flows do NOT emit FlowExecutionsFailed metrics because no execution is attempted. Either a scheduled health-check Lambda or a metric-absence alarm pattern must be used.",
-            "Alarm latency: the 2026-04-16 → 2026-04-21 outage lasted ~5 days before discovery. This alarm must page within 15 minutes of a Suspended flow being detected.",
-            "Alarm is tested by manually stopping one CDC flow (aws appflow stop-flow), confirming the alarm fires and the SNS subscriber receives notification within the target latency, then restarting the flow.",
-            "Runbook note added to docs/runbooks/ (or environments.md) explaining recovery procedure: resume-vs-replace decision tree for Suspended flows (per 2026-04-21 incident — resume will re-fail on aged-out replay IDs; replacement via CDK appflowGeneration context is the known-good recovery)."
-          ]
-        },
-        {
           "id": "99.8",
           "title": "SalesforceClient migration to OAuth Client Credentials with in-process refresh-on-401",
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-21T14:37:34.459820+00:00",
-          "updatedAt": "2026-04-21T14:37:49.009786+00:00",
+          "updatedAt": "2026-04-22T10:43:41.717772+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [],
-          "description": "Durable fix for the Salesforce-auth-staleness failure class that caused half of the 2026-04-21 CDC outage. Currently lambda/common/salesforce_client.py loads a static access_token from SSM (from_ssm at :136) and caches it as a module-level singleton (_salesforce_client at :494). There is no refresh path — if the token expires mid-execution, the Lambda fails with INVALID_SESSION_ID and the token stays stale in SSM until somebody runs 'sf org display → aws ssm put-parameter' manually. Tasks 99.5 and 99.6 mitigate via external rotation but add operational surface area. The durable fix is to switch SalesforceClient to OAuth Client Credentials (or JWT Bearer with in-process exchange) and catch 401 responses to refresh the token automatically in-band. This makes 99.5 and 99.6 obsolete — the token is managed inside the Lambda's auth client and SSM is no longer the source of truth. Referenced as 'Task 46' in docs/archive/handoffs/HANDOFF-2025-12-15-SCHEMA-CACHE-RECOVERY.md:139 and HANDOFF-2025-12-14-TASK35-SCHEMA-EXPORT-VERIFIED.md:178. Scope is larger than 99.5/99.6 (touches production code, needs test coverage for refresh-on-401, needs backward-compat during rollout) so explicitly sized as a Phase 99 backlog item rather than a quick-win.",
+          "description": "Durable fix for the Salesforce-auth-staleness failure class that caused part of the 2026-04-21 CDC outage. Current lambda/common/salesforce_client.py loads a static access_token from SSM and caches it as a module-level singleton. There is no in-process refresh path, so expired tokens cause INVALID_SESSION_ID until external rotation updates SSM. Tasks 4.30 and 4.31 mitigate via external JWT Bearer rotation, but add operational surface area. The durable fix is to switch SalesforceClient to OAuth Client Credentials or JWT Bearer with in-process exchange and catch 401 responses to refresh the token automatically in-band. That makes 4.30 and 4.31 obsolete once all consumers migrate. Scope is larger than the rotation helper/scheduler because it touches production auth code and needs staged rollout plus refresh-on-401 tests.",
           "acceptance_criteria": [
-            "lambda/common/salesforce_client.py replaces the static-SSM access_token path with an OAuth Client Credentials (or JWT Bearer with in-process exchange) flow. Client holds credentials (consumer key + private key or client_secret) sourced from Secrets Manager, not SSM.",
-            "On any 401 / INVALID_SESSION_ID response, the client automatically refreshes the token and retries the failed request once. Refresh is rate-limited (e.g. at most once per N seconds) to avoid thundering-herd refresh storms on an auth outage.",
-            "Tests: unit tests for refresh-on-401 including retry behavior, refresh storm suppression, and graceful handling of genuine auth config errors (wrong client_id → do NOT infinite-retry).",
-            "Rollout plan in the task description: migrate cdc_sync, poll_sync, schema_discovery, schema_drift_checker one Lambda at a time, each with staged verification, before retiring the manual rotation path. Note that schema_discovery already has its own OAuth Client Credentials path at lambda/schema_discovery/discoverer.py:132 — study it as the reference implementation.",
-            "Once all Lambdas are migrated: retire /salesforce/access_token SSM param, delete scripts/refresh_sf_token.py (99.5), delete the scheduled refresh Lambda (99.6). Update memory/feedback_lambda_env_merge.md and the CDC runbook to reflect the new auth model."
+            "lambda/common/salesforce_client.py replaces the static-SSM access_token path with OAuth Client Credentials or JWT Bearer in-process exchange. Credentials come from Secrets Manager, not SSM or env plaintext.",
+            "On 401 / INVALID_SESSION_ID, the client refreshes the token and retries the failed request once, with refresh storm suppression so concurrent auth failures do not stampede Salesforce.",
+            "Unit tests cover refresh-on-401 retry behavior, refresh storm suppression, and genuine auth config errors without infinite retry.",
+            "Rollout plan migrates cdc_sync, poll_sync, schema_discovery, and schema_drift_checker one Lambda at a time with staged verification. Study lambda/schema_discovery/discoverer.py OAuth flow as reference before implementation.",
+            "After all consumers migrate, retire /salesforce/access_token as the runtime source of truth and remove the 4.30 helper / 4.31 scheduled refresh infrastructure. Update the CDC runbook and any env-merge token-refresh notes to reflect the new auth model."
           ],
           "depends_on": [
-            "99.5",
-            "99.6"
+            "4.30",
+            "4.31"
           ]
         },
         {
@@ -4894,7 +4952,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 29,
+      "4.": 32,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,

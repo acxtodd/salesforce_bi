@@ -4853,6 +4853,31 @@
             "Describe-backed artifact gate (the /tmp/describe_gate.py validator from the 4.26 R2 QA package) reports zero violations on the newly compiled artifact across all 13 objects.",
             "Document in the fix PR whether runtime code actually reads parents[LatestContentId] for ContentNote anywhere — if yes, the fix must preserve equivalent behavior; if no, dropping the parent is the cleaner fix."
           ]
+        },
+        {
+          "id": "99.10",
+          "title": "Preserve underscore-delimited ingestion keys for downstream consumers",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-22T09:27:22.015139+00:00",
+          "updatedAt": "2026-04-22T09:27:47.522322+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-22T09:27:47.522114+00:00",
+              "note": "QA branch salvage (2026-04-22): preserved the useful task spec from codex/task-4-24-preserve-ingestion-keys before branch cleanup. The original branch only modified tasks.json and collided with mainline task 4.24; do not merge it directly."
+            }
+          ],
+          "description": "Salvaged from stale branch codex/task-4-24-preserve-ingestion-keys before branch cleanup; the branch originally created this as a conflicting task 4.24 and referenced downstream request 99.54. Current ingestion normalization in lib/denormalize.build_document writes collapsed attribute keys such as totalbuildingarea and property_recordtype_name. lib/tool_dispatch.build_field_registry compensates by generating snake_case aliases over those keys, but downstream consumers that read normalized attributes directly still get the collapsed form. Align the ingestion-side key contract so normalized direct and parent field names preserve underscore separators, then update schema, registry, docs, tests, and any required rebuild or reindex plan.",
+          "technical_context": "Do not merge the stale branch tasks.json directly; it collides with the existing mainline task 4.24. Treat this as a new backlog item. Before implementation, confirm whether runtime behavior should be changed at ingestion time, exposed as a compatibility shim, or deferred until a namespace rebuild can be planned. Current runtime config source is the compiled Ascendix Search artifact plane, not repo-local denorm_config.yaml except as Lambda fallback.",
+          "acceptance_criteria": [
+            "Direct-field ingestion preserves underscore-delimited normalized keys for multiword fields, using one canonical normalization rule shared with registry generation.",
+            "Parent and dotted-parent denormalized fields preserve underscores consistently, for example RecordType.Name -> record_type_name and property_record_type_name, and no dotted keys survive into indexed attributes.",
+            "Schema declarations, field-registry output, semantic aliases, docs, and examples align to the same key contract or document a deliberate compatibility shim.",
+            "Regression tests cover direct, parent, and dotted-parent key normalization plus affected filter-resolution paths."
+          ]
         }
       ]
     }
@@ -4877,7 +4902,7 @@
       "4.9.": 11,
       "4.12.": 6,
       "4.13.": 2,
-      "99.": 10,
+      "99.": 11,
       "4.17.": 9,
       "4.19.": 5,
       "4.20.": 5,

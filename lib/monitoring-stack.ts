@@ -868,6 +868,40 @@ export class MonitoringStack extends cdk.Stack {
       new actions.SnsAction(this.criticalAlarmTopic),
     );
 
+    // Critical: AppFlow CDC flow health (Task 4.29)
+    // Catches Salesforce CDC flows transitioning to a non-Active state
+    // (e.g. Suspended by Salesforce replay-ID expiry). Suspended flows emit
+    // no FlowExecution metrics, so we rely on a scheduled health-check Lambda
+    // that publishes SalesforceAISearch/Ingestion::CDCFlowHealthy every 5 min.
+    // Missing data is treated as BREACHING so the alarm still fires if the
+    // health-check Lambda itself stops publishing.
+    const cdcFlowHealthyMetric = new cloudwatch.Metric({
+      namespace: "SalesforceAISearch/Ingestion",
+      metricName: "CDCFlowHealthy",
+      statistic: "Minimum",
+      period: cdk.Duration.minutes(5),
+    });
+
+    const cdcFlowHealthCriticalAlarm = new cloudwatch.Alarm(
+      this,
+      "CDCFlowHealthCriticalAlarm",
+      {
+        alarmName: "salesforce-ai-search-cdc-flow-health-critical",
+        alarmDescription:
+          "One or more Salesforce CDC AppFlow flows is in a non-Active state. See docs/runbooks/appflow_cdc_recovery.md",
+        metric: cdcFlowHealthyMetric,
+        threshold: 1,
+        evaluationPeriods: 3,
+        datapointsToAlarm: 3,
+        comparisonOperator:
+          cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+        treatMissingData: cloudwatch.TreatMissingData.BREACHING,
+      },
+    );
+    cdcFlowHealthCriticalAlarm.addAlarmAction(
+      new actions.SnsAction(this.criticalAlarmTopic),
+    );
+
     // Critical: Planner latency p95 > 1.5s (Req 12.4)
     const plannerLatencyCriticalAlarm = new cloudwatch.Alarm(
       this,

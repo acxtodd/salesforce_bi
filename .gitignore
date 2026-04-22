@@ -69,3 +69,4 @@ temp_check*/
 lambda/poll_sync/.bundle/
 lambda/cdc_sync/.bundle/
 lambda/config_refresh/.bundle/
+lambda/appflow_health_check/.bundle/

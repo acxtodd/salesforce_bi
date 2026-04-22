@@ -17,6 +17,11 @@ interface MonitoringStackProps extends cdk.StackProps {
   sessionsTable: dynamodb.Table;
   authzCacheTable: dynamodb.Table;
   rateLimitsTable?: dynamodb.Table; // Phase 2
+  // True when the IngestionStack created AppFlow CDC flows (i.e. Salesforce
+  // context was provided at deploy time). Gates the CDC flow health alarm,
+  // which would otherwise page permanently on missing data in environments
+  // where AppFlow was never deployed.
+  appflowEnabled?: boolean;
 }
 
 export class MonitoringStack extends cdk.Stack {
@@ -40,6 +45,7 @@ export class MonitoringStack extends cdk.Stack {
       sessionsTable,
       authzCacheTable,
       rateLimitsTable,
+      appflowEnabled,
     } = props;
 
     // SNS Topics for alarm notifications
@@ -875,32 +881,38 @@ export class MonitoringStack extends cdk.Stack {
     // that publishes SalesforceAISearch/Ingestion::CDCFlowHealthy every 5 min.
     // Missing data is treated as BREACHING so the alarm still fires if the
     // health-check Lambda itself stops publishing.
-    const cdcFlowHealthyMetric = new cloudwatch.Metric({
-      namespace: "SalesforceAISearch/Ingestion",
-      metricName: "CDCFlowHealthy",
-      statistic: "Minimum",
-      period: cdk.Duration.minutes(5),
-    });
+    //
+    // Gated on appflowEnabled: the IngestionStack only creates the
+    // health-check Lambda when AppFlow is configured, so enabling the alarm
+    // in environments without AppFlow would fire forever on missing data.
+    if (appflowEnabled) {
+      const cdcFlowHealthyMetric = new cloudwatch.Metric({
+        namespace: "SalesforceAISearch/Ingestion",
+        metricName: "CDCFlowHealthy",
+        statistic: "Minimum",
+        period: cdk.Duration.minutes(5),
+      });
 
-    const cdcFlowHealthCriticalAlarm = new cloudwatch.Alarm(
-      this,
-      "CDCFlowHealthCriticalAlarm",
-      {
-        alarmName: "salesforce-ai-search-cdc-flow-health-critical",
-        alarmDescription:
-          "One or more Salesforce CDC AppFlow flows is in a non-Active state. See docs/runbooks/appflow_cdc_recovery.md",
-        metric: cdcFlowHealthyMetric,
-        threshold: 1,
-        evaluationPeriods: 3,
-        datapointsToAlarm: 3,
-        comparisonOperator:
-          cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
-        treatMissingData: cloudwatch.TreatMissingData.BREACHING,
-      },
-    );
-    cdcFlowHealthCriticalAlarm.addAlarmAction(
-      new actions.SnsAction(this.criticalAlarmTopic),
-    );
+      const cdcFlowHealthCriticalAlarm = new cloudwatch.Alarm(
+        this,
+        "CDCFlowHealthCriticalAlarm",
+        {
+          alarmName: "salesforce-ai-search-cdc-flow-health-critical",
+          alarmDescription:
+            "One or more Salesforce CDC AppFlow flows is in a non-Active state. See docs/runbooks/appflow_cdc_recovery.md",
+          metric: cdcFlowHealthyMetric,
+          threshold: 1,
+          evaluationPeriods: 3,
+          datapointsToAlarm: 3,
+          comparisonOperator:
+            cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
+          treatMissingData: cloudwatch.TreatMissingData.BREACHING,
+        },
+      );
+      cdcFlowHealthCriticalAlarm.addAlarmAction(
+        new actions.SnsAction(this.criticalAlarmTopic),
+      );
+    }
 
     // Critical: Planner latency p95 > 1.5s (Req 12.4)
     const plannerLatencyCriticalAlarm = new cloudwatch.Alarm(

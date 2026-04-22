@@ -11,7 +11,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "lambda"))
 
 from appflow_health_check.index import (
-    CDC_FLOW_PREFIXES,
+    CDC_FLOW_BASES,
     METRIC_NAME,
     METRIC_NAMESPACE,
     _evaluate_health,
@@ -64,28 +64,49 @@ class TestMatchCdcFlows:
         assert all(m is not None for m in matches.values())
         assert len(matches) == 5
 
-    def test_prefix_match_with_arbitrary_suffix(self):
+    def test_match_with_arbitrary_suffix(self):
         flows = [_flow("salesforce-ai-search-cdc-account-v9-99999999")]
         matches = _match_cdc_flows(flows)
-        account_prefix = "salesforce-ai-search-cdc-account-"
-        assert matches[account_prefix]["name"] == flows[0]["flowName"]
+        base = "salesforce-ai-search-cdc-account"
+        assert matches[base]["name"] == flows[0]["flowName"]
+
+    def test_match_unsuffixed_name(self):
+        # When appflowGeneration CDK context is not set, flow names have no
+        # trailing suffix. These must still match.
+        flows = [
+            _flow("salesforce-ai-search-cdc-account"),
+            _flow("salesforce-ai-search-cdc-contact"),
+            _flow("salesforce-ai-search-cdc-ascendix__property__c"),
+            _flow("salesforce-ai-search-cdc-ascendix__lease__c"),
+            _flow("salesforce-ai-search-cdc-ascendix__availability__c"),
+        ]
+        matches = _match_cdc_flows(flows)
+        assert all(m is not None for m in matches.values())
+        assert matches["salesforce-ai-search-cdc-account"]["name"] == "salesforce-ai-search-cdc-account"
 
     def test_missing_flow_yields_none(self):
         flows = [f for f in _all_active_flows() if "account" not in f["flowName"]]
         matches = _match_cdc_flows(flows)
-        account_prefix = "salesforce-ai-search-cdc-account-"
-        assert matches[account_prefix] is None
+        base = "salesforce-ai-search-cdc-account"
+        assert matches[base] is None
 
     def test_unrelated_flow_ignored(self):
         flows = _all_active_flows() + [_flow("salesforce-ai-search-poll-sync")]
         matches = _match_cdc_flows(flows)
         assert sum(1 for m in matches.values() if m is not None) == 5
 
+    def test_similar_but_non_matching_flow_ignored(self):
+        # "accountability" must not match the "account" base — we require
+        # either an exact match or a "-" separator after the base.
+        flows = [_flow("salesforce-ai-search-cdc-accountability")]
+        matches = _match_cdc_flows(flows)
+        assert matches["salesforce-ai-search-cdc-account"] is None
+
     def test_status_propagates(self):
         flows = [_flow("salesforce-ai-search-cdc-account-x", status="Suspended")]
         matches = _match_cdc_flows(flows)
-        account_prefix = "salesforce-ai-search-cdc-account-"
-        assert matches[account_prefix]["status"] == "Suspended"
+        base = "salesforce-ai-search-cdc-account"
+        assert matches[base]["status"] == "Suspended"
 
 
 class TestEvaluateHealth:
@@ -93,7 +114,7 @@ class TestEvaluateHealth:
         matches = _match_cdc_flows(_all_active_flows())
         healthy, details = _evaluate_health(matches)
         assert healthy is True
-        assert details["missing_prefixes"] == []
+        assert details["missing_flows"] == []
         assert details["degraded_flows"] == []
         assert details["total_matched"] == 5
 
@@ -111,7 +132,7 @@ class TestEvaluateHealth:
         matches = _match_cdc_flows(flows)
         healthy, details = _evaluate_health(matches)
         assert healthy is False
-        assert len(details["missing_prefixes"]) == 1
+        assert len(details["missing_flows"]) == 1
         assert details["total_matched"] == 4
 
     def test_both_missing_and_suspended(self):
@@ -120,7 +141,7 @@ class TestEvaluateHealth:
         matches = _match_cdc_flows(flows)
         healthy, details = _evaluate_health(matches)
         assert healthy is False
-        assert len(details["missing_prefixes"]) == 1
+        assert len(details["missing_flows"]) == 1
         assert len(details["degraded_flows"]) == 1
 
 
@@ -173,11 +194,11 @@ class TestLambdaHandler:
 
 
 class TestConstants:
-    def test_five_cdc_flow_prefixes(self):
-        assert len(CDC_FLOW_PREFIXES) == 5
-        for prefix in CDC_FLOW_PREFIXES:
-            assert prefix.startswith("salesforce-ai-search-cdc-")
-            assert prefix.endswith("-")
+    def test_five_cdc_flow_bases(self):
+        assert len(CDC_FLOW_BASES) == 5
+        for base in CDC_FLOW_BASES:
+            assert base.startswith("salesforce-ai-search-cdc-")
+            assert not base.endswith("-")
 
     def test_metric_namespace_matches_alarm(self):
         assert METRIC_NAMESPACE == "SalesforceAISearch/Ingestion"

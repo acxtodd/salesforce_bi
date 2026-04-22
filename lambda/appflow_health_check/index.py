@@ -7,14 +7,16 @@ import boto3
 logger = logging.getLogger()
 logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
 
-# Prefix-match: the appflowGeneration suffix (-v2-20260421 today) rotates on
-# replay resets, so we cannot hard-code full flow names.
-CDC_FLOW_PREFIXES = [
-    "salesforce-ai-search-cdc-account-",
-    "salesforce-ai-search-cdc-contact-",
-    "salesforce-ai-search-cdc-ascendix__property__c-",
-    "salesforce-ai-search-cdc-ascendix__lease__c-",
-    "salesforce-ai-search-cdc-ascendix__availability__c-",
+# Match both suffixed and unsuffixed flow names. CDK builds names as
+# "salesforce-ai-search-cdc-{object}{-appflowGeneration}" where the suffix is
+# empty when the context value is not provided. When appflowGeneration is set
+# (today: "v2-20260421"), the suffix rotates on replay resets.
+CDC_FLOW_BASES = [
+    "salesforce-ai-search-cdc-account",
+    "salesforce-ai-search-cdc-contact",
+    "salesforce-ai-search-cdc-ascendix__property__c",
+    "salesforce-ai-search-cdc-ascendix__lease__c",
+    "salesforce-ai-search-cdc-ascendix__availability__c",
 ]
 
 METRIC_NAMESPACE = "SalesforceAISearch/Ingestion"
@@ -67,12 +69,13 @@ def _list_all_flows(client):
 
 
 def _match_cdc_flows(flows):
-    matches = {p: None for p in CDC_FLOW_PREFIXES}
+    matches = {base: None for base in CDC_FLOW_BASES}
     for flow in flows:
         name = flow.get("flowName", "")
-        for prefix in CDC_FLOW_PREFIXES:
-            if name.startswith(prefix):
-                matches[prefix] = {
+        for base in CDC_FLOW_BASES:
+            # Exact base (no appflowGeneration) or base followed by "-<suffix>".
+            if name == base or name.startswith(f"{base}-"):
+                matches[base] = {
                     "name": name,
                     "status": flow.get("flowStatus", "UNKNOWN"),
                 }
@@ -81,7 +84,7 @@ def _match_cdc_flows(flows):
 
 
 def _evaluate_health(matches):
-    missing = [p for p, m in matches.items() if m is None]
+    missing = [base for base, m in matches.items() if m is None]
     degraded = [
         {"name": m["name"], "status": m["status"]}
         for m in matches.values()
@@ -89,7 +92,7 @@ def _evaluate_health(matches):
     ]
     healthy = not missing and not degraded
     return healthy, {
-        "missing_prefixes": missing,
+        "missing_flows": missing,
         "degraded_flows": degraded,
         "total_matched": sum(1 for m in matches.values() if m is not None),
     }

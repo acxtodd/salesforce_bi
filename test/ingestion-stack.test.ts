@@ -85,6 +85,23 @@ describe('IngestionStack without Salesforce credentials', () => {
   test('does not create AppFlow ConnectorProfile when credentials are absent', () => {
     template.resourceCountIs('AWS::AppFlow::ConnectorProfile', 0);
   });
+
+  test('does not create the AppFlow health check Lambda when credentials are absent', () => {
+    // Task 4.29: when AppFlow is not configured, no CDC flows exist, so the
+    // health check (and its matching alarm in MonitoringStack) must not
+    // deploy — otherwise it would page permanently on missing data.
+    const functions = template.findResources('AWS::Lambda::Function', {
+      Properties: { FunctionName: 'salesforce-ai-search-appflow-health-check' },
+    });
+    expect(Object.keys(functions)).toHaveLength(0);
+  });
+
+  test('does not create the AppFlow health check schedule rule when credentials are absent', () => {
+    const rules = template.findResources('AWS::Events::Rule', {
+      Properties: { Name: 'salesforce-ai-search-appflow-health-check-schedule' },
+    });
+    expect(Object.keys(rules)).toHaveLength(0);
+  });
 });
 
 describe('IngestionStack AppFlow health check (Task 4.29)', () => {

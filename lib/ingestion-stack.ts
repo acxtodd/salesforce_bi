@@ -801,82 +801,89 @@ export class IngestionStack extends cdk.Stack {
     // =========================================================================
     // Scheduled probe that polls AppFlow flow status for the 5 Salesforce CDC
     // flows and publishes SalesforceAISearch/Ingestion::CDCFlowHealthy. The
-    // matching critical alarm lives in MonitoringStack. Runbook:
+    // matching critical alarm lives in MonitoringStack. Only deployed when
+    // AppFlow itself is configured — otherwise there are no flows to monitor
+    // and the alarm would page permanently on missing data. Runbook:
     // docs/runbooks/appflow_cdc_recovery.md
+    if (
+      salesforceInstanceUrl &&
+      salesforceConnectedAppClientId &&
+      salesforceConnectedAppClientSecretArn
+    ) {
+      const appflowHealthCheckRole = new iam.Role(
+        this,
+        "AppflowHealthCheckLambdaRole",
+        {
+          assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+          managedPolicies: [
+            iam.ManagedPolicy.fromAwsManagedPolicyName(
+              "service-role/AWSLambdaVPCAccessExecutionRole",
+            ),
+          ],
+        },
+      );
 
-    const appflowHealthCheckRole = new iam.Role(
-      this,
-      "AppflowHealthCheckLambdaRole",
-      {
-        assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
-        managedPolicies: [
-          iam.ManagedPolicy.fromAwsManagedPolicyName(
-            "service-role/AWSLambdaVPCAccessExecutionRole",
+      appflowHealthCheckRole.addToPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["appflow:ListFlows"],
+          resources: ["*"],
+        }),
+      );
+
+      appflowHealthCheckRole.addToPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.ALLOW,
+          actions: ["cloudwatch:PutMetricData"],
+          resources: ["*"],
+          conditions: {
+            StringEquals: {
+              "cloudwatch:namespace": "SalesforceAISearch/Ingestion",
+            },
+          },
+        }),
+      );
+
+      const appflowHealthCheckLambda = new lambda.Function(
+        this,
+        "AppflowHealthCheckLambda",
+        {
+          functionName: "salesforce-ai-search-appflow-health-check",
+          runtime: lambda.Runtime.PYTHON_3_11,
+          handler: "index.lambda_handler",
+          code: lambda.Code.fromAsset(
+            path.join(__dirname, "../lambda/appflow_health_check/.bundle"),
+            { exclude: LAMBDA_ASSET_EXCLUDES },
           ),
-        ],
-      },
-    );
-
-    appflowHealthCheckRole.addToPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["appflow:ListFlows"],
-        resources: ["*"],
-      }),
-    );
-
-    appflowHealthCheckRole.addToPolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ["cloudwatch:PutMetricData"],
-        resources: ["*"],
-        conditions: {
-          StringEquals: {
-            "cloudwatch:namespace": "SalesforceAISearch/Ingestion",
+          timeout: cdk.Duration.seconds(60),
+          memorySize: 256,
+          role: appflowHealthCheckRole,
+          vpc,
+          vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+          securityGroups: [lambdaSecurityGroup],
+          environment: {
+            LOG_LEVEL: "INFO",
           },
         },
-      }),
-    );
+      );
 
-    const appflowHealthCheckLambda = new lambda.Function(
-      this,
-      "AppflowHealthCheckLambda",
-      {
-        functionName: "salesforce-ai-search-appflow-health-check",
-        runtime: lambda.Runtime.PYTHON_3_11,
-        handler: "index.lambda_handler",
-        code: lambda.Code.fromAsset(
-          path.join(__dirname, "../lambda/appflow_health_check/.bundle"),
-          { exclude: LAMBDA_ASSET_EXCLUDES },
-        ),
-        timeout: cdk.Duration.seconds(60),
-        memorySize: 256,
-        role: appflowHealthCheckRole,
-        vpc,
-        vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-        securityGroups: [lambdaSecurityGroup],
-        environment: {
-          LOG_LEVEL: "INFO",
+      const appflowHealthCheckRule = new events.Rule(
+        this,
+        "AppflowHealthCheckRule",
+        {
+          ruleName: "salesforce-ai-search-appflow-health-check-schedule",
+          description:
+            "Poll AppFlow CDC flow status every 5 minutes (Task 4.29)",
+          schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
         },
-      },
-    );
+      );
 
-    const appflowHealthCheckRule = new events.Rule(
-      this,
-      "AppflowHealthCheckRule",
-      {
-        ruleName: "salesforce-ai-search-appflow-health-check-schedule",
-        description:
-          "Poll AppFlow CDC flow status every 5 minutes (Task 4.29)",
-        schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
-      },
-    );
-
-    appflowHealthCheckRule.addTarget(
-      new targets.LambdaFunction(appflowHealthCheckLambda, {
-        retryAttempts: 2,
-      }),
-    );
+      appflowHealthCheckRule.addTarget(
+        new targets.LambdaFunction(appflowHealthCheckLambda, {
+          retryAttempts: 2,
+        }),
+      );
+    }
 
     // EventBridge rule to trigger CDC Sync Lambda on S3 CDC events
     const cdcEventRule = new events.Rule(this, "CDCEventRule", {

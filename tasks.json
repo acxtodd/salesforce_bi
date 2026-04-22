@@ -4648,19 +4648,27 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-21T15:04:00.874500+00:00",
-          "updatedAt": "2026-04-21T15:04:09.573900+00:00",
+          "updatedAt": "2026-04-22T05:22:10.527597+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-22T05:22:10.527414+00:00",
+              "note": "QA readiness pass (2026-04-22): task is ready for dev assignment after adding concrete technical handoff, expected write scope, local test/build gates, pre-deploy change-set constraints, and live validation evidence requirements. Keep implementation focused on cdc_sync runtime config convergence; do not reopen 4.26/4.27 outage closure or touch AppFlow/watermarks/active-version during implementation."
+            }
+          ],
           "description": "cdc_sync currently loads only the bundled denorm_config.yaml, while query and poll_sync load the active compiled artifact from S3 via CONFIG_ARTIFACT_BUCKET and the active-version pointer. This creates runtime config divergence: poll_sync can fail on compiled-artifact bugs that cdc_sync does not see, and CDC freshness behavior may not match query/runtime scope. Keep this out of task 4.26 so the compiler fix and outage replay stay tightly scoped; implement as a separate live-CDC change with focused tests and rollback.",
           "acceptance_criteria": [
             "cdc_sync uses RuntimeConfigLoader with the same resolution order as query/poll_sync: active S3 compiled artifact via SSM active-version pointer, then /tmp last-known-good cache, then bundled denorm_config.yaml fallback.",
             "IngestionStack sets CONFIG_ARTIFACT_BUCKET and CONFIG_ARTIFACT_PREFIX for salesforce-ai-search-cdc-sync, grants read access to config artifacts, and grants SSM read access for /salesforce-ai-search/config/* without removing existing CDC env vars or permissions.",
             "Unit tests cover active artifact load, last-known-good or bundled fallback behavior, and unchanged behavior when no CONFIG_ARTIFACT_BUCKET is configured.",
             "Live CDC validation proves a controlled update for at least Property plus one standard object (Account or Contact) still enriches via SOQL and upserts successfully after cdc_sync reads runtime config from S3.",
-            "Rollback path is documented: how to revert the active-version pointer or redeploy cdc_sync without CONFIG_ARTIFACT_BUCKET, and what validation to run after rollback."
-          ]
+            "Rollback path is documented: how to revert the active-version pointer or redeploy cdc_sync without CONFIG_ARTIFACT_BUCKET, and what validation to run after rollback.",
+            "Pre-deploy review includes CDK synth/diff or change-set evidence showing the change is limited to cdc_sync code/env/IAM required for runtime config loading: no AppFlow replacements, no active-version pointer mutation, no watermark writes, and no poll_sync behavior changes.",
+            "Post-deploy live validation evidence includes cdc_sync cold-start logs showing the active compiled artifact version loaded from RuntimeConfigLoader (not bundled-fallback), plus controlled CDC edits for Property and Account or Contact with successful SOQL/upsert, zero INVALID_FIELD/INVALID_SESSION_ID, and user-visible /query confirmation."
+          ],
+          "technical_context": "QA dev-assignment handoff for 4.28 (2026-04-22): keep this as a focused live-CDC convergence task, separate from the completed 4.26/4.27 outage closure. Primary code pattern to copy is lambda/poll_sync/index.py RuntimeConfigLoader usage: import RuntimeConfigLoader, bundled_paths_from_env, extract_denorm_config; add _denorm_config_version and _runtime_config_loader module globals; add _get_runtime_config_loader(); change _load_denorm_config to accept org_id, load active compiled artifact from S3/SSM, safe_dump extract_denorm_config(artifact) for audit raw_yaml, log the loaded runtime config version, and fallback to bundled DENORM_CONFIG_PATH on loader failure. Then pass SALESFORCE_ORG_ID into _load_denorm_config from lambda_handler before write_config_snapshot.\n\nExpected write scope: lambda/cdc_sync/index.py, lib/ingestion-stack.ts, tests/test_cdc_sync.py, and any minimal CDK/unit test files needed to verify env/IAM. Do not change poll_sync, query runtime loading, compiler output, active-version pointer, watermarks, AppFlow flow names, or cdc_sync business logic beyond config loading.\n\nCDK expectations: add CONFIG_ARTIFACT_BUCKET=dataBucket.bucketName and CONFIG_ARTIFACT_PREFIX=config to salesforce-ai-search-cdc-sync without removing existing env vars; grant read access to dataBucket config/*; grant ssm:GetParameter/GetParameters only as needed for /salesforce-ai-search/config/*; preserve existing /salesforce/* SSM, CDC bucket, audit bucket, KMS, DLQ, Turbopuffer, CloudWatch permissions.\n\nLocal verification expected before PR review: python3 -m pytest tests/test_cdc_sync.py tests/test_runtime_config.py -q; any existing poll_sync runtime-config tests that are touched; npm run build; git diff --check. Full pytest may still be blocked by docs/archive/test_automation/adaptive_threshold_precision_test.py requiring SALESFORCE_AI_SEARCH_API_URL/API_KEY, so report that separately if still true.\n\nRuntime/deploy validation is gated and must be reviewed before execution: CDK synth/diff or change-set should show only cdc_sync env/IAM/code changes needed for this task, no AppFlow replacements, no active-version change, no watermark changes, no poll_sync/cdc_sync invocations before approval. Live validation should cold-start cdc_sync, then perform a controlled Salesforce edit for Property plus Account or Contact and verify cdc_sync logs include the active runtime config version, SOQL/upsert success, zero INVALID_FIELD/INVALID_SESSION_ID, and user-visible /query returns the edited records."
         }
       ]
     },

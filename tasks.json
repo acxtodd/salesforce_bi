@@ -4501,7 +4501,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-15T20:38:51.887034+00:00",
-          "updatedAt": "2026-04-22T10:44:20.350537+00:00",
+          "updatedAt": "2026-04-22T16:52:12+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -4513,6 +4513,10 @@
             {
               "timestamp": "2026-04-22T10:42:27.552870+00:00",
               "note": "QA readiness patch (2026-04-22): command/payload correction for the sprint handoff. The exact config command shape must use the compile subcommand, e.g. python3 scripts/run_config_refresh.py compile --bucket salesforce-ai-search-data-382211616288-us-west-2 --target-org ascendix-beta-sandbox --apply [--objects ascendix__Sale__c if narrowing is supported by the current workflow]. The Lambda invoke payload for Sale re-seed must use {\"objects\":[\"ascendix__Sale__c\"],\"full_sync\":true}, not a singular \"object\" key. Keep the one-object-at-a-time evidence pattern from 4.26/4.27: raw response, logs, metric, audit doc, and /query validation."
+            },
+            {
+              "timestamp": "2026-04-22T16:52:12+00:00",
+              "note": "QA next-session handoff after 4.29 closure: 4.25 can be assigned in parallel with 4.30 because it is the user-value/data-plane lane and does not depend on token-refresh helper work. Keep the risk posture higher than 4.30/4.31: this task touches the active Ascendix runtime config plane and live Sale re-seeding. Start with the read-only broker-field survey and compiled-artifact inspection, then make the minimal SearchSetting/Search__c edit, run compile without surprises, and only then use compile --apply. Do not edit denorm_config.yaml or Lambda bundles. 4.24 close-out must piggyback here: the Sale namespace re-seed, Sylvan Ridge audit doc, and live /query validation should close both 4.25 and 4.24 with the same evidence. If any CDK deploy becomes necessary, account for the 4.29 lesson captured in 4.32: named stacks can pull transitive dependencies, so run/review the exact deploy graph before approval."
             }
           ],
           "description": "Narrow feature delivery for Sale sale-comp output in the compiled Ascendix runtime config plane. Property already has correct Street, PostalCode, and YearBuilt in the sandbox org; the remaining Sale gap is that Sale.parents.ascendix__Property__c currently contains only [Name], so Sale documents do not carry the linked property's full address and vintage. Add exactly Street, PostalCode, and YearBuilt to the Sale -> Property parent fields through Ascendix SearchSetting__c / Search__c config, then compile/apply the runtime artifact and re-seed Sale. Sale.parents.ascendix__ListingBrokerCompany__c already contains Name and related Account fields in active artifact 20260421T172143-75e7d0ebea94, so the broker work is now an org-wide canonical-field survey and validation step: confirm ListingBrokerCompany is the right sale-side broker field or identify the better populated Sale broker lookup before changing config. Validation target: Sylvan Ridge Apartments sale (a0jdl000003fr1pAAA). The final Sale card/result must show correct property address, correct property year built, and correct sale-side broker; the Property broker must not be used as a substitute. Do not touch denorm_config.yaml or Lambda bundles. If the 256-attribute Turbopuffer namespace cap blocks additions, propose and execute the minimal trim from Sale's existing compiled attribute footprint in the same control plane.",
@@ -4794,7 +4798,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-21T14:35:53.528135+00:00",
-          "updatedAt": "2026-04-22T10:43:19.399433+00:00",
+          "updatedAt": "2026-04-22T16:52:12+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -4806,6 +4810,10 @@
             {
               "timestamp": "2026-04-22T10:30:17.907182+00:00",
               "note": "SPRINT PLAN \"Close 2026-04-21 Blast Radius + Sale Comp Value\"\nLINEUP: 4.29[S] + 4.30[S] + 4.31[S, blocks on 4.30] + 4.25[M]. Close-outs: 4.22[XS], 4.24[XS, folds into 4.25].\nSTART ORDER: 4.29, 4.30, 4.25 in parallel (no blockers). 4.31 after 4.30 lands. 4.24 piggybacks on 4.25 validation. 4.22 close any time.\n\nTHIS TASK: reliability lane A. Size S. No blockers. Prerequisite for 4.31.\nWhy: 2026-04-21 outage root cause included a 5-day stale SSM token with no automated rotation path.\n\nAPPROACH (decided): new scripts/refresh_sf_token.py completing the JWT Bearer flow that mint_jwt.py leaves half-done.\n- Load Connected App creds + private key from Secrets Manager salesforce-ai-search/appflow-creds (NOT .env — per memory/feedback_no_hardcoded_secrets)\n- Mint JWT assertion via mint_jwt.py (prefer import over subprocess for clean error propagation)\n- POST https://test.salesforce.com/services/oauth2/token with grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer — sandbox audience, not login.salesforce.com\n- Parse access_token + instance_url from response; write /salesforce/access_token as SecureString via aws ssm put-parameter --type SecureString --overwrite (matches reader expectations per memory/feedback_ssm_parameter_type_match)\n- Cold-start cdc_sync + poll_sync via env-merge pattern (per memory/feedback_lambda_env_merge): fetch current env with get-function-configuration, add SF_TOKEN_REFRESHED_AT=<ts>, push back via --environment file://env.json. NEVER Variables={...} shorthand — it clobbers all other env keys.\n- Fail loud: non-zero exit + explicit stderr on any of JWT sign error, HTTP non-200, SSM write error, Lambda update error. No partial/silent success.\n\nFUTURE SHARING: extract token-exchange into lib/sf_token_refresh.py during this task so 4.31 scheduled Lambda can import the same logic — single source of truth.\n\nRESEARCH 2026-04-22: scripts/ has mint_jwt.py (assertion only) — no refresh script exists. Grep for token.refresh / RefreshSF / salesforce-ai-search-sf-token across repo returns only tasks.json and archived docs hits. No code path POSTs to /services/oauth2/token anywhere.\n\nVALIDATION (AC4): after running script, aws ssm get-parameter /salesforce/access_token --query Parameter.LastModifiedDate shows within the last minute. Controlled SF edit on a sandbox record -> cdc_sync logs show Upserted with zero INVALID_SESSION_ID.\n\nHANDOFF:\n- Audience URL MUST default to test.salesforce.com (sandbox). Production (login.salesforce.com) should require an explicit --audience override flag to prevent accidental prod token mint.\n- Script should be safe to run on demand by ops AND importable by 4.31 Lambda handler. Keep the CLI thin; put logic in lib/sf_token_refresh.py."
+            },
+            {
+              "timestamp": "2026-04-22T16:52:12+00:00",
+              "note": "QA next-session handoff after 4.29 closure: pick up 4.30 first in the reliability lane. It is the prerequisite for 4.31 and should land as a reviewed PR before any scheduled refresh Lambda is built. Dev-ready start: branch from current main, implement the importable lib/sf_token_refresh.py plus thin CLI, add unit tests around audience default/override, HTTP error handling, SecureString SSM write shape, and merge-preserving Lambda env bump payload construction. Treat live execution as a validation gate, not a development shortcut: before writing /salesforce/access_token or bumping Lambda env, present the exact command/evidence plan for QA approval. 4.32 Api-dev validation is not a blocker for this task, but if CDK/deploy work is introduced unexpectedly, account for transitive stack dependencies before approval."
             }
           ],
           "description": "The 2026-04-21 CDC outage traced in part to /salesforce/access_token being stale in SSM, causing cdc_sync SalesforceAuthenticationError / INVALID_SESSION_ID during enrichment calls. Existing scripts/mint_jwt.py only produces the signed JWT assertion half of the JWT Bearer flow; it does not POST the assertion to /services/oauth2/token to exchange for an access_token. This task adds a reusable lib/sf_token_refresh.py plus thin scripts/refresh_sf_token.py CLI that (1) loads Connected App credentials from Secrets Manager, (2) mints a fresh JWT assertion, (3) POSTs to the Salesforce OAuth token endpoint with sandbox audience by default, (4) writes the returned access_token to SSM /salesforce/access_token as SecureString, and (5) merge-preserving bumps cdc_sync and poll_sync to recycle warm containers. This turns manual multi-step rotation into one-command ops and provides the shared module used by 4.31 scheduled refresh.",
@@ -4824,7 +4832,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-21T14:36:19.368064+00:00",
-          "updatedAt": "2026-04-22T10:44:08.750403+00:00",
+          "updatedAt": "2026-04-22T16:52:12+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -4840,6 +4848,10 @@
             {
               "timestamp": "2026-04-22T10:44:08.750185+00:00",
               "note": "QA readiness patch (2026-04-22): stale textual references to 99.5/99.6 in the title and description were normalized to 4.30/4.31. The earlier ID RENAME NOTE remains historical only; current task fields are authoritative. Added ACs requiring direct import of lib/sf_token_refresh.py and a guarded validation window for the invalid-token test."
+            },
+            {
+              "timestamp": "2026-04-22T16:52:12+00:00",
+              "note": "QA next-session handoff after 4.29 closure: do not assign/start 4.31 until 4.30 is merged and lib/sf_token_refresh.py is available as the shared module. First review 4.30's exported API and tests, then keep 4.31 as a thin Lambda/CDK wrapper with EventBridge schedule, scoped IAM, and a critical alarm. Validation is intentionally destructive because AC5 writes an invalid token; it must run only in an approved window with the pre-test SSM token version/timestamp captured and a restore path using the 4.30 helper. For CDK review, apply the 4.29/4.32 process lesson: diff/deploy approval must consider transitive dependencies, not just named stacks. 99.8 remains the durable in-process OAuth refresh-on-401 fix, so avoid broad auth refactors here."
             }
           ],
           "description": "Even with the one-command helper from 4.30, token rotation would still be manual unless scheduled. Manual rotation is what left /salesforce/access_token stale during the 2026-04-16 to 2026-04-21 CDC outage. This task wraps the shared lib/sf_token_refresh.py logic delivered by 4.30 in a Lambda invoked by an EventBridge rule every ~90 minutes, well inside the Salesforce access_token expiry window. The Lambda should be a thin wrapper that fetches private key material from Secrets Manager, exchanges a JWT Bearer assertion for an access_token, writes /salesforce/access_token, and merge-preserving bumps cdc_sync and poll_sync so warm containers recycle. CloudWatch alarm on Lambda errors must page through the operator SNS path. This is a mitigation that can be retired by 99.8 once SalesforceClient owns in-process OAuth refresh-on-401.",

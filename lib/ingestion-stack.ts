@@ -328,6 +328,11 @@ export class IngestionStack extends cdk.Stack {
         DENORM_CONFIG_PATH: "denorm_config.yaml",
         DLQ_URL: this.dlq.queueUrl,
         TURBOPUFFER_API_KEY: turbopufferApiKeySecret.secretValue.unsafeUnwrap(),
+        // Runtime config convergence (task 4.28): load the active compiled
+        // artifact with the same S3/SSM resolution as poll_sync. Bundled
+        // denorm_config.yaml remains the final fallback inside the Lambda.
+        CONFIG_ARTIFACT_BUCKET: dataBucket.bucketName,
+        CONFIG_ARTIFACT_PREFIX: "config",
         LOG_LEVEL: "INFO",
         ...(props.auditBucket ? { AUDIT_BUCKET: props.auditBucket.bucketName } : {}),
       },
@@ -343,6 +348,20 @@ export class IngestionStack extends cdk.Stack {
     if (props.auditBucket) {
       props.auditBucket.grantWrite(cdcSyncLambda);
     }
+
+    // Grant CDC sync Lambda read access to compiled config artifacts
+    dataBucket.grantRead(cdcSyncLambda, "config/*");
+
+    // Grant CDC sync Lambda read access to active-version SSM pointer
+    cdcSyncRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["ssm:GetParameter"],
+        resources: [
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/salesforce-ai-search/config/*`,
+        ],
+      }),
+    );
 
     // =========================================================================
     // Poll Sync Lambda — incremental sync for non-CDC objects

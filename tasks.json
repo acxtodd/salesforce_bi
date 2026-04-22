@@ -4648,14 +4648,27 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-21T15:04:00.874500+00:00",
-          "updatedAt": "2026-04-22T05:22:10.527597+00:00",
-          "files_modified": [],
+          "updatedAt": "2026-04-22T05:56:18.353622+00:00",
+          "files_modified": [
+            "lambda/cdc_sync/index.py",
+            "lib/ingestion-stack.ts",
+            "tests/test_cdc_sync.py",
+            "scripts/bundle_cdc_sync.sh"
+          ],
           "commits": [],
           "pull_requests": [],
           "progress_notes": [
             {
               "timestamp": "2026-04-22T05:22:10.527414+00:00",
               "note": "QA readiness pass (2026-04-22): task is ready for dev assignment after adding concrete technical handoff, expected write scope, local test/build gates, pre-deploy change-set constraints, and live validation evidence requirements. Keep implementation focused on cdc_sync runtime config convergence; do not reopen 4.26/4.27 outage closure or touch AppFlow/watermarks/active-version during implementation."
+            },
+            {
+              "timestamp": "2026-04-22T05:31:03.677937+00:00",
+              "note": "R1 local implementation (2026-04-22, branch task-4.28-cdc-sync-runtime-config): (1) lambda/cdc_sync/index.py now uses RuntimeConfigLoader with the same resolution order as poll_sync (S3 active compiled artifact via SSM pointer → /tmp last-known-good cache → bundled denorm_config.yaml); adds _denorm_config_version and _runtime_config_loader module globals + _get_runtime_config_loader() helper + _load_denorm_config(org_id) signature change; logs the loaded runtime config version; falls back to bundled YAML on any loader exception. (2) lib/ingestion-stack.ts adds CONFIG_ARTIFACT_BUCKET=dataBucket.bucketName and CONFIG_ARTIFACT_PREFIX=config env vars on salesforce-ai-search-cdc-sync, grants dataBucket.grantRead(cdcSyncLambda, 'config/*'), and adds a minimal SSM GetParameter policy scoped to /salesforce-ai-search/config/* — no changes to existing Bedrock/Turbopuffer/CloudWatch/DLQ/KMS/CDC-bucket/audit-bucket/SSM /salesforce/* permissions. (3) tests/test_cdc_sync.py adds TestRuntimeConfigLoading with 4 cases covering runtime loader success, fallback to static YAML on loader error, module-level caching, and unchanged-behavior when CONFIG_ARTIFACT_BUCKET is unset. Verification: pytest tests/test_cdc_sync.py tests/test_runtime_config.py -q → 48 passed; pytest plus tests/test_poll_sync.py → 65 passed total; npm run build → tsc clean; git diff --check → no whitespace errors. Not run: CDK synth/diff and any AWS/Salesforce action — per task scope, deploy validation stays gated until PR review."
+            },
+            {
+              "timestamp": "2026-04-22T05:56:18.353420+00:00",
+              "note": "R1 bundle fix (2026-04-22 after QA P1): scripts/bundle_cdc_sync.sh now copies lib/runtime_config.py and lib/config_refresh.py into the deployment bundle at lambda/cdc_sync/.bundle/lib/, mirroring scripts/bundle_poll_sync.sh lines 26-27. Without this fix, the CDK asset (lib/ingestion-stack.ts:316 Code.fromAsset(lambda/cdc_sync/.bundle)) would either fail Lambda import for the new modules or ship stale code. Verified by re-running the bundle and confirming lib/ now contains 6 files (audit_writer.py, config_refresh.py, denormalize.py, runtime_config.py, search_backend.py, turbopuffer_backend.py); the new modules import cleanly inside the bundle, isolated from the Linux-compiled turbopuffer/pydantic deps. Pre-deploy sequence must now include bash scripts/bundle_cdc_sync.sh before cdk diff/deploy so the code-asset hash in the change-set reflects the new handler + bundled lib changes."
             }
           ],
           "description": "cdc_sync currently loads only the bundled denorm_config.yaml, while query and poll_sync load the active compiled artifact from S3 via CONFIG_ARTIFACT_BUCKET and the active-version pointer. This creates runtime config divergence: poll_sync can fail on compiled-artifact bugs that cdc_sync does not see, and CDC freshness behavior may not match query/runtime scope. Keep this out of task 4.26 so the compiler fix and outage replay stay tightly scoped; implement as a separate live-CDC change with focused tests and rollback.",

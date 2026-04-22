@@ -54,6 +54,11 @@ from lib.audit_writer import (  # noqa: E402
     write_denorm_audit,
 )
 from lib.turbopuffer_backend import TurbopufferBackend  # noqa: E402
+from lib.runtime_config import (  # noqa: E402
+    RuntimeConfigLoader,
+    bundled_paths_from_env,
+    extract_denorm_config,
+)
 
 LOG = logging.getLogger("cdc_sync")
 LOG.setLevel(os.getenv("LOG_LEVEL", "INFO"))
@@ -211,6 +216,8 @@ def parse_event(event: dict, s3_client: Any) -> list[CDCEvent]:
 
 _denorm_config: dict | None = None
 _denorm_config_raw_yaml: str = ""
+_denorm_config_version: str = ""
+_runtime_config_loader: RuntimeConfigLoader | None = None
 _sf_client: SalesforceClient | None = None
 _bedrock_client: Any = None
 _backend: TurbopufferBackend | None = None
@@ -221,18 +228,62 @@ _relationship_maps: dict[str, dict[str, str]] = {}
 _config_snapshot_written: bool = False
 
 
-def _load_denorm_config() -> tuple[dict, str]:
-    """Load denorm config (cached at module level after first call).
+def _get_runtime_config_loader() -> RuntimeConfigLoader:
+    """Get or create the RuntimeConfigLoader (cached at module level)."""
+    global _runtime_config_loader
+    if _runtime_config_loader is None:
+        bucket = os.getenv("CONFIG_ARTIFACT_BUCKET", "")
+        _runtime_config_loader = RuntimeConfigLoader(
+            s3_client=boto3.client("s3") if bucket else None,
+            ssm_client=boto3.client("ssm") if bucket else None,
+            bucket=bucket,
+            s3_prefix=os.getenv("CONFIG_ARTIFACT_PREFIX", "config"),
+            bundled_paths=bundled_paths_from_env(__file__),
+        )
+    return _runtime_config_loader
+
+
+def _load_denorm_config(org_id: str = "") -> tuple[dict, str]:
+    """Load denorm config via RuntimeConfigLoader with safe fallback.
+
+    Uses the control-plane fallback order: S3 active artifact → /tmp
+    cache → bundled denorm_config.yaml. When CONFIG_ARTIFACT_BUCKET is
+    unset the loader falls straight through to the bundled YAML, so
+    behavior is unchanged for environments that have not been
+    converged onto the runtime artifact plane.
 
     Returns ``(parsed_dict, raw_yaml_str)`` so callers that need byte-
     for-byte provenance (audit trail) can use the raw string.
     """
-    global _denorm_config, _denorm_config_raw_yaml
-    if _denorm_config is None:
+    global _denorm_config, _denorm_config_raw_yaml, _denorm_config_version
+    if _denorm_config is not None:
+        return _denorm_config, _denorm_config_raw_yaml
+
+    org_id = org_id or os.environ.get("SALESFORCE_ORG_ID", "")
+    try:
+        loader = _get_runtime_config_loader()
+        artifact = loader.load(org_id)
+        _denorm_config = extract_denorm_config(artifact)
+        _denorm_config_version = str(artifact.get("version_id", "unknown"))
+        _denorm_config_raw_yaml = yaml.safe_dump(
+            _denorm_config, sort_keys=False, allow_unicode=False
+        )
+        LOG.info(
+            "cdc_sync loaded runtime config version %s for org %s",
+            _denorm_config_version,
+            org_id,
+        )
+    except Exception:
+        LOG.warning(
+            "RuntimeConfigLoader failed — falling back to static YAML",
+            exc_info=True,
+        )
         config_path = os.environ.get("DENORM_CONFIG_PATH", "denorm_config.yaml")
         with open(config_path) as f:
             _denorm_config_raw_yaml = f.read()
         _denorm_config = yaml.safe_load(_denorm_config_raw_yaml)
+        _denorm_config_version = "bundled-fallback"
+
     return _denorm_config, _denorm_config_raw_yaml
 
 
@@ -565,7 +616,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
     backend = _get_backend()
     cloudwatch_client = _get_cloudwatch_client()
     sqs_client = _get_sqs_client()
-    denorm_config, raw_yaml_str = _load_denorm_config()
+    denorm_config, raw_yaml_str = _load_denorm_config(salesforce_org_id)
 
     # Wrap backend with audit writer if AUDIT_BUCKET is configured
     audit_s3_client = None

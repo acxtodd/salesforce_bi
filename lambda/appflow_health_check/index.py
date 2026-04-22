@@ -69,30 +69,37 @@ def _list_all_flows(client):
 
 
 def _match_cdc_flows(flows):
-    matches = {base: None for base in CDC_FLOW_BASES}
+    # List per base rather than a single entry: during a generation replacement
+    # an old Suspended flow and a new Active flow can briefly coexist. Keeping
+    # both means the evaluator can flag the stale flow instead of letting
+    # AppFlow list-order hide it.
+    matches = {base: [] for base in CDC_FLOW_BASES}
     for flow in flows:
         name = flow.get("flowName", "")
         for base in CDC_FLOW_BASES:
             # Exact base (no appflowGeneration) or base followed by "-<suffix>".
             if name == base or name.startswith(f"{base}-"):
-                matches[base] = {
-                    "name": name,
-                    "status": flow.get("flowStatus", "UNKNOWN"),
-                }
+                matches[base].append(
+                    {
+                        "name": name,
+                        "status": flow.get("flowStatus", "UNKNOWN"),
+                    }
+                )
                 break
     return matches
 
 
 def _evaluate_health(matches):
-    missing = [base for base, m in matches.items() if m is None]
+    missing = [base for base, found in matches.items() if not found]
     degraded = [
         {"name": m["name"], "status": m["status"]}
-        for m in matches.values()
-        if m is not None and m["status"] != "Active"
+        for found in matches.values()
+        for m in found
+        if m["status"] != "Active"
     ]
     healthy = not missing and not degraded
     return healthy, {
         "missing_flows": missing,
         "degraded_flows": degraded,
-        "total_matched": sum(1 for m in matches.values() if m is not None),
+        "total_matched": sum(len(found) for found in matches.values()),
     }

@@ -27,15 +27,23 @@ The alarm is critical. It fires when `CDCFlowHealthy` is less than 1 for
 health-check Lambda itself stops publishing (missing data is treated as
 breaching).
 
-Expected CDC flows matched by prefix:
+Expected CDC flow base names:
 
-- `salesforce-ai-search-cdc-account-*`
-- `salesforce-ai-search-cdc-contact-*`
-- `salesforce-ai-search-cdc-ascendix__property__c-*`
-- `salesforce-ai-search-cdc-ascendix__lease__c-*`
-- `salesforce-ai-search-cdc-ascendix__availability__c-*`
+- `salesforce-ai-search-cdc-account`
+- `salesforce-ai-search-cdc-contact`
+- `salesforce-ai-search-cdc-ascendix__property__c`
+- `salesforce-ai-search-cdc-ascendix__lease__c`
+- `salesforce-ai-search-cdc-ascendix__availability__c`
 
-Suffix rotates on replay resets (set by CDK context `appflowGeneration`).
+The health check matches each base exactly (`salesforce-ai-search-cdc-account`)
+or followed by a generation suffix (`salesforce-ai-search-cdc-account-v2-20260421`).
+The suffix is set by CDK context `appflowGeneration` and rotates on replay
+resets; when the context is unset, flows deploy with no suffix.
+
+Any non-Active flow matching a base — including an old Suspended generation
+that has not yet been deleted — marks the whole health check degraded. This is
+intentional: list_flows order is not deterministic, so hiding old generations
+would be order-dependent.
 
 ## Immediate Checks
 

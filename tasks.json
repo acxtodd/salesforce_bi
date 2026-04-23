@@ -5370,6 +5370,29 @@
             "Schema declarations, field-registry output, semantic aliases, docs, and examples align to the same key contract or document a deliberate compatibility shim.",
             "Regression tests cover direct, parent, and dotted-parent key normalization plus affected filter-resolution paths."
           ]
+        },
+        {
+          "id": "99.11",
+          "title": "Harden build_text() against compound field values promoted into embed_fields",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T16:08:40.669105+00:00",
+          "updatedAt": "2026-04-23T16:09:00.025600+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-23T16:09:00.025435+00:00",
+              "note": "ORIGIN: Flagged in PR #25 (task 4.35) review on 2026-04-23 as 'future config footgun'. Non-blocking because the current compiled artifact has BillingAddress only in metadata_fields. Reviewer noted: 'lib/denormalize.py:338 build_text() still stringifies compound values if a compound field is ever promoted into embed_fields; this PR only fixes attribute emission.' Reference the _emit_attr helper pattern in lib/denormalize.py for the flatten semantics to mirror."
+            }
+          ],
+          "description": "PR #25 (task 4.35) fixed compound-field emission at build_document() so Turbopuffer upsert no longer 422s. It does NOT fix lib/denormalize.py build_text() at line 356 / 374, which still stringifies values via f-string. If a Salesforce compound field (BillingAddress, MailingAddress, ShippingAddress, geolocation) is ever promoted into an object's embed_fields list (currently they live in metadata_fields only), build_text() would emit Python repr of the nested dict into the embedding text — e.g. 'BillingAddress: {\"Street\": \"1209 Orange Street\", \"City\": \"Wilmington\"}'. That leaks structural syntax into the embedding and hurts retrieval quality without causing any crash (so it's a silent correctness bug). Fix: apply the same flatten semantics used in _emit_attr when generating text. For each field value, if it is a dict, emit one text segment per scalar subfield labeled with the SF-native scalar name (e.g. 'Billing Street: 1209 Orange Street | Billing City: Wilmington'). Same defensive guard for unknown nested shapes. Add regression tests in tests/test_denormalize.py::TestBuildText covering compound address in embed_fields. Non-urgent: no current config promotes a compound field to embed_fields, and the compiled artifact for Account has BillingAddress only in metadata_fields. Flagged as a future config footgun by PR #25 review.",
+          "acceptance_criteria": [
+            "lib/denormalize.py build_text() detects dict values and emits per-subfield text segments using SF-native scalar labels ('Billing Street', 'Billing City', etc.), matching the flatten semantics in _emit_attr. Unknown nested shapes are dropped with a warning log, same as _emit_attr.",
+            "Regression tests in tests/test_denormalize.py::TestBuildText cover: compound BillingAddress in embed_fields produces scalar-labeled text segments, null compound passes through, compound in parent_fields gets parent-prefixed labels.",
+            "No config changes required to trigger the fix — the change is a defensive hardening in build_text() so the Ascendix Search config plane can later promote compound fields to embed_fields without a silent retrieval-quality regression."
+          ]
         }
       ]
     }
@@ -5394,7 +5417,7 @@
       "4.9.": 11,
       "4.12.": 6,
       "4.13.": 2,
-      "99.": 11,
+      "99.": 12,
       "4.17.": 9,
       "4.19.": 5,
       "4.20.": 5,

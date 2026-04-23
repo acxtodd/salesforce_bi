@@ -3923,16 +3923,20 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:47:18.882987+00:00",
-          "updatedAt": "2026-03-23T13:58:26.724268+00:00",
+          "updatedAt": "2026-04-23T14:56:38.348683+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-23T14:56:38.348523+00:00",
+              "note": "GATED ON 4.34 (2026-04-23): write-path architecture decision task created. Current 4.17.1-4.17.3 use sync-REST from LWC; 4.34 evaluates whether remaining 4.17 subtasks should adopt queued-Apex-Invocable (SA pattern) or Hosted MCP instead. Do not start implementation of this task until 4.34 lands a decision and updates this task's description+ACs to match."
+            }
+          ],
           "description": "Add a propose_create tool definition to the query Lambda's Claude tool-use schema so the agent can propose new-record creation using real Salesforce createable field API names. The tool must consume the writable metadata contract, resolve parent lookups explicitly, and emit a structured create proposal through the shared proposal transport. Prompt guidance should require the agent to state what it will create, which parent/context it will link to, and which required fields still need user input.",
           "parent": "4.17",
           "depends_on": [
-            "4.17.7",
-            "4.17.8"
+            "4.34"
           ]
         },
         {
@@ -3941,17 +3945,20 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:47:28.364704+00:00",
-          "updatedAt": "2026-03-23T13:58:26.833131+00:00",
+          "updatedAt": "2026-04-23T14:56:43.326924+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-23T14:56:43.326743+00:00",
+              "note": "GATED ON 4.34 (2026-04-23): write-path architecture decision task created. Current 4.17.1-4.17.3 use sync-REST from LWC; 4.34 evaluates whether remaining 4.17 subtasks should adopt queued-Apex-Invocable (SA pattern) or Hosted MCP instead. Do not start implementation of this task until 4.34 lands a decision and updates this task's description+ACs to match."
+            }
+          ],
           "description": "When the LWC receives a structured propose_create payload, show a preview modal with the proposed field values and resolved parent context. On Create, use NavigationMixin.Navigate to open the native Salesforce create experience with encoded defaultFieldValues. Scope this task to opening the correct native create flow with accurate defaults and preserving a sane chat state before and after navigation. Do not claim save/cancel detection in chat unless a supported mechanism is identified and validated; otherwise the UX must return safely without false confirmation.",
           "parent": "4.17",
           "depends_on": [
-            "4.17.4",
-            "4.17.7",
-            "4.17.8"
+            "4.34"
           ],
           "technical_context": "NavigationMixin with encodeDefaultFieldValues is supported for opening native create, but reliable chat-side success/cancel detection after navigation is not yet established in this repo. Keep acceptance criteria to supported behavior unless a validated callback/override strategy is added."
         },
@@ -3961,16 +3968,20 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:47:36.446354+00:00",
-          "updatedAt": "2026-03-23T13:58:26.942009+00:00",
+          "updatedAt": "2026-04-23T14:56:51.347954+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
-          "progress_notes": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-23T14:56:51.347782+00:00",
+              "note": "GATED ON 4.34 (2026-04-23): write-path architecture decision task created. This task's multi-record sequential workflow is the PRIMARY driver for evaluating the SA's queue-based pattern — chained agent-proposed edits benefit most from queue durability + Composite Graph atomicity. Do not start implementation until 4.34 lands a decision and updates this task's description+ACs to match."
+            }
+          ],
           "description": "Enable the agent to propose a sequence of related create/edit operations as an ordered action plan after the single-record edit and create foundations are proven. The LWC shows the plan as a checklist, launches forms sequentially, captures saved record IDs, and injects them into downstream lookup defaults. If a step fails or is cancelled, remaining steps pause with explicit retry/skip handling. Reuse the shared metadata contract and structured proposal transport rather than creating a separate orchestration protocol.",
           "parent": "4.17",
           "depends_on": [
-            "4.17.3",
-            "4.17.5"
+            "4.34"
           ]
         },
         {
@@ -3979,7 +3990,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:56:53.789285+00:00",
-          "updatedAt": "2026-03-23T14:29:19.989543+00:00",
+          "updatedAt": "2026-04-23T14:56:56.167505+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -3987,6 +3998,10 @@
             {
               "timestamp": "2026-03-23T14:29:19.989372+00:00",
               "note": "Supplemental implementation spec added at docs/specs/task-4.17.7-writable-field-metadata-spec.md."
+            },
+            {
+              "timestamp": "2026-04-23T14:56:56.167354+00:00",
+              "note": "GATED ON 4.34 (2026-04-23): write-path architecture decision task created. Writable-field metadata contract shape depends on the chosen pattern (sync-REST needs per-field UI metadata; queued-Apex-Invocable needs per-action metadata; Hosted MCP uses SF-native metadata). Do not start until 4.34 lands."
             }
           ],
           "description": "Create the shared metadata layer required for agent write-back. Provide object/field metadata for supported write scenarios: field API name, label, data type, createable/updateable flags, required-on-create hints, lookup targets, and visibility to the current user/context where feasible. Exclude formula, system, auto-number, denormalized, and otherwise read-only fields from agent-proposable write scope. Define how search-time aliases or denormalized labels map back to real Salesforce writable fields so the agent and UI do not confuse read-model fields with write targets.",
@@ -3994,6 +4009,9 @@
           "parent": "4.17",
           "references": [
             "docs/specs/task-4.17.7-writable-field-metadata-spec.md"
+          ],
+          "depends_on": [
+            "4.34"
           ]
         },
         {
@@ -4002,7 +4020,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-03-23T13:56:53.854066+00:00",
-          "updatedAt": "2026-03-23T14:29:20.040688+00:00",
+          "updatedAt": "2026-04-23T14:57:00.366938+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -4010,6 +4028,10 @@
             {
               "timestamp": "2026-03-23T14:29:20.040548+00:00",
               "note": "Supplemental implementation spec added at docs/specs/task-4.17.8-write-proposal-transport-spec.md."
+            },
+            {
+              "timestamp": "2026-04-23T14:57:00.366785+00:00",
+              "note": "GATED ON 4.34 (2026-04-23): write-path architecture decision task created. Write-proposal transport contract is the most decision-sensitive 4.17 subtask — its JSON shape and transport layer (LWC state vs durable queue envelope) depends entirely on the 4.34 outcome. Do not start until 4.34 lands."
             }
           ],
           "description": "Define and implement the transport contract for agent write proposals end to end: Claude tool result -> query handler response -> Lambda SSE event or JSON payload -> Apex parser -> LWC state. Replace or supersede the current bracketed [ACTION:...] answer-marker flow for write-back scenarios with a typed payload that includes proposal kind (edit/create/multi), object type, target record or parent context, proposed fields, and any user-facing summary text. Preserve backward compatibility only if it does not complicate the new contract materially.",
@@ -4017,6 +4039,9 @@
           "parent": "4.17",
           "references": [
             "docs/specs/task-4.17.8-write-proposal-transport-spec.md"
+          ],
+          "depends_on": [
+            "4.34"
           ]
         },
         {
@@ -4887,6 +4912,326 @@
             "IAM changes don't block normal operation: sample ~10 /query requests succeed end-to-end with authz + search + answer citations; no AccessDenied or kms:DescribeKey errors in Authz/Query/Action Lambda logs",
             "Process fix: document in environments.md (or a runbook) that CDK stack dependencies can pull in unnamed stacks during deploy; recommend future deploy gates run 'cdk deploy --exclusively' or explicit cdk diff <named-stacks-only> before approval, so the reviewed diff matches what actually deploys"
           ]
+        },
+        {
+          "id": "4.33",
+          "title": "Hybrid retrieval spike: prove slim-index + live-fetch pattern on Sale before broader adoption",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:47:53.273718+00:00",
+          "updatedAt": "2026-04-23T14:49:04.803680+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-23T14:48:52.680957+00:00",
+              "note": "CONTEXT (2026-04-23 session): created from agentic-landscape research comparing Turbopuffer+CDC (current) vs Salesforce GraphQL API, Hosted MCP (Feb '26 GA), Agentforce Agent API, Data 360 Query Connect API, Einstein Retrievers, and Apex Invocable Actions. Conclusion: current architecture's unique value is semantic ranking across objects; its weaknesses are (1) 256-attr cap pressure on denormalized parent fields, (2) CDC freshness lag, (3) double schema maintenance (Ascendix config drift). Hybrid retrieval addresses (1) and (2). This spike proves it on one object before any general rewire. User was explicit: 'before we rewire anything we are doing now (it works really well) we should prove it out first.' See 2026-04-23 chat transcript for full comparison."
+            },
+            {
+              "timestamp": "2026-04-23T14:49:04.803514+00:00",
+              "note": "IMPLEMENTATION NOTES FOR FUTURE AGENT: (1) lib/query_handler.py is the orchestration layer; lib/tool_dispatch.py handles search_records/aggregate_records. Post-fetch could be injected either as a new tool ('fetch_record_details') the model calls explicitly, or as a transparent post-processing step after search_records returns. Transparent post-processing is simpler for the spike; explicit tool requires prompt changes and may be cleaner long-term. Recommend transparent for spike, revisit in go/no-go. (2) SF live fetch: the cdc_sync SalesforceClient wrapper (lambda/common/salesforce_client.py) supports describe + SOQL. For this spike, reuse that client rather than introducing GraphQL (reduces scope + moving parts; GraphQL comparison goes in the go/no-go doc). (3) Shadow namespace: Turbopuffer backend (lib/turbopuffer_backend.py) takes namespace as a constructor arg; /query Lambda reads SALESFORCE_ORG_ID and builds 'org_{id}'. Add a HYBRID_NAMESPACE_SUFFIX env var ('_shadow') to target the shadow namespace when flag is ON. (4) Shadow pointer: SSM parameter /salesforce-ai-search/config/{org_id}/shadow-version holds the candidate version_id; lib/runtime_config.py currently reads /active-version; add a shadow variant that reads /shadow-version when HYBRID_POSTFETCH_ENABLED=true. (5) Benchmark harness: reuse the pattern in tests/acceptance/ — they already drive /query with canned queries and capture metrics. Extend for dual-path."
+            }
+          ],
+          "description": "Current architecture pre-denormalizes ALL display fields into Turbopuffer (256-attribute namespace cap is biting at 4.25 and will bite harder as object count grows to 15). Agentic-landscape analysis (2026-04-23 session) surfaced a hybrid pattern: keep only embedding-relevant fields in Turbopuffer; fetch display fields live via GraphQL or REST after top-N retrieval. Also mitigates CDC freshness lag since display data would come from live SF. This task is a RISK-CONTAINED SPIKE on Sale only. Current production path MUST NOT be rewired. Success = measurable 256-cap relief + freshness improvement + acceptable p95 latency on Sale; output is a go/no-go recommendation for generalizing the pattern to other objects. If no-go, document why and keep the current path. No changes to the active compiled-artifact pointer, /query Lambda in prod, LWC, or Turbopuffer production namespace during the spike — use feature flags and a test-pointer or shadow namespace. Sale chosen because (a) 4.25 already exercises the 256-cap pressure, (b) Sylvan Ridge provides a deterministic correctness probe, (c) audit bucket has zero Sale docs so re-seed cost is bounded. Relates to architecture comparison in 2026-04-23 research session (GraphQL API, Hosted MCP Feb '26 GA, Agentforce, Data 360).",
+          "acceptance_criteria": [
+            "Baseline captured for current Sale retrieval path before any change: Turbopuffer Sale attribute count (from compiled artifact 20260421T172143-75e7d0ebea94 or successor), p50/p95 end-to-end /query latency over 10+ Sale queries x 20 invocations (Sylvan Ridge + Marcus & Millichap + cap-rate/year-built/price-per-unit variants), and freshness-probe results on 3 stale-data scenarios (edit Property on a Sale's parent, confirm current CDC-lagged cap behavior). Store evidence under docs/analysis/hybrid_retrieval_baseline_sale.md.",
+            "Post-fetch dispatch path implemented behind a feature flag (env var, e.g. HYBRID_POSTFETCH_ENABLED=true, OFF by default). Flag OFF must be bit-identical to current behavior verified by existing tests. Flag ON causes /query to slim Turbopuffer result attributes to (id, object_type, score, embedding-relevant fields only) and issue a secondary live-fetch (GraphQL preferred; REST /composite/sobjects fallback) for display fields before the LLM sees results. Hosted MCP is OUT OF SCOPE for this spike because Feb '26 GA is not yet proven on this org — add a note in the design doc that Hosted MCP is the preferred 2026-later alternative.",
+            "Sale compiled artifact slimmed via scripts/run_config_refresh.py compile (NOT --apply) — producing a candidate artifact that drops Property-parent display fields (ascendix__Street__c, ascendix__PostalCode__c, ascendix__YearBuilt__c) and any other fields not used in the embedding. The new artifact version_id is referenced by a SHADOW test-pointer parameter (e.g. /salesforce-ai-search/config/{org_id}/shadow-version) so the production active-version pointer is untouched. Re-seed Sale into a SHADOW Turbopuffer namespace (e.g. org_{id}_shadow) from the slimmed artifact using scripts/run_poll_sync.py or bulk_load with a namespace override. Verify attribute count reduction vs baseline captured in AC1.",
+            "Comparative benchmark executed with the feature flag OFF (production path, production namespace) and ON (hybrid path, shadow namespace + live fetch) on the SAME query set used for baseline. Captures for each variant: p50/p95/p99 end-to-end latency, Bedrock invoke count, Turbopuffer query count, SF API call count (describe + SOQL or GraphQL), token cost per query (input+output), correctness on freshness probes (stale Property address should read LIVE under hybrid, CDC-lagged under baseline). Benchmark script committed to scripts/ as run_hybrid_retrieval_benchmark.py so it can be re-run on other objects later. Results in docs/analysis/hybrid_retrieval_benchmark_sale.md.",
+            "Go/no-go recommendation written in docs/analysis/hybrid_retrieval_recommendation.md covering: (a) does hybrid relieve the 256-attribute cap enough to unblock 4.25 and future Sale-like expansions, (b) is the latency penalty acceptable (threshold: p95 total must not regress more than 30% vs baseline; absolute p95 must stay under 2000ms for /query end-to-end), (c) what does this cost at 15-object scale (projected SF API call increase, projected Bedrock cost decrease from fewer indexed fields), (d) specific next-object order if go (likely Lease and Availability next, which are CDC-managed), (e) rollback plan if hybrid is partially adopted then regresses. If no-go, document the blocker and what external change (Hosted MCP GA, SF API limit changes, different retrieval shape) would reopen the question.",
+            "Zero production impact: (a) production compiled-artifact active-version pointer is unchanged before, during, and after the spike (verify SSM parameter version number at start and end), (b) production Turbopuffer namespace org_{org_id} is untouched (shadow namespace used), (c) /query Lambda environment in production has HYBRID_POSTFETCH_ENABLED=false or unset, (d) LWC is untouched. If any production surface must change to enable benchmarking (e.g. Lambda env to add the flag), use merge-preserving env-bump pattern per CLAUDE.md rule 4. Clean up shadow pointer, shadow namespace, and any scratch artifacts at end of spike."
+          ]
+        },
+        {
+          "id": "4.33.1",
+          "title": "Baseline measurement of current Sale retrieval path",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:49:18.966140+00:00",
+          "updatedAt": "2026-04-23T14:49:56.811640+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Before changing anything, capture the numbers we're benchmarking against. Measure: (a) current Turbopuffer attribute count for Sale parent fields by reading the active compiled artifact via the /active-version SSM pointer and parsing the Sale denorm spec; (b) run a benchmark script that invokes the production /query Lambda with 10+ canonical Sale queries (at minimum: 'Tell me about the Sylvan Ridge Apartments sale', 'What Marcus & Millichap sales happened in 2025', 'Which sales had a cap rate above 6 percent', 'Top sales by price per unit', 'Sales of apartment complexes built before 1990', 'Find Sale comps for Portland multi-family', 'What sales closed in the last quarter', 'Sale with year built 1986 in 97225', 'Transactions over ten million dollars', 'Sales by listing broker company') x 20 invocations each; (c) capture p50/p95/p99 end-to-end latency, Bedrock invoke count per query, Turbopuffer query count per query, and token cost per query; (d) probe freshness: make a controlled edit on a Property that's a parent of a Sale, wait for CDC, record how many minutes until the change is visible in /query. Write output as structured markdown to docs/analysis/hybrid_retrieval_baseline_sale.md so the follow-up benchmark can diff against it. Do NOT modify any production artifact during this task.",
+          "parent": "4.33",
+          "acceptance_criteria": [
+            "Turbopuffer attribute count for Sale documents recorded: sum the fields across Sale own-fields + all Sale parent lookups in the current compiled artifact. Include the exact count, the per-parent breakdown, and the version_id of the artifact measured. Target reading: scripts/run_config_refresh.py has an inspect subcommand or equivalent; if not, write a small read-only script that fetches the artifact from S3 and counts attributes.",
+            "Latency and cost benchmark run against production /query with 10+ canonical Sale queries x 20 invocations each; results stored as a structured file (CSV or JSON) at docs/analysis/hybrid_retrieval_baseline_sale_raw.csv and summary markdown at docs/analysis/hybrid_retrieval_baseline_sale.md. Summary must include p50/p95/p99 latency per query and overall, and mean/total Bedrock+Turbopuffer+SF API call counts.",
+            "Freshness probe result captured for at least 3 scenarios: (a) edit ascendix__Street__c on a Property that is a parent of Sylvan Ridge Sale (or equivalent), measure minutes until change shows in /query; (b) same for ascendix__YearBuilt__c; (c) same for the canonical sale-side broker field. Record the CDC path end-to-end: AppFlow delivery time, cdc_sync Upsert time, and /query visibility time.",
+            "Zero production changes: no writes to Turbopuffer, no changes to compiled-artifact active pointer, no Lambda env changes. Only read-only API calls and controlled SF edits for the freshness probe (which restore to original values at end)."
+          ]
+        },
+        {
+          "id": "4.33.2",
+          "title": "Design post-fetch dispatch tool specification",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:50:08.473192+00:00",
+          "updatedAt": "2026-04-23T14:50:30.134514+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Write a short design note (docs/specs/task-4.33.2-post-fetch-design.md) specifying exactly how hybrid retrieval is injected into lib/query_handler.py. Must decide: (A) transparent post-processing after search_records returns vs (B) new explicit tool the model can call. Recommend A for the spike unless there is a concrete reason to prefer B — simpler prompt, fewer model-side decisions, easier to flag-toggle. Specify: (1) exact function signature and module location, (2) which fields are considered 'embedding-relevant' (stay in Turbopuffer) vs 'display-only' (fetched live) for Sale, (3) SF live-fetch shape — reuse lambda/common/salesforce_client.py describe + SOQL; do not introduce GraphQL in this spike, (4) caching strategy — request-scoped memoization keyed by object+id to avoid fetching the same record twice in one /query turn, (5) error handling — if live fetch fails, fall back to whatever fields Turbopuffer returned with a warning log (never block the response), (6) feature-flag envelope — HYBRID_POSTFETCH_ENABLED toggle, HYBRID_NAMESPACE_SUFFIX, shadow-pointer integration. Design note must be reviewed before 4.33.3 starts.",
+          "parent": "4.33",
+          "acceptance_criteria": [
+            "Design note published at docs/specs/task-4.33.2-post-fetch-design.md covering the six points in the description (injection point, field split, live-fetch shape, caching, error handling, feature flags).",
+            "Explicit Sale-object field split enumerated: one list for 'embedding-relevant' fields that stay in the slimmed artifact, one list for 'display-only' fields that move to live fetch. Decision rationale per field — why it's in each list — documented. At minimum Property-parent Street/PostalCode/YearBuilt should be in the display-only list (that is the 4.25 pain point); Name should stay embedding-relevant.",
+            "Design note explicitly addresses what happens on a cold /query (no cache) with N=10 Sale results where each has 5 parent lookups with live-fetch fields: total SF API call count, parallelism strategy (concurrent describes/SOQL vs serial), upper-bound latency budget. Must conclude the per-turn SF API call count is within the org's REST API daily limit at projected QPS."
+          ],
+          "depends_on": [
+            "4.33.1"
+          ]
+        },
+        {
+          "id": "4.33.3",
+          "title": "Implement post-fetch dispatch behind HYBRID_POSTFETCH_ENABLED feature flag",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:50:41.655728+00:00",
+          "updatedAt": "2026-04-23T14:51:04.236933+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Implement the design from 4.33.2 in lib/query_handler.py (or wherever the design lands). Hard requirements: (1) HYBRID_POSTFETCH_ENABLED env var gates ALL new behavior; default OFF; flag OFF path must be byte-identical to current behavior (add a test that asserts no behavioral drift when OFF, using an existing acceptance test as anchor). (2) When ON, slim search_records result dicts to embedding-relevant fields before passing to the LLM, then a secondary live-fetch fills in display-only fields before final rendering. (3) Live fetch reuses lambda/common/salesforce_client.py; do not introduce new SF client plumbing. (4) Request-scoped memoization: same object+id within one /query turn fetched at most once. (5) Fail-soft: if live fetch errors, log warning + proceed with whatever was in Turbopuffer (never 500 the /query). (6) Unit tests for the post-fetch layer alone (mocking SF client) and one integration test through /query with mocked Turbopuffer results. (7) Update scripts/bundle_query.sh if new modules are added per CLAUDE.md rule 5; rebuild bundle; confirm asset hash changed. No production deploy in this task — code merged on main OK, but Lambda in prod stays on the previous bundle until benchmark phase.",
+          "parent": "4.33",
+          "acceptance_criteria": [
+            "HYBRID_POSTFETCH_ENABLED env var controls all new behavior; default OFF. An explicit regression test asserts that with the flag OFF, /query output (including ordering and field contents) is bit-identical to the pre-change baseline on a fixed query set.",
+            "Unit tests for the post-fetch module in tests/test_hybrid_postfetch.py cover: (a) transparent pass-through when flag OFF, (b) correct field-split enforcement when flag ON, (c) request-scoped memoization (same id fetched once), (d) fail-soft behavior when SF client raises.",
+            "Integration test in tests/test_query_lambda.py or a new test_query_hybrid.py that drives /query end-to-end with mocked Turbopuffer + mocked SF client under flag ON, verifying display-only fields come from the live fetch and embedding-relevant fields come from the index.",
+            "If any new Python module is imported by the query Lambda, scripts/bundle_query.sh is updated accordingly, the bundle is rebuilt, and the new asset hash is recorded in the task note. Per CLAUDE.md rule 5.",
+            "Production Lambda not updated during this task: the new bundle may be deployed to a non-prod alias or kept as a build artifact until 4.33.5. In prod, HYBRID_POSTFETCH_ENABLED must remain unset or false."
+          ],
+          "depends_on": [
+            "4.33.2"
+          ]
+        },
+        {
+          "id": "4.33.4",
+          "title": "Slim Sale compiled artifact on shadow pointer + seed shadow Turbopuffer namespace",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:51:16.994601+00:00",
+          "updatedAt": "2026-04-23T14:51:38.268971+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Produce a candidate compiled artifact with Sale parent-field lists trimmed to match the 4.33.2 field-split design (embedding-relevant only), without touching the active-version pointer. Steps: (1) Edit the Ascendix SearchSetting__c / Search__c records in a sandbox branch (or feature-flagged config) so Sale's Property parent lookup drops Street, PostalCode, YearBuilt — document these edits but DO NOT promote them to active. (2) Run scripts/run_config_refresh.py compile (NOT --apply) to produce a candidate artifact and record the new version_id. (3) Write the new version_id to a SHADOW SSM parameter at /salesforce-ai-search/config/{org_id}/shadow-version — create this parameter if it does not exist, as String not SecureString per CLAUDE.md rule K-2. (4) Re-seed Sale into a shadow Turbopuffer namespace (e.g. 'org_{id}_shadow') using scripts/run_poll_sync.py or a bulk-load invocation with --namespace override. (5) Verify the shadow namespace has the expected reduced attribute count for Sale documents and the expected record count. (6) Active-version pointer and production namespace must be unchanged at end — verify SSM parameter version numbers before and after per CLAUDE.md rule 3.",
+          "parent": "4.33",
+          "acceptance_criteria": [
+            "Candidate compiled artifact published to S3 under the normal compiled/ prefix with a new version_id. Artifact contains Sale.parents.ascendix__Property__c WITHOUT ascendix__Street__c, ascendix__PostalCode__c, ascendix__YearBuilt__c. Sale.parents.ascendix__ListingBrokerCompany__c retained in whatever form aligns with 4.33.2 split.",
+            "SSM parameter /salesforce-ai-search/config/{org_id}/shadow-version created (type String, not SecureString) and populated with the new version_id. Parameter is newly introduced; verify /salesforce-ai-search/config/{org_id}/active-version is unchanged (same parameter version number before and after).",
+            "Shadow Turbopuffer namespace org_{org_id}_shadow (or similar suffix) seeded with Sale documents from the slimmed artifact. Record count matches expected Sale total (or documented subset). Attribute count per Sale document verified lower than baseline captured in 4.33.1.",
+            "Production namespace org_{org_id} bytes/record count unchanged — verify by a read-only Turbopuffer query before and after the seed operation. No production data mutated."
+          ],
+          "depends_on": [
+            "4.33.2"
+          ]
+        },
+        {
+          "id": "4.33.5",
+          "title": "Execute comparative benchmark: baseline vs hybrid path on Sale",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:51:49.355874+00:00",
+          "updatedAt": "2026-04-23T14:52:10.303388+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Run the benchmark harness twice against the same 10+ canonical Sale query set used in 4.33.1, once with HYBRID_POSTFETCH_ENABLED=false (production path against production namespace) and once with HYBRID_POSTFETCH_ENABLED=true (hybrid path against shadow namespace from 4.33.4). Same query set, same invocation count (>=20 per query), same cold/warm-cache conditions (include both cold first-invocation and steady-state warm numbers). Capture for each variant: p50/p95/p99 end-to-end latency per query and aggregate, Bedrock invoke count, Turbopuffer query count, SF API call count (describe + SOQL), total token cost. Also run the 3 freshness probes from 4.33.1 against the hybrid path and confirm live-fetched fields now reflect edits without CDC lag. Benchmark script committed to scripts/run_hybrid_retrieval_benchmark.py; raw results to docs/analysis/hybrid_retrieval_benchmark_sale_raw.csv; comparative summary markdown at docs/analysis/hybrid_retrieval_benchmark_sale.md with side-by-side tables for all metrics.",
+          "parent": "4.33",
+          "acceptance_criteria": [
+            "Both benchmark runs complete against the identical query set; raw metrics stored at docs/analysis/hybrid_retrieval_benchmark_sale_raw.csv with columns including variant, query, invocation_index, latency_ms, bedrock_invokes, tpuf_queries, sf_api_calls, input_tokens, output_tokens, final_answer_length, citations_count.",
+            "Comparative summary at docs/analysis/hybrid_retrieval_benchmark_sale.md reports side-by-side p50/p95/p99 latency, mean SF API call count per query, mean token cost per query, Turbopuffer attribute footprint, and correctness-delta on freshness probes. Quantitative deltas expressed both absolute and percent.",
+            "Freshness probes from 4.33.1 re-run against the hybrid path. Expected: display-only field edits (Property.Street, YearBuilt) are visible in /query output immediately after SF commit without waiting for CDC. Document actual vs expected behavior including any observed caching / eventual-consistency effects.",
+            "Benchmark harness scripts/run_hybrid_retrieval_benchmark.py is parameterized over query-set file + variant config so it can be reused on other objects later (Lease, Availability, etc.) without re-writing."
+          ],
+          "depends_on": [
+            "4.33.3",
+            "4.33.4"
+          ]
+        },
+        {
+          "id": "4.33.6",
+          "title": "Go/no-go recommendation for generalizing hybrid retrieval beyond Sale",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:52:22.529818+00:00",
+          "updatedAt": "2026-04-23T14:52:39.663808+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Write docs/analysis/hybrid_retrieval_recommendation.md synthesizing 4.33.1 baseline + 4.33.5 benchmark into a clear proceed/adjust/abandon recommendation. Must cover: (a) quantitative outcome vs the AC gates in parent 4.33 AC5 — latency regression <= 30 percent p95, absolute p95 under 2000ms, 256-cap relief quantified; (b) cost projection to 15 full-DB-search-scope objects — expected SF API call growth at steady-state QPS, risk of hitting daily REST limit; (c) proposed next-object order if go (candidate: Lease, Availability since they are CDC-managed and have similar parent-field patterns); (d) explicit rollback path if partial adoption regresses; (e) what changes (Hosted MCP GA, SF API entitlement increase, different embedding strategy) would reopen the decision if no-go; (f) relationship to 4.17 write-path decision (4.34) — any implications either direction. Recommendation is a task-closing deliverable; no further 4.33 subtasks are created from this report — follow-up work is a new Phase 4 task if go, or backlog entries if conditional.",
+          "parent": "4.33",
+          "acceptance_criteria": [
+            "docs/analysis/hybrid_retrieval_recommendation.md exists and covers the six points listed in the description (outcome vs gates, 15-object cost projection, next-object order, rollback path, reopen conditions, 4.34 coupling).",
+            "Recommendation is one of: GO (proceed to Lease/Availability next object), CONDITIONAL (specific gates to meet before broader adoption), or NO-GO (stay with current architecture, with documented reopen conditions). Not a hand-wave.",
+            "Shadow pointer, shadow Turbopuffer namespace, and any temporary Lambda config introduced during the spike are cleaned up — or explicitly retained with a note explaining why (e.g. held for a rolling adoption)."
+          ],
+          "depends_on": [
+            "4.33.5"
+          ]
+        },
+        {
+          "id": "4.34",
+          "title": "Write-path architecture decision: sync-REST vs queued-Apex-Invocable for 4.17 agent-proposed edits",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:52:56.692266+00:00",
+          "updatedAt": "2026-04-23T14:54:12.843174+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-23T14:53:56.791146+00:00",
+              "note": "CONTEXT (2026-04-23 session): User flagged that on a prior project, an SA strongly recommended NOT doing direct API updates from client agent/LWC, instead building transactions interactively and passing them to a Lambda via server-to-server queue. User explicitly asked whether 2026 changes invalidate that advice. Analysis concluded the SA pattern is MORE relevant in agent-driven contexts than in human-driven ones (agent cascades, ephemeral sessions, programmatic retry needed especially after 2026-04-22 token outage showed how fragile client-side-only writes would be). 2026 tooling matured the implementation shape: SQS + Lambda + Apex Invocable Actions + Composite Graph API + Platform Events make it straightforward. Hosted MCP (Feb '26 GA) is a counter-current pushing direct sync DML but that's for single-record low-risk writes, not chained compound edits. See 2026-04-23 research task + chat transcript for full analysis. User direction: 'before we rewire anything we are doing now (it works really well) we should prove it out first' — this is why the task is DECISION + PROTOTYPE + SPEC UPDATE, not implementation."
+            },
+            {
+              "timestamp": "2026-04-23T14:54:12.842989+00:00",
+              "note": "IMPLEMENTATION NOTES FOR FUTURE AGENT: (1) Read the 2026-04-23 agentic-landscape research before starting — the comparison matrix is the starting frame for the ADR. (2) Current 4.17 implementation reference points: salesforce/lwc/ascendixAiSearch/ (edit modal + form), lambda/query/ (propose_edit tool definition), lib/tool_dispatch.py (tool handler). The propose_edit tool returns a structured proposal; LWC renders the modal and on user approve issues the SF REST call. This is pattern A. (3) Prototype infra for pattern B: one API Gateway HTTP API route /edits/submit, one SQS standard queue salesforce-ai-search-edits-prototype with DLQ, one Lambda salesforce-ai-search-edit-processor-prototype (Python) that calls SalesforceClient.action_invoke or equivalent, one Apex Invocable test method @InvocableMethod(callout=false) that does a Lease single-field update WITH USER_MODE. Prototype should be in experiments/ or a throwaway CDK stack so it doesn't land in the main CDK app. (4) Token-expiry context: the 2026-04-22 outage would have been survived by pattern B (queue retries until token rotated) but not by pattern A (user sees error, must retry manually) nor by pattern D if Hosted MCP uses the same token path. This is a load-bearing argument for the ADR. (5) FLS/sharing: pattern A currently relies on whatever the LWC-authed user can do; pattern C enforces automatically via Apex USER_MODE; pattern B depends on whether the Lambda assumes user identity or runs with system perms. The latter is a real design choice to surface in the ADR. (6) Platform Events for result notification: see SFDC Platform Events + LWC empApi subscription pattern. Prototype can defer this and just poll; production would need it."
+            }
+          ],
+          "description": "Tasks 4.17.1-4.17.3 delivered the first cut of agent-proposed edits via LWC -> direct SF REST DML with a user-approval modal as the gate. The remaining 4.17 subtasks (4.17.4 propose_create, 4.17.6 multi-record sequential workflow, 4.17.8 structured write proposal transport) will lock in the write-path contract. Before that happens, evaluate whether the current sync-REST direction is right or whether to pivot to a queue-based pattern. Context: a prior-project SA argued strongly for NOT routing agent edits through direct API calls, instead staging transactions client-side, enqueuing them to a server-side queue, and processing via Lambda with server-to-server auth. That pattern is MORE relevant for agent-driven use cases than human-driven ones because: (1) agents chain edits (update Lease -> recompute Availability -> notify Contact) needing atomicity, (2) agent sessions are ephemeral so writes need to outlive them, (3) programmatic retry on transient SF failures like the 2026-04-22 token expiry outage, (4) governor-limit smoothing on bursts, (5) audit separation between 'what was proposed' and 'what was executed'. 2026 landscape adds new wrinkles: Salesforce Hosted MCP GA Feb '26 pushes the opposite (direct sync DML from agent), Composite Graph API offers SF-native multi-record atomicity, Apex Invocable Actions give FLS/sharing enforcement for free. Output: Architecture Decision Record + updated 4.17.6/4.17.8 specs matching the chosen direction. NO code rewire of the already-landed 4.17.1-4.17.3 during this task. This is a decision, a small prototype, and a spec update — not an implementation.",
+          "acceptance_criteria": [
+            "ADR document written at docs/architecture/ADR-write-path-for-agent-proposed-edits.md comparing four patterns against three concrete 4.17 use cases (single-record user-approved edit, multi-record agent-chained workflow, create-from-conversation). The four patterns: (A) current sync-REST from LWC, (B) client stages -> API Gateway -> SQS -> Lambda -> SF REST/DML (the SA pattern), (C) sync LWC -> Apex Invocable Action (FLS-enforced, SF decides sync vs async internally), (D) Salesforce Hosted MCP sobject-all direct DML.",
+            "ADR explicitly addresses 2026 context: (a) Hosted MCP Feb '26 GA status checked via Salesforce release notes + a sandbox test connection, (b) Composite Graph API atomicity guarantees for up to 500 records in one commit, (c) Platform Events for async result notification back to LWC, (d) LWC wire adapter limitations for long-lived subscriptions, (e) FLS/sharing implications per pattern (B and C enforce, A and D depend on implementation), (f) interaction with the 2026-04-22 token expiry failure class — which patterns would have survived that outage automatically.",
+            "ADR documents per-pattern trade-offs in a structured comparison table: latency (user-perceived), durability (surviving agent/LWC crash mid-flow), retry semantics, multi-record atomicity, audit surface, FLS/sharing enforcement, infra cost, implementation cost, rollback/rollforward options if we change later.",
+            "Minimal prototype of the leading non-current alternative (likely queued-Apex-Invocable — pattern B+C hybrid) is built against a test Lease edit in the sandbox org. Scope: one API Gateway route, one SQS queue with DLQ, one Lambda that calls one Apex Invocable Action that does a single-field Lease update under sharing rules. Prototype is throwaway — not deployed to a production-adjacent path — but produces real end-to-end latency numbers to compare against sync-REST. Prototype artifacts kept under experiments/write-path-prototype/ or similar; clean up SQS + Lambda if not retained.",
+            "Decision recorded in the ADR (not just left implicit) with one of four outcomes: KEEP-SYNC (stay with current 4.17 direction), PIVOT-QUEUED (adopt pattern B), PIVOT-INVOCABLE (adopt pattern C), HYBRID (specific split, e.g. sync for single-record user-approved, queued for multi-record chained). Decision includes: explicit trade-offs accepted, migration cost if we change later, what external change would reopen the decision.",
+            "4.17.4 (propose_create tool), 4.17.5 (create preview + NavigationMixin), 4.17.6 (multi-record sequential workflow), 4.17.7 (writable field metadata), and 4.17.8 (structured write proposal transport) descriptions + acceptance criteria are reviewed and updated where needed to match the decision. If pivot chosen, add explicit note to each that contract shape changed and why. Set depends_on 4.34 on any of 4.17.4 / 4.17.5 / 4.17.6 / 4.17.7 / 4.17.8 that are not yet started, to prevent drift.",
+            "If decision is KEEP-SYNC, the ADR must document honestly WHY — not by default — including explicit acknowledgement of the SA pattern's arguments and what about this project makes them not apply. 'We already started this way' is not a sufficient reason. This AC exists to prevent the alternative being waved away.",
+            "No changes to already-landed 4.17.1 (propose_edit tool), 4.17.2 (diff modal), or 4.17.3 (edit form modal) during this task. Those remain operational in prod. Any migration of those to the chosen pattern becomes a separate follow-up task after the decision lands."
+          ]
+        },
+        {
+          "id": "4.34.1",
+          "title": "Draft ADR: four write-path patterns compared against 4.17 use cases",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:54:23.846314+00:00",
+          "updatedAt": "2026-04-23T14:54:37.554433+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Produce a first-draft ADR at docs/architecture/ADR-write-path-for-agent-proposed-edits.md covering patterns A (current sync-REST), B (queued via Lambda per SA pattern), C (Apex Invocable from LWC), D (Hosted MCP sobject-all). Use three concrete 4.17 use cases as the evaluation rubric: (1) user clicks 'approve' on a single-field Lease edit proposed by the agent, (2) agent proposes a compound edit across Lease + Availability + Contact that must either all-succeed or all-fail, (3) agent proposes creating a new Contact from conversation context. For each pattern x use case, score: user-perceived latency, durability under network/session failure, retry semantics, atomicity, audit surface, FLS/sharing, infra cost to build, implementation complexity, migration cost to switch later. Also include: how each pattern would have behaved during the 2026-04-22 token expiry outage (this is concrete, not hypothetical). Draft only — no decision yet; decision is the output of 4.34.4 after the prototype informs it.",
+          "parent": "4.34",
+          "acceptance_criteria": [
+            "ADR draft exists at docs/architecture/ADR-write-path-for-agent-proposed-edits.md with the four patterns compared across the three use cases listed in the description, and with the 2026-04-22 token-outage hypothetical analyzed for each pattern.",
+            "Scoring table in the ADR is populated for every (pattern, use-case, dimension) triple — no gaps. Where a dimension doesn't apply cleanly to a pattern, the cell explicitly says so instead of being blank.",
+            "ADR draft explicitly cites: (a) the prior-project SA recommendation as the motivating alternative, (b) the 2026 landscape research summary (Hosted MCP, Composite Graph, Apex Invocable, Platform Events), (c) the 2026-04-22 token outage incident as a concrete failure-mode anchor, (d) current 4.17.1-4.17.3 code locations as the already-chosen baseline being re-evaluated."
+          ]
+        },
+        {
+          "id": "4.34.2",
+          "title": "Prototype queued-Apex-Invocable write path against a test Lease edit",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:54:48.960084+00:00",
+          "updatedAt": "2026-04-23T14:55:10.617860+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Build a throwaway end-to-end prototype of pattern B (queued via Lambda invoking Apex Invocable Action) in the sandbox org, with enough fidelity to produce real latency numbers for the ADR. Scope strictly to ONE Lease update (e.g. ascendix__LeaseType__c on a test record) to keep it contained. Components: (1) API Gateway HTTP API route /prototype/edit accepting a JSON payload {record_id, object, fields}, (2) SQS standard queue salesforce-ai-search-edits-prototype + DLQ, (3) Lambda salesforce-ai-search-edit-processor-prototype that consumes the queue and calls an Apex Invocable Action via SF REST /services/data/vXX.X/actions/custom/apex/{ActionName}, (4) Apex class ProposedEditProcessor with @InvocableMethod(callout=false) that does WITH USER_MODE single-field update on Lease, (5) round-trip latency logging at each hop. Deploy to the sandbox only — do not introduce into the main CDK app under lib/. Keep under experiments/write-path-prototype/ with its own minimal CDK script or raw CLI commands documented in a readme. Measure: p50/p95 end-to-end latency from /prototype/edit POST to record updated in SF, and compare to a direct synchronous SF REST update of the same field by the same LWC-authed user.",
+          "parent": "4.34",
+          "acceptance_criteria": [
+            "Prototype under experiments/write-path-prototype/ with readme documenting how to deploy, invoke, and tear down. All components clearly named as prototype (-prototype suffix) to avoid confusion with production resources.",
+            "End-to-end test measures: API Gateway accept -> SQS enqueue -> Lambda dequeue -> Apex Invocable call -> SF commit -> log receipt. Per-hop latency captured for at least 10 runs; p50 / p95 reported. Compared side-by-side with sync SF REST update latency in the same sandbox under same auth.",
+            "Prototype exercises a controlled failure mode: kill the /salesforce/access_token SSM parameter (write an invalid value) mid-flow, confirm the queue retries until the token is restored and the edit eventually lands. This directly tests the 2026-04-22 outage survival claim. Restore the token immediately after per CLAUDE.md rule on token hygiene.",
+            "Prototype artifacts (Lambda, SQS, API Gateway route, Apex class) are torn down at end of task OR explicitly retained with a note explaining why. If retained, document the cost footprint so it is not forgotten. No prototype resources promoted to production namespaces."
+          ],
+          "depends_on": [
+            "4.34.1"
+          ]
+        },
+        {
+          "id": "4.34.3",
+          "title": "Evaluate Salesforce Hosted MCP readiness on this org post-Feb '26 GA",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:55:21.970830+00:00",
+          "updatedAt": "2026-04-23T14:55:38.255002+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Pattern D (Hosted MCP sobject-all direct DML) can only be evaluated if Hosted MCP is actually reachable for this org. Task: (1) Confirm GA status by checking Salesforce release notes and the Hosted MCP documentation at developer.salesforce.com; (2) Provision or verify the required External Client App with the api, refresh_token, and sfap_api scopes; (3) Connect from a test environment (e.g. Claude Desktop or a small test script) to https://api.salesforce.com/platform/mcp/v1-beta.2/sobject-all or the GA equivalent endpoint, with this org's credentials; (4) Exercise at least one read (SOQL via run_soql_query tool) and one write (simple Lease update via DML tool) and record latency + auth behavior; (5) Document what works, what doesn't, and any gaps (e.g. Invocable Action tool coverage, custom object support, FLS enforcement at the tool layer). This evaluation feeds into ADR pattern-D scoring. If Hosted MCP is not yet GA or not reachable for this org at task time, document that and mark pattern D as deferred rather than guessing.",
+          "parent": "4.34",
+          "acceptance_criteria": [
+            "Hosted MCP GA status verified against current SF release notes and linked in the ADR. If still in beta, note the expected GA date.",
+            "At least one read (SOQL) and one write (simple sandbox Lease update) exercised against Hosted MCP from an MCP client, with observed latency and auth behavior captured. If access cannot be provisioned, document the blocker explicitly (e.g. External Client App scope approval needed).",
+            "Gaps documented in pattern-D section of the ADR: (a) does Hosted MCP expose Invocable Actions as tools or only raw sobject DML, (b) FLS enforcement at the tool layer, (c) custom object support including ascendix__Lease__c and ascendix__Property__c, (d) per-request auth model (token rotation requirements)."
+          ],
+          "depends_on": [
+            "4.34.1"
+          ]
+        },
+        {
+          "id": "4.34.4",
+          "title": "Finalize decision + update 4.17.4/4.17.5/4.17.6/4.17.7/4.17.8 specs to match",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T14:55:47.613412+00:00",
+          "updatedAt": "2026-04-23T14:56:13.457425+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Take the ADR draft (4.34.1) + prototype numbers (4.34.2) + Hosted MCP evaluation (4.34.3) and commit to a decision. Finalize docs/architecture/ADR-write-path-for-agent-proposed-edits.md with outcome = one of KEEP-SYNC / PIVOT-QUEUED / PIVOT-INVOCABLE / HYBRID. Then update each of 4.17.4, 4.17.5, 4.17.6, 4.17.7, 4.17.8 task descriptions and acceptance criteria to match the decision using task_manager.py set-description + add-ac as needed. If pivoting, every one of those tasks gets a progress note referencing this decision. Establish dependencies: any of those five subtasks that are not yet started get depends_on 4.34 set. This locks in the contract before implementation resumes on 4.17.",
+          "parent": "4.34",
+          "acceptance_criteria": [
+            "ADR at docs/architecture/ADR-write-path-for-agent-proposed-edits.md moved from draft to final with explicit decision and rationale. Decision is one of KEEP-SYNC, PIVOT-QUEUED, PIVOT-INVOCABLE, HYBRID — not left open-ended.",
+            "Tasks 4.17.4 (propose_create), 4.17.5 (create preview + NavigationMixin), 4.17.6 (multi-record sequential workflow), 4.17.7 (writable field metadata), 4.17.8 (structured write proposal transport) each have updated descriptions and acceptance criteria that match the decision. A progress note on each referencing 4.34 ADR is added so the decision history is visible from any of those tasks.",
+            "depends_on 4.34 set on every pending task among 4.17.4 / 4.17.5 / 4.17.6 / 4.17.7 / 4.17.8 so a future coder does not accidentally start them on the old contract.",
+            "If decision is KEEP-SYNC, still complete the spec-update acceptance criteria for the five 4.17 subtasks — at minimum confirming current descriptions still reflect intent and adding a cross-reference to the ADR so future reviewers can see the decision was consciously kept.",
+            "Prototype infra from 4.34.2 either torn down or explicitly retained; state in a 4.34.4 progress note. No orphan prototype resources left running without ownership."
+          ],
+          "depends_on": [
+            "4.34.1",
+            "4.34.2",
+            "4.34.3"
+          ]
+        },
+        {
+          "id": "4.35",
+          "title": "Fix Turbopuffer schema failure on Account (and likely Contact) records with populated compound address fields",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-04-23T15:45:03.178700+00:00",
+          "updatedAt": "2026-04-23T15:46:24.675730+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-04-23T15:46:11.218755+00:00",
+              "note": "DISCOVERY (2026-04-23 second rotation recovery): DLQ had 24 stuck events after the 11:00Z-15:33Z token outage. Recovery replayed 27 S3 keys; 24 succeeded and 3 Account records persistently failed with Turbopuffer 422. Error text: 'Failed to deserialize the JSON body into the target type: upsert_rows[0]: data did not match any variant of untagged enum AttrValueInput at line 1 column 7746'. Affected IDs and names: 001dl000013uCQvAAM Preston Park Asset Management (CREATE, Plano TX), 001fk000002qDEfAAM Cushman & Wakefield US Inc (UPDATE, Chicago IL), 001dl000013uhksAAA Rock Construction (CREATE, Plano TX). Control record 001dl000013uCIoAAM PPFC Owner DE LLC (no BillingAddress populated) SUCCEEDED on replay — confirms the BillingAddress hypothesis. Raw CDC payloads are 586-786 bytes; error column 7746 is in the post-denorm outbound document, so compound field is being emitted after denorm enrichment. CDC payload inspected at /tmp/cdc-recovery/account_*.json during discovery session."
+            },
+            {
+              "timestamp": "2026-04-23T15:46:24.675582+00:00",
+              "note": "IMPLEMENTATION NOTES FOR FUTURE AGENT: (1) The error is at error: 'Failed to deserialize... AttrValueInput at line 1 column 7746' — that column offset is in the POST-denorm body, not raw CDC. To reproduce locally: download one failing CDC S3 key, run lib/denormalize.py against it to get the full doc, find the nested-dict attribute. (2) Salesforce compound fields documented at https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/compound_fields.htm — address compounds include Billing/Shipping/Mailing/Other (each with Street/City/State/PostalCode/Country/GeocodeAccuracy subfields); geolocation compounds appear on custom __c fields with Latitude/Longitude subfields. (3) Existing bulk-loaded Accounts with populated BillingAddress are presumably already in Turbopuffer — either the bulk path handles flattening differently, or those records don't have BillingAddress populated (sandbox data is sparse). Worth checking a few bulk-loaded Account docs in the index to understand how their address data actually lives there — that tells us whether this is a regression from a recent CDC-path change or a longstanding bug that only triggers on fresh writes. (4) Check lib/denormalize.py specifically for how fields from SOQL describe results are serialized into Turbopuffer attrs — the flatten logic (if any) probably operates on field type codes from describe; compound field types may not have a type code mapping. (5) After the fix, consider whether a one-time full Account re-seed via bulk_load is needed to backfill any Accounts that silently failed or got partial documents during CDC. Not strictly part of this task — could be a follow-up."
+            }
+          ],
+          "description": "Discovered 2026-04-23 during second token-rotation recovery. Three Account CDC events were stuck in the DLQ with a Turbopuffer 422 UnprocessableEntityError: 'Failed to deserialize the JSON body into the target type: upsert_rows[0]: data did not match any variant of untagged enum AttrValueInput at line 1 column 7746'. Root cause hypothesis: compound address fields on Account (BillingAddress, ShippingAddress) arrive from Salesforce as nested JSON objects (e.g. {State, Street, PostalCode, City}), and the CDC denormalization path at lib/denormalize.py does not flatten them into scalar components before upsert. Turbopuffer attributes must be scalars or scalar lists; nested dicts are rejected. Pattern confirmed on four records: PPFC Owner DE LLC (no BillingAddress) succeeded on replay; Preston Park Asset Management, Cushman & Wakefield, and Rock Construction (all with populated BillingAddress) failed. Same class of bug likely affects Contact.MailingAddress, Contact.OtherAddress, and any compound geolocation fields. The raw CDC payloads are only 500-800 bytes so the error column 7746 in the outbound JSON means the compound field is being emitted after denorm enrichment, not pulled straight from CDC. This is a data-shape bug, not a token/auth bug — it would persist regardless of token freshness. Until fixed, any new Account/Contact with a populated compound address field is silently broken after 2-3 EventBridge retries. Bulk-loaded records that pre-existed are fine because the bulk path may have handled flattening differently (investigate).",
+          "acceptance_criteria": [
+            "Reproduce: fetch the 3 affected Account CDC S3 payloads (keys under cdc/Account/ for 2026-04-23 at 11:00:21Z, 14:58:32Z, 15:03:02Z) and confirm each denormalized doc contains at least one nested dict attribute pre-upsert. Document the exact offending field name(s) and shape in a progress note on this task before attempting a fix.",
+            "Enumerate the full surface of compound fields at risk across all indexed objects: at minimum Account.BillingAddress, Account.ShippingAddress, Contact.MailingAddress, Contact.OtherAddress, and any geolocation fields (__Latitude__s / __Longitude__s compound pairs) on Property/Lease/Availability/Sale/Deal/etc. Output: a markdown table in docs/architecture/compound_field_audit.md listing object -> compound field name -> scalar components.",
+            "Fix in lib/denormalize.py (or lib/turbopuffer_backend.py, whichever is the right architectural layer after reading the code) that detects compound/nested field values and flattens them into their scalar components before upsert. Flatten: BillingAddress -> BillingStreet, BillingCity, BillingState, BillingPostalCode, BillingCountry (and similarly for Shipping/Mailing/Other). Geolocation compound -> Latitude/Longitude scalars. Prefer flattening over dropping because the scalar components are useful signal — city/state/postal-code are commonly queried.",
+            "Defensive guard: after flattening, any remaining nested-dict or nested-list attribute values should be logged with WARNING and dropped, not sent to Turbopuffer. This catches unknown compound field classes without 500ing the pipeline again. Include the field name in the warning so future occurrences are discoverable.",
+            "Unit tests in tests/test_denormalize.py cover: (a) Account.BillingAddress with all 5 scalar components populated flattens correctly, (b) partial BillingAddress (e.g. Plano TX with no street) flattens correctly, (c) null/missing BillingAddress passes through unchanged, (d) Contact.MailingAddress flattens correctly, (e) the defensive guard drops unknown nested-dict fields with a warning log.",
+            "Replay the 3 affected Account S3 keys through cdc_sync after the fix is deployed; all 3 must return succeeded=1 with Upserted log lines. Specific keys: 0-4acec6fa492e496ef062fb1a89879181-0069E9FBBFDBE2E39D (Preston Park), 0-d630667b55fd580533dce59a4488b483-0069EA339297B5DB04 (Cushman), 0-e0949b9b6da539e06ebd41b90c72d9bd-0069EA34A0B3015060 (Rock Construction).",
+            "/query roundtrip validation per CLAUDE.md rule K-3: after replay, a natural-language query referencing one of the three records (e.g. 'Tell me about Cushman & Wakefield in Chicago') returns a result whose response text includes the city or state from the newly flattened field. Logs are not sufficient — user-visible /query behavior is the proof.",
+            "Bundle update per CLAUDE.md rule 5 if any new module is imported by cdc_sync or poll_sync. Rebuild scripts/bundle_cdc_sync.sh and scripts/bundle_poll_sync.sh; confirm asset hash changed; note the hash in a progress note. Deploy both bundled Lambdas.",
+            "Prompt-facing fields audit: if flattening exposes new queryable fields (BillingCity, BillingState) that were previously hidden behind the compound object, update lib/system_prompt.py aliases and regenerate docs/agent_prompt_export.md per CLAUDE.md rule 6."
+          ]
         }
       ]
     },
@@ -5028,7 +5373,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 33,
+      "4.": 36,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,
@@ -5041,7 +5386,9 @@
       "4.19.": 5,
       "4.20.": 5,
       "4.16.": 6,
-      "4.25.": 2
+      "4.25.": 2,
+      "4.33.": 7,
+      "4.34.": 5
     }
   }
 }

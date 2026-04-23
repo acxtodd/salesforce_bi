@@ -2,12 +2,17 @@
 
 Extracted from scripts/bulk_load.py so they can be shared between the
 bulk loader and the CDC sync Lambda.  Every function here is stateless
-and free of I/O — it transforms data in memory only.
+— it transforms data in memory only.  The only side effect is a
+warning log when a Salesforce compound field contains a shape we can
+not flatten into scalar Turbopuffer attributes.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+
+LOG = logging.getLogger(__name__)
 
 # ===================================================================
 # Embedding constants
@@ -376,6 +381,73 @@ def build_text(
 # ===================================================================
 
 
+def _emit_attr(doc: dict[str, Any], key: str, value: Any, *, record_id: str = "") -> None:
+    """Write ``value`` into ``doc[key]`` safely for Turbopuffer upsert.
+
+    Turbopuffer attribute values must be scalars or scalar lists. Salesforce
+    compound fields — Billing/Shipping/Mailing/Other address, geolocation
+    compounds — come back from SOQL as nested dicts and would fail the
+    upsert with an UnprocessableEntityError (AttrValueInput).
+
+    This helper flattens known compound shapes using the SF-native scalar
+    naming convention:
+        BillingAddress.Street -> billingstreet
+        ShippingAddress.PostalCode -> shippingpostalcode
+    For compound keys that do not end in "address", subkeys are appended
+    directly (so a geolocation compound named "Geolocation" becomes
+    geolocationlatitude / geolocationlongitude, matching the existing
+    FULL_TEXT_SEARCH_SCHEMA conventions).
+
+    Flattened keys that collide with attributes already present in the doc
+    are skipped — the scalar component already populated via the canonical
+    SOQL field (e.g. BillingStreet) wins.
+
+    Any remaining non-scalar attribute (nested lists, unknown compounds
+    with non-scalar subvalues) is dropped with a WARNING log so the
+    pipeline does not crash on unexpected shapes.
+    """
+    if value is None:
+        return
+
+    if isinstance(value, dict):
+        # Determine prefix for flattened subkeys.
+        prefix = key[:-7] if key.endswith("address") else key
+        dropped_subkeys: list[str] = []
+        for subkey, subval in value.items():
+            if subkey == "attributes":
+                continue
+            if subval is None:
+                continue
+            if isinstance(subval, (dict, list)):
+                dropped_subkeys.append(subkey)
+                continue
+            flat_key = f"{prefix}{subkey.lower()}"
+            # Scalars already recorded via canonical SOQL names win.
+            if flat_key not in doc:
+                doc[flat_key] = subval
+        if dropped_subkeys:
+            LOG.warning(
+                "Dropping non-scalar subfields of compound attr %s for record %s: %s",
+                key,
+                record_id,
+                dropped_subkeys,
+            )
+        return
+
+    if isinstance(value, list):
+        if all(isinstance(x, (str, int, float, bool)) or x is None for x in value):
+            doc[key] = value
+        else:
+            LOG.warning(
+                "Dropping list attr %s with non-scalar elements for record %s",
+                key,
+                record_id,
+            )
+        return
+
+    doc[key] = value
+
+
 def build_document(
     direct_fields: dict,
     parent_fields: dict,
@@ -403,7 +475,7 @@ def build_document(
     for f in embed_field_names + metadata_field_names:
         val = direct_fields.get(f)
         if val is not None:
-            doc[clean_label(f).lower()] = val
+            _emit_attr(doc, clean_label(f).lower(), val, record_id=record_id)
 
     # Parent fields with prefixed cleaned keys
     for ref_field, entry in parent_config.items():
@@ -421,6 +493,6 @@ def build_document(
                     pf_key = "_".join(clean_label(p).lower() for p in pf.split("."))
                 else:
                     pf_key = clean_label(pf).lower()
-                doc[f"{prefix}_{pf_key}"] = val
+                _emit_attr(doc, f"{prefix}_{pf_key}", val, record_id=record_id)
 
     return doc

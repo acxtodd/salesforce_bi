@@ -5203,12 +5203,14 @@
         {
           "id": "4.35",
           "title": "Fix Turbopuffer schema failure on Account (and likely Contact) records with populated compound address fields",
-          "status": "in_progress",
+          "status": "completed",
           "owner": "Todd Terry",
           "createdAt": "2026-04-23T15:45:03.178700+00:00",
-          "updatedAt": "2026-04-23T16:03:03.976352+00:00",
+          "updatedAt": "2026-04-23T16:15:07.267786+00:00",
           "files_modified": [],
-          "commits": [],
+          "commits": [
+            "cb9dc18"
+          ],
           "pull_requests": [],
           "progress_notes": [
             {
@@ -5230,6 +5232,10 @@
             {
               "timestamp": "2026-04-23T16:03:03.976147+00:00",
               "note": "VALIDATION 2026-04-23T15:59Z: All 5 originally affected Account records successfully Upserted after fix deploy — Preston Park (001dl000013uCQvAAM), Cushman (001fk000002qDEfAAM), Rock Construction (001dl000013uhksAAA), PPFC Owner DE (001dl000013uCIoAAM post-address-edit), Concord Systems Group (001dl00000V1tBwAAJ discovered in DLQ during replay). DLQ depth 0 after cleanup. /query roundtrip validation per CLAUDE.md K-3: 'Tell me about Cushman and Wakefield in Chicago' returns '225 West Wacker Drive, Chicago, IL 60606' from flattened billingstreet/billingcity/billingstate/billingpostalcode attributes. 'Tell me about PPFC Owner DE' returns '1209 Orange Street, Wilmington, DE 19801' plus phone 800-555-6321, matching the user's 15:44Z edit exactly. CLAUDE.md rule 5 bundle update done (bundle_cdc_sync.sh unchanged since no new module imports; rebuild + deploy confirmed new code hash lzPUwqyY7CFx8pUftaENfru1uYVQJEEiLqwOAHU5Vc0=). Rule 6 (system prompt regen) NOT needed for this fix — flattened keys match canonical scalar field names that were already in the prompt vocabulary."
+            },
+            {
+              "timestamp": "2026-04-23T16:15:07.267790+00:00",
+              "note": "Task completed, commit: cb9dc18"
             }
           ],
           "description": "Discovered 2026-04-23 during second token-rotation recovery. Three Account CDC events were stuck in the DLQ with a Turbopuffer 422 UnprocessableEntityError: 'Failed to deserialize the JSON body into the target type: upsert_rows[0]: data did not match any variant of untagged enum AttrValueInput at line 1 column 7746'. Root cause hypothesis: compound address fields on Account (BillingAddress, ShippingAddress) arrive from Salesforce as nested JSON objects (e.g. {State, Street, PostalCode, City}), and the CDC denormalization path at lib/denormalize.py does not flatten them into scalar components before upsert. Turbopuffer attributes must be scalars or scalar lists; nested dicts are rejected. Pattern confirmed on four records: PPFC Owner DE LLC (no BillingAddress) succeeded on replay; Preston Park Asset Management, Cushman & Wakefield, and Rock Construction (all with populated BillingAddress) failed. Same class of bug likely affects Contact.MailingAddress, Contact.OtherAddress, and any compound geolocation fields. The raw CDC payloads are only 500-800 bytes so the error column 7746 in the outbound JSON means the compound field is being emitted after denorm enrichment, not pulled straight from CDC. This is a data-shape bug, not a token/auth bug — it would persist regardless of token freshness. Until fixed, any new Account/Contact with a populated compound address field is silently broken after 2-3 EventBridge retries. Bulk-loaded records that pre-existed are fine because the bulk path may have handled flattening differently (investigate).",
@@ -5244,7 +5250,8 @@
             "Bundle update per CLAUDE.md rule 5 if any new module is imported by cdc_sync or poll_sync. Rebuild scripts/bundle_cdc_sync.sh and scripts/bundle_poll_sync.sh; confirm asset hash changed; note the hash in a progress note. Deploy both bundled Lambdas.",
             "Prompt-facing fields audit: if flattening exposes new queryable fields (BillingCity, BillingState) that were previously hidden behind the compound object, update lib/system_prompt.py aliases and regenerate docs/agent_prompt_export.md per CLAUDE.md rule 6."
           ],
-          "startedAt": "2026-04-23T15:53:11.316008+00:00"
+          "startedAt": "2026-04-23T15:53:11.316008+00:00",
+          "completedAt": "2026-04-23T16:15:07.267653+00:00"
         }
       ]
     },

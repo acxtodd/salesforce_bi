@@ -669,6 +669,180 @@ class TestDottedParentFields:
         assert "ascendix__Property__r.Name" in soql
 
 
+class TestCompoundFieldFlattening:
+    """Task 4.35: Salesforce compound fields (BillingAddress, etc.) must be
+    flattened into scalar attributes before upsert or Turbopuffer rejects the
+    write with UnprocessableEntityError."""
+
+    def _build_account_doc(self, direct_fields, metadata_fields=None, embed_fields=None):
+        return build_document(
+            direct_fields={"Id": "001A", "LastModifiedDate": "2026-01-01", **direct_fields},
+            parent_fields={},
+            text="t",
+            vector=[0.1] * 1024,
+            record_id="001A",
+            object_type="Account",
+            salesforce_org_id="00D001",
+            embed_field_names=embed_fields or [],
+            metadata_field_names=metadata_fields or [],
+            parent_config={},
+        )
+
+    def test_compound_address_flattened_to_sf_native_scalar_names(self):
+        """BillingAddress compound flattens to billingstreet, billingcity, etc."""
+        doc = self._build_account_doc(
+            {"BillingAddress": {
+                "Street": "1209 Orange Street",
+                "City": "Wilmington",
+                "State": "DE",
+                "PostalCode": "19801",
+                "Country": "USA",
+            }},
+            metadata_fields=["BillingAddress"],
+        )
+        assert doc["billingstreet"] == "1209 Orange Street"
+        assert doc["billingcity"] == "Wilmington"
+        assert doc["billingstate"] == "DE"
+        assert doc["billingpostalcode"] == "19801"
+        assert doc["billingcountry"] == "USA"
+        # Nested compound key itself must not leak into Turbopuffer payload.
+        assert "billingaddress" not in doc
+
+    def test_partial_compound_address_flattens_populated_subkeys_only(self):
+        """A partial address (Plano TX with no street) flattens what is populated."""
+        doc = self._build_account_doc(
+            {"BillingAddress": {
+                "Street": None,
+                "City": "Plano",
+                "State": "TX",
+                "PostalCode": None,
+                "Country": None,
+            }},
+            metadata_fields=["BillingAddress"],
+        )
+        assert doc["billingcity"] == "Plano"
+        assert doc["billingstate"] == "TX"
+        assert "billingstreet" not in doc
+        assert "billingpostalcode" not in doc
+
+    def test_null_compound_address_passes_through(self):
+        """A null BillingAddress produces no attributes and does not raise."""
+        doc = self._build_account_doc(
+            {"BillingAddress": None},
+            metadata_fields=["BillingAddress"],
+        )
+        assert "billingaddress" not in doc
+        assert "billingstreet" not in doc
+
+    def test_compound_with_explicit_scalar_already_present_does_not_override(self):
+        """If BillingStreet is already in the doc via scalar field, the compound
+        flatten must not overwrite it — canonical scalar wins."""
+        doc = self._build_account_doc(
+            {
+                "BillingStreet": "Canonical Street Value",
+                "BillingAddress": {"Street": "Compound Street Value", "City": "Plano"},
+            },
+            embed_fields=["BillingStreet"],
+            metadata_fields=["BillingAddress"],
+        )
+        assert doc["billingstreet"] == "Canonical Street Value"
+        # City was not on the scalar list so it still comes from the compound.
+        assert doc["billingcity"] == "Plano"
+
+    def test_contact_mailing_address_flattens_same_way(self):
+        """Same flattening applies to other Salesforce compound address classes."""
+        doc = build_document(
+            direct_fields={
+                "Id": "003A",
+                "LastModifiedDate": "2026-01-01",
+                "MailingAddress": {"City": "Austin", "State": "TX"},
+            },
+            parent_fields={},
+            text="t",
+            vector=[0.1] * 1024,
+            record_id="003A",
+            object_type="Contact",
+            salesforce_org_id="00D001",
+            embed_field_names=[],
+            metadata_field_names=["MailingAddress"],
+            parent_config={},
+        )
+        assert doc["mailingcity"] == "Austin"
+        assert doc["mailingstate"] == "TX"
+
+    def test_geolocation_compound_flattens_without_address_suffix(self):
+        """Compounds whose key does not end in 'address' append subkey directly."""
+        doc = self._build_account_doc(
+            {"Geolocation": {"latitude": 32.9, "longitude": -96.7}},
+            metadata_fields=["Geolocation"],
+        )
+        assert doc["geolocationlatitude"] == 32.9
+        assert doc["geolocationlongitude"] == -96.7
+
+    def test_unknown_nested_dict_with_scalar_subvalues_still_flattens(self):
+        """Any nested dict with scalar subvalues is flattened, not dropped."""
+        doc = self._build_account_doc(
+            {"SomeUnknownCompound": {"a": 1, "b": "two"}},
+            metadata_fields=["SomeUnknownCompound"],
+        )
+        assert doc["someunknowncompounda"] == 1
+        assert doc["someunknowncompoundb"] == "two"
+
+    def test_nested_list_attr_dropped_with_warning(self, caplog):
+        """A list with nested dicts inside must be dropped, not upserted."""
+        with caplog.at_level("WARNING", logger="lib.denormalize"):
+            doc = self._build_account_doc(
+                {"WeirdList": [{"a": 1}, {"b": 2}]},
+                metadata_fields=["WeirdList"],
+            )
+        assert "weirdlist" not in doc
+        assert any("WeirdList" in rec.message or "weirdlist" in rec.message for rec in caplog.records)
+
+    def test_scalar_list_attr_preserved(self):
+        """A list of pure scalars is accepted unchanged (tpuf supports scalar lists)."""
+        doc = self._build_account_doc(
+            {"Tags": ["enterprise", "vip"]},
+            metadata_fields=["Tags"],
+        )
+        assert doc["tags"] == ["enterprise", "vip"]
+
+    def test_deeply_nested_subvalue_in_compound_dropped_with_warning(self, caplog):
+        """If a compound subfield is itself nested, it gets dropped (with warning),
+        while scalar sibling subfields flatten normally."""
+        with caplog.at_level("WARNING", logger="lib.denormalize"):
+            doc = self._build_account_doc(
+                {"BillingAddress": {"City": "Plano", "Extra": {"x": 1}}},
+                metadata_fields=["BillingAddress"],
+            )
+        assert doc["billingcity"] == "Plano"
+        assert "billingextra" not in doc
+        assert any("Extra" in rec.message or "billingaddress" in rec.message for rec in caplog.records)
+
+    def test_parent_field_compound_also_flattens(self):
+        """Compound fields on parent lookups must flatten the same way."""
+        doc = build_document(
+            direct_fields={"Id": "a0A001", "LastModifiedDate": "2026-01-01"},
+            parent_fields={
+                "ascendix__Parent__c": {
+                    "Name": "Main Tower",
+                    "BillingAddress": {"City": "Plano", "State": "TX"},
+                }
+            },
+            text="t",
+            vector=[0.1] * 1024,
+            record_id="a0A001",
+            object_type="ascendix__Availability__c",
+            salesforce_org_id="00D001",
+            embed_field_names=[],
+            metadata_field_names=[],
+            parent_config={"ascendix__Parent__c": ["Name", "BillingAddress"]},
+        )
+        # Parent compound fields flatten under the parent prefix.
+        assert doc["parent_billingcity"] == "Plano"
+        assert doc["parent_billingstate"] == "TX"
+        assert "parent_billingaddress" not in doc
+
+
 class TestConstants:
     def test_embedding_model_id(self):
         assert EMBEDDING_MODEL_ID == "us.cohere.embed-v4:0"

@@ -5203,10 +5203,10 @@
         {
           "id": "4.35",
           "title": "Fix Turbopuffer schema failure on Account (and likely Contact) records with populated compound address fields",
-          "status": "pending",
+          "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-04-23T15:45:03.178700+00:00",
-          "updatedAt": "2026-04-23T15:46:24.675730+00:00",
+          "updatedAt": "2026-04-23T16:03:03.976352+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -5218,6 +5218,18 @@
             {
               "timestamp": "2026-04-23T15:46:24.675582+00:00",
               "note": "IMPLEMENTATION NOTES FOR FUTURE AGENT: (1) The error is at error: 'Failed to deserialize... AttrValueInput at line 1 column 7746' — that column offset is in the POST-denorm body, not raw CDC. To reproduce locally: download one failing CDC S3 key, run lib/denormalize.py against it to get the full doc, find the nested-dict attribute. (2) Salesforce compound fields documented at https://developer.salesforce.com/docs/atlas.en-us.api.meta/api/compound_fields.htm — address compounds include Billing/Shipping/Mailing/Other (each with Street/City/State/PostalCode/Country/GeocodeAccuracy subfields); geolocation compounds appear on custom __c fields with Latitude/Longitude subfields. (3) Existing bulk-loaded Accounts with populated BillingAddress are presumably already in Turbopuffer — either the bulk path handles flattening differently, or those records don't have BillingAddress populated (sandbox data is sparse). Worth checking a few bulk-loaded Account docs in the index to understand how their address data actually lives there — that tells us whether this is a regression from a recent CDC-path change or a longstanding bug that only triggers on fresh writes. (4) Check lib/denormalize.py specifically for how fields from SOQL describe results are serialized into Turbopuffer attrs — the flatten logic (if any) probably operates on field type codes from describe; compound field types may not have a type code mapping. (5) After the fix, consider whether a one-time full Account re-seed via bulk_load is needed to backfill any Accounts that silently failed or got partial documents during CDC. Not strictly part of this task — could be a follow-up."
+            },
+            {
+              "timestamp": "2026-04-23T15:53:11.316169+00:00",
+              "note": "Started by Todd Terry"
+            },
+            {
+              "timestamp": "2026-04-23T16:02:51.795797+00:00",
+              "note": "FIX LANDED 2026-04-23T15:59Z: lib/denormalize.py build_document now flattens SF compound address fields via new _emit_attr helper. Flattening uses SF-native scalar names (BillingAddress -> billingstreet/billingcity/billingstate/billingpostalcode/billingcountry) so attributes collide by name with the canonical scalar fields already selected — no duplicates. Non-address compounds fall back to prefix+subkey (geolocation -> geolocationlatitude). Nested lists and unknown nested dicts are dropped with WARNING log (defensive guard). 11 new unit tests in tests/test_denormalize.py::TestCompoundFieldFlattening all pass; full existing test suite (53 tests) still green. Bundle rebuilt and deployed: new CodeSha256 lzPUwqyY7CFx8pUftaENfru1uYVQJEEiLqwOAHU5Vc0=."
+            },
+            {
+              "timestamp": "2026-04-23T16:03:03.976147+00:00",
+              "note": "VALIDATION 2026-04-23T15:59Z: All 5 originally affected Account records successfully Upserted after fix deploy — Preston Park (001dl000013uCQvAAM), Cushman (001fk000002qDEfAAM), Rock Construction (001dl000013uhksAAA), PPFC Owner DE (001dl000013uCIoAAM post-address-edit), Concord Systems Group (001dl00000V1tBwAAJ discovered in DLQ during replay). DLQ depth 0 after cleanup. /query roundtrip validation per CLAUDE.md K-3: 'Tell me about Cushman and Wakefield in Chicago' returns '225 West Wacker Drive, Chicago, IL 60606' from flattened billingstreet/billingcity/billingstate/billingpostalcode attributes. 'Tell me about PPFC Owner DE' returns '1209 Orange Street, Wilmington, DE 19801' plus phone 800-555-6321, matching the user's 15:44Z edit exactly. CLAUDE.md rule 5 bundle update done (bundle_cdc_sync.sh unchanged since no new module imports; rebuild + deploy confirmed new code hash lzPUwqyY7CFx8pUftaENfru1uYVQJEEiLqwOAHU5Vc0=). Rule 6 (system prompt regen) NOT needed for this fix — flattened keys match canonical scalar field names that were already in the prompt vocabulary."
             }
           ],
           "description": "Discovered 2026-04-23 during second token-rotation recovery. Three Account CDC events were stuck in the DLQ with a Turbopuffer 422 UnprocessableEntityError: 'Failed to deserialize the JSON body into the target type: upsert_rows[0]: data did not match any variant of untagged enum AttrValueInput at line 1 column 7746'. Root cause hypothesis: compound address fields on Account (BillingAddress, ShippingAddress) arrive from Salesforce as nested JSON objects (e.g. {State, Street, PostalCode, City}), and the CDC denormalization path at lib/denormalize.py does not flatten them into scalar components before upsert. Turbopuffer attributes must be scalars or scalar lists; nested dicts are rejected. Pattern confirmed on four records: PPFC Owner DE LLC (no BillingAddress) succeeded on replay; Preston Park Asset Management, Cushman & Wakefield, and Rock Construction (all with populated BillingAddress) failed. Same class of bug likely affects Contact.MailingAddress, Contact.OtherAddress, and any compound geolocation fields. The raw CDC payloads are only 500-800 bytes so the error column 7746 in the outbound JSON means the compound field is being emitted after denorm enrichment, not pulled straight from CDC. This is a data-shape bug, not a token/auth bug — it would persist regardless of token freshness. Until fixed, any new Account/Contact with a populated compound address field is silently broken after 2-3 EventBridge retries. Bulk-loaded records that pre-existed are fine because the bulk path may have handled flattening differently (investigate).",
@@ -5231,7 +5243,8 @@
             "/query roundtrip validation per CLAUDE.md rule K-3: after replay, a natural-language query referencing one of the three records (e.g. 'Tell me about Cushman & Wakefield in Chicago') returns a result whose response text includes the city or state from the newly flattened field. Logs are not sufficient — user-visible /query behavior is the proof.",
             "Bundle update per CLAUDE.md rule 5 if any new module is imported by cdc_sync or poll_sync. Rebuild scripts/bundle_cdc_sync.sh and scripts/bundle_poll_sync.sh; confirm asset hash changed; note the hash in a progress note. Deploy both bundled Lambdas.",
             "Prompt-facing fields audit: if flattening exposes new queryable fields (BillingCity, BillingState) that were previously hidden behind the compound object, update lib/system_prompt.py aliases and regenerate docs/agent_prompt_export.md per CLAUDE.md rule 6."
-          ]
+          ],
+          "startedAt": "2026-04-23T15:53:11.316008+00:00"
         }
       ]
     },

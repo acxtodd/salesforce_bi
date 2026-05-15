@@ -4919,7 +4919,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-23T14:47:53.273718+00:00",
-          "updatedAt": "2026-04-23T14:49:04.803680+00:00",
+          "updatedAt": "2026-05-15T11:36:25.026575+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -4931,6 +4931,10 @@
             {
               "timestamp": "2026-04-23T14:49:04.803514+00:00",
               "note": "IMPLEMENTATION NOTES FOR FUTURE AGENT: (1) lib/query_handler.py is the orchestration layer; lib/tool_dispatch.py handles search_records/aggregate_records. Post-fetch could be injected either as a new tool ('fetch_record_details') the model calls explicitly, or as a transparent post-processing step after search_records returns. Transparent post-processing is simpler for the spike; explicit tool requires prompt changes and may be cleaner long-term. Recommend transparent for spike, revisit in go/no-go. (2) SF live fetch: the cdc_sync SalesforceClient wrapper (lambda/common/salesforce_client.py) supports describe + SOQL. For this spike, reuse that client rather than introducing GraphQL (reduces scope + moving parts; GraphQL comparison goes in the go/no-go doc). (3) Shadow namespace: Turbopuffer backend (lib/turbopuffer_backend.py) takes namespace as a constructor arg; /query Lambda reads SALESFORCE_ORG_ID and builds 'org_{id}'. Add a HYBRID_NAMESPACE_SUFFIX env var ('_shadow') to target the shadow namespace when flag is ON. (4) Shadow pointer: SSM parameter /salesforce-ai-search/config/{org_id}/shadow-version holds the candidate version_id; lib/runtime_config.py currently reads /active-version; add a shadow variant that reads /shadow-version when HYBRID_POSTFETCH_ENABLED=true. (5) Benchmark harness: reuse the pattern in tests/acceptance/ — they already drive /query with canned queries and capture metrics. Extend for dual-path."
+            },
+            {
+              "timestamp": "2026-05-15T11:36:25.026395+00:00",
+              "note": "STRATEGY GATE 2026-05-15: per Headless/MCP strategy approval, do not start this spike under the older 'slim-index + live fetch' framing until 4.38.2 updates it around semantic candidate retrieval plus live Salesforce detail fetch, freshness probes, attribute-cap relief, and REST vs GraphQL/UI API vs Apex/Aura facade comparison. Hosted MCP remains a potential exposure channel, not the primary retrieval runtime for this spike."
             }
           ],
           "description": "Current architecture pre-denormalizes ALL display fields into Turbopuffer (256-attribute namespace cap is biting at 4.25 and will bite harder as object count grows to 15). Agentic-landscape analysis (2026-04-23 session) surfaced a hybrid pattern: keep only embedding-relevant fields in Turbopuffer; fetch display fields live via GraphQL or REST after top-N retrieval. Also mitigates CDC freshness lag since display data would come from live SF. This task is a RISK-CONTAINED SPIKE on Sale only. Current production path MUST NOT be rewired. Success = measurable 256-cap relief + freshness improvement + acceptable p95 latency on Sale; output is a go/no-go recommendation for generalizing the pattern to other objects. If no-go, document why and keep the current path. No changes to the active compiled-artifact pointer, /query Lambda in prod, LWC, or Turbopuffer production namespace during the spike — use feature flags and a test-pointer or shadow namespace. Sale chosen because (a) 4.25 already exercises the 256-cap pressure, (b) Sylvan Ridge provides a deterministic correctness probe, (c) audit bucket has zero Sale docs so re-seed cost is bounded. Relates to architecture comparison in 2026-04-23 research session (GraphQL API, Hosted MCP Feb '26 GA, Agentforce, Data 360).",
@@ -4941,7 +4945,11 @@
             "Comparative benchmark executed with the feature flag OFF (production path, production namespace) and ON (hybrid path, shadow namespace + live fetch) on the SAME query set used for baseline. Captures for each variant: p50/p95/p99 end-to-end latency, Bedrock invoke count, Turbopuffer query count, SF API call count (describe + SOQL or GraphQL), token cost per query (input+output), correctness on freshness probes (stale Property address should read LIVE under hybrid, CDC-lagged under baseline). Benchmark script committed to scripts/ as run_hybrid_retrieval_benchmark.py so it can be re-run on other objects later. Results in docs/analysis/hybrid_retrieval_benchmark_sale.md.",
             "Go/no-go recommendation written in docs/analysis/hybrid_retrieval_recommendation.md covering: (a) does hybrid relieve the 256-attribute cap enough to unblock 4.25 and future Sale-like expansions, (b) is the latency penalty acceptable (threshold: p95 total must not regress more than 30% vs baseline; absolute p95 must stay under 2000ms for /query end-to-end), (c) what does this cost at 15-object scale (projected SF API call increase, projected Bedrock cost decrease from fewer indexed fields), (d) specific next-object order if go (likely Lease and Availability next, which are CDC-managed), (e) rollback plan if hybrid is partially adopted then regresses. If no-go, document the blocker and what external change (Hosted MCP GA, SF API limit changes, different retrieval shape) would reopen the question.",
             "Zero production impact: (a) production compiled-artifact active-version pointer is unchanged before, during, and after the spike (verify SSM parameter version number at start and end), (b) production Turbopuffer namespace org_{org_id} is untouched (shadow namespace used), (c) /query Lambda environment in production has HYBRID_POSTFETCH_ENABLED=false or unset, (d) LWC is untouched. If any production surface must change to enable benchmarking (e.g. Lambda env to add the flag), use merge-preserving env-bump pattern per CLAUDE.md rule 4. Clean up shadow pointer, shadow namespace, and any scratch artifacts at end of spike."
-          ]
+          ],
+          "depends_on": [
+            "4.38.2"
+          ],
+          "gate_criteria": "Do not start the Sale hybrid retrieval spike until 4.38.2 has updated 4.33 around live Salesforce detail fetch, freshness probes, and production-no-impact validation."
         },
         {
           "id": "4.33.1",
@@ -5084,7 +5092,7 @@
           "status": "pending",
           "owner": "Todd Terry",
           "createdAt": "2026-04-23T14:52:56.692266+00:00",
-          "updatedAt": "2026-04-23T14:54:12.843174+00:00",
+          "updatedAt": "2026-05-15T11:36:30.201473+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -5096,6 +5104,10 @@
             {
               "timestamp": "2026-04-23T14:54:12.842989+00:00",
               "note": "IMPLEMENTATION NOTES FOR FUTURE AGENT: (1) Read the 2026-04-23 agentic-landscape research before starting — the comparison matrix is the starting frame for the ADR. (2) Current 4.17 implementation reference points: salesforce/lwc/ascendixAiSearch/ (edit modal + form), lambda/query/ (propose_edit tool definition), lib/tool_dispatch.py (tool handler). The propose_edit tool returns a structured proposal; LWC renders the modal and on user approve issues the SF REST call. This is pattern A. (3) Prototype infra for pattern B: one API Gateway HTTP API route /edits/submit, one SQS standard queue salesforce-ai-search-edits-prototype with DLQ, one Lambda salesforce-ai-search-edit-processor-prototype (Python) that calls SalesforceClient.action_invoke or equivalent, one Apex Invocable test method @InvocableMethod(callout=false) that does a Lease single-field update WITH USER_MODE. Prototype should be in experiments/ or a throwaway CDK stack so it doesn't land in the main CDK app. (4) Token-expiry context: the 2026-04-22 outage would have been survived by pattern B (queue retries until token rotated) but not by pattern A (user sees error, must retry manually) nor by pattern D if Hosted MCP uses the same token path. This is a load-bearing argument for the ADR. (5) FLS/sharing: pattern A currently relies on whatever the LWC-authed user can do; pattern C enforces automatically via Apex USER_MODE; pattern B depends on whether the Lambda assumes user identity or runs with system perms. The latter is a real design choice to surface in the ADR. (6) Platform Events for result notification: see SFDC Platform Events + LWC empApi subscription pattern. Prototype can defer this and just poll; production would need it."
+            },
+            {
+              "timestamp": "2026-05-15T11:36:30.201297+00:00",
+              "note": "STRATEGY GATE 2026-05-15: per Headless/MCP strategy approval, do not start the write-path ADR/prototype under the older Salesforce-LWC-only framing until 4.38.3 updates it around downstream consumer write-back. The ADR must decide by use case across current LWC sync REST, GraphQL/UI API mutations, Apex Invocable Actions, Flows, Composite Graph, queued worker, and Hosted MCP exposure. The output should shape 4.17.7 and 4.17.8 before implementation starts."
             }
           ],
           "description": "Tasks 4.17.1-4.17.3 delivered the first cut of agent-proposed edits via LWC -> direct SF REST DML with a user-approval modal as the gate. The remaining 4.17 subtasks (4.17.4 propose_create, 4.17.6 multi-record sequential workflow, 4.17.8 structured write proposal transport) will lock in the write-path contract. Before that happens, evaluate whether the current sync-REST direction is right or whether to pivot to a queue-based pattern. Context: a prior-project SA argued strongly for NOT routing agent edits through direct API calls, instead staging transactions client-side, enqueuing them to a server-side queue, and processing via Lambda with server-to-server auth. That pattern is MORE relevant for agent-driven use cases than human-driven ones because: (1) agents chain edits (update Lease -> recompute Availability -> notify Contact) needing atomicity, (2) agent sessions are ephemeral so writes need to outlive them, (3) programmatic retry on transient SF failures like the 2026-04-22 token expiry outage, (4) governor-limit smoothing on bursts, (5) audit separation between 'what was proposed' and 'what was executed'. 2026 landscape adds new wrinkles: Salesforce Hosted MCP GA Feb '26 pushes the opposite (direct sync DML from agent), Composite Graph API offers SF-native multi-record atomicity, Apex Invocable Actions give FLS/sharing enforcement for free. Output: Architecture Decision Record + updated 4.17.6/4.17.8 specs matching the chosen direction. NO code rewire of the already-landed 4.17.1-4.17.3 during this task. This is a decision, a small prototype, and a spec update — not an implementation.",
@@ -5108,7 +5120,11 @@
             "4.17.4 (propose_create tool), 4.17.5 (create preview + NavigationMixin), 4.17.6 (multi-record sequential workflow), 4.17.7 (writable field metadata), and 4.17.8 (structured write proposal transport) descriptions + acceptance criteria are reviewed and updated where needed to match the decision. If pivot chosen, add explicit note to each that contract shape changed and why. Set depends_on 4.34 on any of 4.17.4 / 4.17.5 / 4.17.6 / 4.17.7 / 4.17.8 that are not yet started, to prevent drift.",
             "If decision is KEEP-SYNC, the ADR must document honestly WHY — not by default — including explicit acknowledgement of the SA pattern's arguments and what about this project makes them not apply. 'We already started this way' is not a sufficient reason. This AC exists to prevent the alternative being waved away.",
             "No changes to already-landed 4.17.1 (propose_edit tool), 4.17.2 (diff modal), or 4.17.3 (edit form modal) during this task. Those remain operational in prod. Any migration of those to the chosen pattern becomes a separate follow-up task after the decision lands."
-          ]
+          ],
+          "depends_on": [
+            "4.38.3"
+          ],
+          "gate_criteria": "Do not start the write-path ADR/prototype until 4.38.3 has reframed it around external downstream consumer write-back as well as Salesforce LWC edits."
         },
         {
           "id": "4.34.1",
@@ -5256,10 +5272,10 @@
         {
           "id": "4.36",
           "title": "Fix Ascendix default-layout parsing in config compiler so result-column boost actually lands",
-          "status": "pending",
+          "status": "in_progress",
           "owner": "Todd Terry",
           "createdAt": "2026-04-23T17:07:56.135031+00:00",
-          "updatedAt": "2026-04-23T17:40:58.550247+00:00",
+          "updatedAt": "2026-04-23T17:41:30.902903+00:00",
           "files_modified": [],
           "commits": [],
           "pull_requests": [],
@@ -5283,6 +5299,10 @@
             {
               "timestamp": "2026-04-23T17:39:02.607313+00:00",
               "note": "REVIEW RESPONSE 2 (2026-04-23): Codex raised two residual issues before implementation. Both accepted and folded into the ACs. (A) SOQL degradation: if fetch_ascendix_source adds managed-package fields (LayoutName__c / ObjectKeyPrefix__c / ResultColumns__c) that happen to be unavailable on some org/package version, the whole query fails before normalization. New AC15 requires clean degradation back to the current Name/Value__c-only path with an INFO log and a covering unit test. (B) AC13 was too broad — wholesale replacing docs/evidence/live_raw_source_snapshot.json could break its value as a broader evidence artifact with other consumers. AC13 narrowed to 'add a minimal targeted fixture under tests/fixtures/' additively; the broader snapshot is left alone. ACs 1-15 below are authoritative after this revision. Implementation sequence per Codex: (1) commit task-tracker update as its own isolated commit, (2) branch task-4.36-default-layout-prefix-fix, (3) AC1 + targeted fixture capture first, (4) confirm dry-run classification before deciding prompt-only vs field-scope path."
+            },
+            {
+              "timestamp": "2026-04-23T17:41:30.902906+00:00",
+              "note": "Started by Todd Terry"
             }
           ],
           "description": "Discovered 2026-04-23 while trying to surface ascendix__Description__c on Lease. User edited the Ascendix Search default view for Lease in the SF UI — correctly added ascendix__Description__c to SearchSetting__c row 'Default Layout Lease-a0V-816a1ed' (LastModifiedDate 2026-04-23T16:56:28Z). Running scripts/run_config_refresh.py compile against the live org produced a candidate Lease config IDENTICAL to the current active config — Description nowhere. Root cause: lib/config_refresh.py::_normalize_default_layouts uses display-name-based alias lookup that cannot match the real Ascendix Search row names (format: 'Default Layout {5-char-label-prefix}-{3-char-SF-key-prefix}-{7-char-hash}', e.g. 'Default Layout Lease-a0V-816a1ed'). Confirmed: normalized_source['default_layouts'] == {} against the live raw source payload. All 11 Default Layout rows in this org are silently skipped. Consequence: WEIGHT_ASCENDIX_RESULT_COL (+12) has never landed in this org; every object's compiled config is missing its default-layout column signal. Fix approach (authoritative plan is in the REVIEW RESPONSE progress note and ACs 1-14 below; earlier plan drafts and progress notes are historical only): extend fetch_ascendix_source to pull the authoritative package fields (ascendix_search__LayoutName__c / ObjectKeyPrefix__c / ResultColumns__c — already the canonical source per scripts/generate_denorm_config.py:813), precompute a key-prefix -> API-name map in compile_config_artifact, pass it into _normalize_default_layouts as an explicit argument so the normalizer stays pure and I/O-free. Keep legacy label-suffix matching as a fallback for older/mock fixtures. Classification expected from the dry-run: prompt_only (auto-apply per runbook) if pure default-layout changes, or field_scope_change (approval path) if the restored signal shifts scored fields across embed/metadata thresholds — the dry-run is the source of truth, not the plan.",
@@ -5302,7 +5322,334 @@
             "Add a minimal targeted live fixture (additive — do NOT wholesale replace existing evidence artifacts) under tests/fixtures/ capturing the post-edit Lease SearchSetting__c row. The fixture must include ascendix_search__ObjectKeyPrefix__c='a0V' and ascendix_search__ResultColumns__c listing 'ascendix__Description__c', plus at least one other object's default-layout row so the parameterized AC4 test has real data to cross-reference. docs/evidence/live_raw_source_snapshot.json is left untouched — it remains the broader evidence artifact for other consumers. The new fixture is scoped only to the default-layout test surface.",
             "Scope posture: this task is a compiler normalization BUGFIX that incidentally unblocks Description on Lease. It is NOT a pre-committed org-wide field-scope rollout. If the dry-run in AC7 reveals changes beyond the expected default-layout restoration (e.g. thresholds flipping fields between embed_fields and metadata_fields, unfamiliar fields surfacing), STOP and reassess BEFORE apply. Consider scoping apply via --objects ascendix__Lease__c to contain blast radius on the first pass, then iterating on the remaining 10 objects in follow-ups.",
             "SOQL degradation safety: fetch_ascendix_source must degrade cleanly when the managed-package fields (ascendix_search__LayoutName__c, ascendix_search__ObjectKeyPrefix__c, ascendix_search__ResultColumns__c) are unavailable on the target org or package version. Implementation: try the extended SOQL first; on a Salesforce 'INVALID_FIELD' / 'No such column' / equivalent error, log a single INFO that package fields are unavailable and fall back to the current Name/Value__c-only SOQL path. A unit test in tests/test_config_refresh.py mocks the sf client to raise INVALID_FIELD on the extended query and asserts (a) fetch_ascendix_source returns a valid source payload, (b) compile proceeds without crash, (c) legacy label-suffix matching still works so compile doesn't regress from current behavior. Do NOT let package-field unavailability brick the entire compile."
+          ],
+          "startedAt": "2026-04-23T17:41:30.902778+00:00"
+        },
+        {
+          "id": "4.37",
+          "title": "External media mirror for Property and Availability images",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-08T14:25:10.072818+00:00",
+          "updatedAt": "2026-05-08T14:31:41.786838+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [
+            {
+              "timestamp": "2026-05-08T14:31:41.786626+00:00",
+              "note": "Research update 2026-05-08: reviewed current Salesforce Headless 360 / Agentforce / MCP / Data 360 direction. Headless 360 positions Salesforce capabilities as APIs, MCP tools, or CLI commands; Agent API supports headless agent conversations from external websites/workflows; Hosted MCP Servers expose SObjects, Data 360, API Catalog, Flows, Invocable Actions, etc. with per-user auth/FLS/sharing; Data 360 MCP is Developer Preview and local/single-user today, with Data 360 APIs covering query, data streams, S3 ingestion, Data Actions, semantic models, AI/Search. Conclusion: these are strong agent/control-plane integration options but not a substitute for external URL-addressable media delivery. Keep AWS media mirror + /media/resolve as primary delivery path. Optional future: expose /media/resolve as a custom MCP/API Catalog tool for agents, and/or ingest S3 media manifests into Data 360 for agent/search context."
+            }
+          ],
+          "description": "Enable external consumers such as property portals and brochure generators to retrieve URL-addressable media for Property and Availability records returned by query results. Build a backend media mirror that discovers Salesforce media assets, copies supported binaries to AWS-managed storage, and exposes stable external URLs or signed URLs through a media manifest/API. Do not rely on Salesforce UI, Apex/LWC rendering, or authenticated Salesforce file URLs for external consumption. POC should seed demo images into the sandbox where needed because ascendix-beta-sandbox currently has sparse image data.",
+          "technical_context": "Research on 2026-05-08 found Salesforce CLI and AWS CLI access working. In ascendix-beta-sandbox, Property has ascendix__PrimaryImage__c plus Image_1__c..Image_5__c URL fields, but only one Property has ascendix__PrimaryImage__c populated and Image_1__c..Image_5__c are empty. Availability has ascendix__PrimaryImage__c but no populated values. ContentDocumentLink is richer but currently mostly PDFs: 128 Property file links (118 PDF, 10 SNOTE) and 306 Availability file links (all PDF). Two legacy image/jpeg Attachment records exist on Property a0afk000000PvnOAAS, and the populated Property primary image points at Attachment 00Pdl00001GCtTdEAL. Recommended implementation: seed POC images as Salesforce Files where possible, support legacy Attachment because Ascendix primary image may reference it, mirror binaries to S3 under a deterministic media prefix, write per-record manifests, and expose those manifests through a backend endpoint for external portals/brochure generators. Keep /query text retrieval unchanged; consumers call media lookup with record IDs returned by /query.",
+          "acceptance_criteria": [
+            "POC media seed exists in ascendix-beta-sandbox for representative Property and Availability records: at least 5 Properties have retrievable image assets, and at least 5 Availabilities either have direct image assets or intentionally rely on parent Property fallback.",
+            "Backend media discovery supports Salesforce Files via ContentDocumentLink -> ContentDocument.LatestPublishedVersionId -> ContentVersion.VersionData and legacy images via Attachment.Body, including the existing ascendix__PrimaryImage__c -> Attachment Id pattern.",
+            "Media binaries are mirrored to AWS-owned storage with deterministic keys, content type, source Salesforce IDs, source last-modified metadata, and idempotent overwrite/update behavior.",
+            "Per-record media manifests are produced for Property and Availability records, including kind, source, title, MIME type, file extension, size, source IDs, S3 key, sort order, and fallback relationship metadata when an Availability uses parent Property media.",
+            "External consumers can request media by Salesforce record ID through a backend interface and receive URL-addressable assets using pre-signed S3 URLs for POC, with CloudFront-compatible URL strategy documented for portal/brochure production use.",
+            "The /query answer and citation path remains text/record-ID focused; image binaries and Salesforce-authenticated download URLs are not passed through the model, Turbopuffer, SSE response, Apex, or LWC.",
+            "Validation demonstrates an external-style brochure or portal payload: run /query for Property/Availability records, call the media lookup with returned record IDs, and verify returned image URLs render without Salesforce authentication during their validity window.",
+            "External media resolver contract is explicit and tested: implement or document POST /media/resolve accepting recordIds, includeFallbacks, and urlMode (presigned for POC), and returning one entry per requested record with objectType, assets[], URL, expiresAt when applicable, source IDs, and fallbackFromRecordId/fallbackReason when media is inherited from a parent Property.",
+            "Architecture review explicitly evaluates Salesforce Headless 360, Agent API, Hosted MCP Servers, API Catalog, and Data 360 MCP/S3 ingestion options. Document why AWS media mirror + /media/resolve remains the primary external delivery path, and identify any optional future exposure of /media/resolve as an MCP/API Catalog tool or Data 360-ingested manifest without making those optional surfaces required for POC delivery."
           ]
+        },
+        {
+          "id": "4.37.1",
+          "title": "Media architecture and external resolver contract",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-08T15:18:30.282593+00:00",
+          "updatedAt": "2026-05-08T15:22:02.296845+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Turn the external media mirror epic into an implementation-ready contract. Decide storage location, manifest persistence, API shape, auth/security limits, URL TTL, allowed object types and MIME types, fallback semantics, deployment surface, and production CloudFront strategy before implementation starts. Include the Salesforce Headless 360 / Agent API / Hosted MCP / API Catalog / Data 360 review here so downstream implementation tasks do not re-litigate platform strategy.",
+          "technical_context": "This is the first assignable task under 4.37. Inputs: current 4.37 research notes, live org findings from 2026-05-08, existing AWS DataStack/API patterns, current /query citation contract, and Salesforce docs for Headless 360, Hosted MCP Servers, Agent API, API Catalog, and Data 360 MCP/S3 ingestion. Output should be a short architecture/spec doc plus any task updates needed for downstream tasks.",
+          "parent": "4.37",
+          "acceptance_criteria": [
+            "Architecture/spec doc is written under docs/specs or docs/architecture and names the chosen AWS storage location, manifest persistence model, sync/runtime entrypoint, API route, request and response payloads, URL mode, URL TTL, and production CloudFront strategy.",
+            "Security contract is explicit: allowed object types, allowed MIME types, max file size, max assets per record, URL TTL, no-public-bucket guarantee, API authentication model, abuse/rate limits, and how external consumers are authorized to request media for record IDs.",
+            "Fallback semantics are named precisely, including Availability -> parent Property lookup field, fallbackFromRecordId, fallbackReason, sort order, and behavior when direct and fallback media both exist.",
+            "Salesforce Headless 360, Agent API, Hosted MCP Servers, API Catalog, and Data 360 MCP/S3 ingestion are evaluated in the doc with a decision: primary POC path remains AWS media mirror + /media/resolve, and optional future MCP/API Catalog/Data 360 exposure is explicitly non-blocking.",
+            "Downstream tasks 4.37.2 through 4.37.5 have enough contract detail after this task to implement without reopening decisions about storage, manifests, auth, fallback, or endpoint behavior."
+          ]
+        },
+        {
+          "id": "4.37.2",
+          "title": "Sandbox media seed and discovery probe",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-08T15:19:03.534868+00:00",
+          "updatedAt": "2026-05-08T15:19:27.296959+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Seed representative image media into ascendix-beta-sandbox and prove the exact Salesforce discovery queries before building the mirror. Cover Property and Availability records, Salesforce Files, legacy Attachments, and the existing ascendix__PrimaryImage__c -> Attachment Id pattern. Produce read-only evidence after seeding plus cleanup/rollback notes.",
+          "technical_context": "Do not start until 4.37.1 defines the media contract. This task may mutate sandbox data for POC seeding, so it must name seed records, source image assets, naming conventions, and rollback/cleanup approach. Discovery evidence should use Salesforce CLI/API queries and avoid implementation in AWS.",
+          "parent": "4.37",
+          "acceptance_criteria": [
+            "Seed plan identifies source image files, target Property/Availability records, expected Salesforce storage method for each asset, naming convention, and cleanup/rollback steps before data is mutated.",
+            "At least 5 Properties and 5 Availabilities are represented in sandbox media evidence; Availabilities either have direct image media or explicit parent Property fallback coverage.",
+            "Discovery evidence proves Salesforce Files retrieval path through ContentDocumentLink, ContentDocument.LatestPublishedVersionId, and ContentVersion.VersionData for seeded image files.",
+            "Discovery evidence proves legacy Attachment retrieval path through Attachment.Body and includes the existing populated ascendix__PrimaryImage__c -> Attachment Id example if it remains present.",
+            "Evidence is saved under docs/evidence or an equivalent repo evidence path and records counts, sample IDs, storage type distribution, and any sandbox data mutations made for the POC."
+          ],
+          "depends_on": [
+            "4.37.1"
+          ],
+          "gate_criteria": "Media architecture contract approved"
+        },
+        {
+          "id": "4.37.3",
+          "title": "Media mirror library",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-08T15:19:32.470883+00:00",
+          "updatedAt": "2026-05-08T15:22:25.726732+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Implement the reusable backend library that discovers Salesforce media, downloads supported binaries safely, writes them to AWS-owned storage with deterministic keys, and builds per-record media manifests. This task owns core logic and unit tests, not API Gateway/CDK exposure.",
+          "technical_context": "Depends on 4.37.1 for the contract. Use or extend the existing backend Salesforce client carefully because current paths are JSON-oriented; ContentVersion.VersionData and Attachment.Body require binary-safe download support. Keep implementation reusable by Lambda handlers, scripts, and tests.",
+          "parent": "4.37",
+          "acceptance_criteria": [
+            "Library discovers media for allowed Property and Availability records using the Salesforce paths selected in 4.37.1 and proven in 4.37.2, including direct media and configured Availability parent fallback.",
+            "Binary-safe Salesforce download support exists for ContentVersion.VersionData and Attachment.Body without corrupting file bytes or assuming JSON responses.",
+            "S3 writes use deterministic keys, content type metadata, source Salesforce IDs, source last-modified/checksum metadata where available, and idempotent update behavior.",
+            "Manifest builder emits the fields defined in 4.37.1, including source IDs, S3 keys, kind, source, title, MIME type, size, sort order, and fallback metadata.",
+            "Focused unit tests cover discovery filtering, MIME/size rejection, deterministic key generation, idempotent writes, binary download handling, and fallback manifest generation."
+          ],
+          "depends_on": [
+            "4.37.1",
+            "4.37.2"
+          ],
+          "gate_criteria": "Architecture contract and sandbox discovery evidence complete"
+        },
+        {
+          "id": "4.37.4",
+          "title": "/media/resolve API and CDK wiring",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-08T15:20:06.529582+00:00",
+          "updatedAt": "2026-05-08T15:20:33.060936+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Expose the media mirror through a backend resolver API for external consumers. Add the Lambda/API/CDK/IAM surface, request validation, presigned URL generation, and handler tests according to the 4.37.1 contract. This task does not own the core mirror library implementation.",
+          "technical_context": "Depends on 4.37.1 and should integrate with 4.37.3. Follow existing ApiStack/Lambda patterns in the repo. Keep /query unchanged; /media/resolve accepts record IDs and returns URL-addressable media manifests for external portals or brochure generators.",
+          "parent": "4.37",
+          "acceptance_criteria": [
+            "API handler implements the 4.37.1 request/response contract for POST /media/resolve, including recordIds, includeFallbacks, urlMode, per-record results, assets[], and structured per-record errors.",
+            "Request validation enforces allowed object ID prefixes/types, max record IDs per request, urlMode allowlist, and reject-safe behavior for unsupported inputs.",
+            "Presigned URL generation uses the TTL and bucket/key policy from 4.37.1, never exposes Salesforce-authenticated download URLs, and does not require the caller to have Salesforce credentials.",
+            "CDK adds the required Lambda/API route/IAM/env vars using existing stack patterns, with least-privilege access to media storage and any required Salesforce secrets/SSM parameters.",
+            "Handler and infrastructure tests cover successful resolution, no-media records, fallback media, invalid requests, URL expiry fields, and storage/API permission assumptions."
+          ],
+          "depends_on": [
+            "4.37.1",
+            "4.37.3"
+          ],
+          "gate_criteria": "Architecture contract and media mirror library ready"
+        },
+        {
+          "id": "4.37.5",
+          "title": "External media validation and evidence",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-08T15:20:38.817370+00:00",
+          "updatedAt": "2026-05-08T15:21:03.427689+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Validate the full external-consumer flow after seed, mirror, and API work are complete. Run /query to obtain Property/Availability record IDs, call /media/resolve with those IDs, verify returned URLs render without Salesforce authentication during the validity window, and document evidence for portal/brochure-generator consumption.",
+          "technical_context": "This is the close-out validation task for 4.37 and should not start until the sandbox seed, mirror library, and API/CDK surface are complete. Evidence should include request/response samples, URL render checks, negative/no-media cases, and any remaining production hardening gaps.",
+          "parent": "4.37",
+          "acceptance_criteria": [
+            "Validation starts from a realistic /query response for Property/Availability records and uses returned record IDs as input to /media/resolve.",
+            "Returned media URLs render or download without Salesforce authentication during their validity window, and expired/invalid URL behavior is documented.",
+            "Evidence covers direct Property media, direct Availability media if seeded, Availability parent Property fallback, no-media records, and unsupported/non-image files where applicable.",
+            "Validation artifact is saved under docs/evidence or docs/testing and includes sample requests, sample responses, record IDs, media source types, S3 keys or redacted URL examples, and remaining production readiness notes.",
+            "Task 4.37 is not marked complete until this validation evidence exists and the parent task has a progress note pointing to the evidence location."
+          ],
+          "depends_on": [
+            "4.37.2",
+            "4.37.3",
+            "4.37.4"
+          ],
+          "gate_criteria": "Seed, mirror library, and API resolver implementation complete"
+        },
+        {
+          "id": "4.38",
+          "title": "Salesforce Headless/MCP strategy validation and roadmap alignment",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-15T11:33:33.206652+00:00",
+          "updatedAt": "2026-05-15T11:36:20.458305+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Convert the 2026-05-15 Salesforce Headless 360 / Hosted MCP strategy into an evidence-backed roadmap. Validate which Salesforce headless surfaces should augment AscendixIQ for freshness, auto-configuration, answer accuracy, and downstream record editing. This is a strategy and proof-point workstream, not a wholesale rewrite of the current Turbopuffer-backed query architecture.",
+          "acceptance_criteria": [
+            "Capability matrix classifies Hosted MCP, Agent API, GraphQL/UI API, Pub/Sub API, API Catalog, Apex Invocable Actions, Flows, Composite Graph, Data 360 MCP, and Salesforce CLI/headless tooling as use-now, spike, defer, or avoid for freshness, auto-configuration, accuracy, and downstream editing.",
+            "Existing tasks 4.33 and 4.34 are updated or explicitly superseded so hybrid live-fetch and write-back ADR work reflects the approved Headless/MCP strategy rather than older assumptions.",
+            "At least two hands-on proof points are executed or scoped with concrete validation plans: Hosted MCP sandbox proof and Pub/Sub API CDC spike.",
+            "External downstream write-back contract is drafted with propose, approve_or_submit, status, cancel, and audit surfaces, independent of whether execution uses Apex, GraphQL, Composite Graph, queued Lambda, or Hosted MCP behind the scenes.",
+            "Final recommendation identifies which bets are go, probe, defer, or avoid, and creates or updates follow-up tasks without starting implementation."
+          ],
+          "references": [
+            "docs/analysis/salesforce_headless_mcp_strategy_20260515.md",
+            "/Users/toddadmin/GitHub/aws_strands_poc/results/20260514_182215_salesforce-mcp-for-ascendixre-customers"
+          ]
+        },
+        {
+          "id": "4.38.1",
+          "title": "Headless capability matrix",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-15T11:34:01.138062+00:00",
+          "updatedAt": "2026-05-15T11:34:48.831234+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Produce an evidence-backed capability matrix for Salesforce Headless 360 surfaces against AscendixIQ goals: freshness, auto-configuration, accuracy, and downstream record editing. Classify each surface as use-now, spike, defer, or avoid, citing official docs and any sandbox evidence.",
+          "parent": "4.38",
+          "acceptance_criteria": [
+            "Matrix covers Hosted MCP, Agent API, GraphQL/UI API, Pub/Sub API, API Catalog, Apex Invocable Actions, Flows, Composite Graph, Data 360 MCP, and CLI/headless tooling.",
+            "Each surface is classified as use-now, spike, defer, or avoid for freshness, auto-configuration, accuracy, and downstream editing, with rationale and official-source links.",
+            "Output explicitly distinguishes product runtime, admin/customer integration channel, developer tooling, and future platform option so MCP is not treated as a single undifferentiated capability."
+          ]
+        },
+        {
+          "id": "4.38.2",
+          "title": "Reframe 4.33 hybrid live-fetch spike",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-15T11:34:06.893710+00:00",
+          "updatedAt": "2026-05-15T11:34:58.976676+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Update the existing 4.33 Sale spike so it explicitly proves semantic candidate retrieval plus live Salesforce detail fetch for freshness, accuracy, and Turbopuffer attribute-cap relief. The revised task should compare REST, GraphQL/UI API, and packaged Apex/Aura facade options where feasible while keeping production unchanged.",
+          "parent": "4.38",
+          "acceptance_criteria": [
+            "Task 4.33 title, description, and acceptance criteria are reviewed and updated where needed to center the spike on semantic retrieval plus live Salesforce detail fetch.",
+            "Reframed 4.33 includes freshness probes, Turbopuffer attribute-count relief, latency/API-cost measurement, and a clear production-no-impact envelope.",
+            "Reframed 4.33 compares REST, GraphQL/UI API, and packaged Apex/Aura facade options where feasible, or explicitly documents why an option is deferred."
+          ]
+        },
+        {
+          "id": "4.38.3",
+          "title": "Reframe 4.34 write-path ADR around downstream consumers",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-15T11:34:11.298764+00:00",
+          "updatedAt": "2026-05-15T11:35:11.120529+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Update the existing 4.34 write-path ADR/prototype task so it evaluates external downstream consumer write-back, not only Salesforce LWC edits. The ADR should decide by use case across current LWC sync REST, GraphQL/UI API mutations, Apex Invocable Actions, Flows, Composite Graph, queued worker, and Hosted MCP exposure.",
+          "parent": "4.38",
+          "acceptance_criteria": [
+            "Task 4.34 title, description, and acceptance criteria are reviewed and updated where needed to evaluate downstream app write-back in addition to Salesforce LWC edits.",
+            "Reframed 4.34 decision matrix compares current LWC sync REST, GraphQL/UI API mutations, Apex Invocable Actions, Flows, Composite Graph, queued worker, and Hosted MCP exposure by use case.",
+            "Reframed 4.34 identifies which 4.17 subtasks remain gated and which proposal/transport contracts must change before implementation starts."
+          ]
+        },
+        {
+          "id": "4.38.4",
+          "title": "Hosted MCP sandbox proof",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-15T11:34:15.845889+00:00",
+          "updatedAt": "2026-05-15T11:35:22.058813+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "In an Enterprise or Developer sandbox where Hosted MCP is available, enable a narrow custom MCP server with one read-only Named Query or SObject-read tool and one safe packaged Apex Invocable Action or Flow. Validate setup friction, OAuth/PKCE behavior, FLS/sharing enforcement, tool descriptions, audit trail, and client behavior using Postman, MCP Inspector, Claude, or another MCP-compatible client.",
+          "parent": "4.38",
+          "acceptance_criteria": [
+            "Hosted MCP server is enabled in an eligible sandbox or the blocker is documented with exact edition/permission/setup evidence.",
+            "One read-only tool and one safe action tool are exposed through a custom MCP server and invoked from at least one MCP-compatible client or test tool.",
+            "Evidence records auth setup, FLS/sharing behavior, tool descriptions, audit trail, packaging/admin friction, and whether ISV-managed package assets can be exposed cleanly."
+          ]
+        },
+        {
+          "id": "4.38.5",
+          "title": "Pub/Sub API CDC spike",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-15T11:34:20.112430+00:00",
+          "updatedAt": "2026-05-15T11:35:31.750760+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Build or specify a tiny Pub/Sub API subscriber for one Salesforce CDC object and compare it against the current AppFlow -> S3 -> EventBridge path for latency, replay behavior, flow control, operational complexity, authentication, alerting, and recovery after downtime. Output a go/probe/defer recommendation for replacing or supplementing AppFlow CDC.",
+          "parent": "4.38",
+          "acceptance_criteria": [
+            "A one-object Pub/Sub API CDC subscriber is implemented or specified deeply enough to validate auth, replay, schema handling, and event processing against the sandbox.",
+            "Comparison against AppFlow covers latency, replay after downtime, failure detection, operational burden, deployment complexity, and cost/API entitlement risk.",
+            "Output recommends replace, supplement, or defer for Pub/Sub API CDC, with rollback and coexistence considerations."
+          ]
+        },
+        {
+          "id": "4.38.6",
+          "title": "External write proposal API contract",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-15T11:34:24.465013+00:00",
+          "updatedAt": "2026-05-15T11:35:41.541959+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Draft the downstream-consumer write-back contract for AscendixIQ as a platform API. Define propose, approve_or_submit, status, cancel, and audit surfaces; payload shape; idempotency keys; user/context model; approval semantics; error handling; and execution abstraction so the backing implementation can be Apex, GraphQL, Composite Graph, queued Lambda, or Hosted MCP.",
+          "parent": "4.38",
+          "acceptance_criteria": [
+            "Contract defines propose, approve_or_submit, status, cancel, and audit operations with request/response examples.",
+            "Contract covers user/context identity, approval semantics, idempotency, async status, partial failure handling, Salesforce record links, and audit evidence.",
+            "Contract deliberately separates proposal generation from execution backend so Apex, GraphQL, Composite Graph, queued Lambda, and Hosted MCP remain interchangeable implementation choices."
+          ]
+        },
+        {
+          "id": "4.38.7",
+          "title": "Final Headless/MCP roadmap recommendation",
+          "status": "pending",
+          "owner": "Todd Terry",
+          "createdAt": "2026-05-15T11:34:28.481200+00:00",
+          "updatedAt": "2026-05-15T11:36:07.878017+00:00",
+          "files_modified": [],
+          "commits": [],
+          "pull_requests": [],
+          "progress_notes": [],
+          "description": "Synthesize the capability matrix, task reframes, Hosted MCP proof, Pub/Sub spike, and external write API contract into a final roadmap recommendation. Identify go/probe/defer/avoid decisions, update or create follow-up tasks, and preserve the strategy in docs without starting implementation.",
+          "parent": "4.38",
+          "acceptance_criteria": [
+            "Final recommendation summarizes evidence from 4.38.1 through 4.38.6 and classifies each strategic bet as go, probe, defer, or avoid.",
+            "Roadmap is updated with approved follow-up tasks and explicit deferrals; no implementation starts as part of the recommendation task.",
+            "Strategy document docs/analysis/salesforce_headless_mcp_strategy_20260515.md is updated if findings materially change the initial recommendation."
+          ],
+          "depends_on": [
+            "4.38.1",
+            "4.38.2",
+            "4.38.3",
+            "4.38.4",
+            "4.38.5",
+            "4.38.6"
+          ],
+          "gate_criteria": "Final recommendation must synthesize the capability matrix, task reframes, Hosted MCP proof, Pub/Sub spike, and write API contract before closing."
         }
       ]
     },
@@ -5467,7 +5814,7 @@
       "3.3.2.": 10,
       "3.2.": 2,
       "3.": 8,
-      "4.": 37,
+      "4.": 39,
       "4.3.": 2,
       "4.6.": 6,
       "4.6.5.": 5,
@@ -5482,7 +5829,9 @@
       "4.16.": 6,
       "4.25.": 2,
       "4.33.": 7,
-      "4.34.": 5
+      "4.34.": 5,
+      "4.37.": 6,
+      "4.38.": 8
     }
   }
 }
